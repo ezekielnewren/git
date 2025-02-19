@@ -23,21 +23,16 @@ fn xdl_hash_record_with_whitespace(slice: &[u8], flags: u64) -> (u64, usize) {
 			}
 		} else if XDL_ISSPACE(slice[range.start]) {
 			let mut ptr2 = range.start;
-			let at_eol: bool;
 			while range.start + 1 < range.end && XDL_ISSPACE(slice[range.start + 1]) && slice[range.start + 1] != b'\n' {
 				range.start += 1;
 			}
-			at_eol = range.end <= range.start + 1 || slice[range.start + 1] == b'\n';
+			let at_eol = range.end <= range.start + 1 || slice[range.start + 1] == b'\n';
 			if (flags & XDF_IGNORE_WHITESPACE) != 0 {
 				/* already handled */
 			} else if (flags & XDF_IGNORE_WHITESPACE_CHANGE) != 0 && !at_eol {
-				// hash += hash << 5;
-				// hash ^= b' ' as u64;
 				hash = hash.overflowing_mul(33).0 ^ b' ' as u64;
 			} else if (flags & XDF_IGNORE_WHITESPACE_AT_EOL) != 0 && !at_eol {
 				while ptr2 != range.start + 1 {
-					// hash += hash << 5;
-					// hash ^= *ptr2 as u64;
 					hash = hash.overflowing_mul(33).0 ^ slice[ptr2] as u64;
 					ptr2 += 1;
 				}
@@ -45,8 +40,6 @@ fn xdl_hash_record_with_whitespace(slice: &[u8], flags: u64) -> (u64, usize) {
 			range.start += 1;
 			continue;
 		}
-		// hash += hash << 5;
-		// hash ^= *ptr as u64;
 		hash = hash.overflowing_mul(33).0 ^ slice[range.start] as u64;
 		range.start += 1;
 	}
@@ -83,12 +76,8 @@ mod tests {
 	fn test_xdl_hash_record() {
 		let file = "This is\nsome text for \n xdl_hash_record() to \r\nchew on.";
 		let slice = file.as_bytes();
-		unsafe {
-			// let mut data = slice.as_ptr();
-			// let top = data.add(slice.len());
-			let (line_hash, with_eol) = xdl_hash_record(slice, 0);
-			assert_ne!(0, line_hash);
-		}
+		let (line_hash, _with_eol) = xdl_hash_record(slice, 0);
+		assert_ne!(0, line_hash);
 	}
 
 }
