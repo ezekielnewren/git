@@ -171,7 +171,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		rust_ivec_push(&xdf->useless, &rec);
 	}
 
-	xdf->nrec = xdf->record.length;
 	xdf->recs = xdf->useless.ptr;
 	xdf->rchg = (char *) (xdf->rchg_vec.ptr + 1);
 	xdf->dstart = 0;
@@ -209,14 +208,14 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		return -1;
 	}
 
-	if (xdl_init_classifier(&cf, xe->xdf1.nrec + xe->xdf2.nrec + 1, xpp->flags) < 0)
+	if (xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length + 1, xpp->flags) < 0)
 		return -1;
 
-	for (usize i = 0; i < xe->xdf1.nrec; i++) {
+	for (usize i = 0; i < xe->xdf1.record.length; i++) {
 		xrecord_t *rec = xe->xdf1.recs[i];
 		xdl_classify_record(1, &cf, rec);
 	}
-	for (usize i = 0; i < xe->xdf2.nrec; i++) {
+	for (usize i = 0; i < xe->xdf2.record.length; i++) {
 		xrecord_t *rec = xe->xdf2.recs[i];
 		xdl_classify_record(2, &cf, rec);
 	}
@@ -313,12 +312,12 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 	xdlclass_t *rcrec;
 	char *dis, *dis1, *dis2;
 
-	if (!XDL_CALLOC_ARRAY(dis, xdf1->nrec + xdf2->nrec + 2))
+	if (!XDL_CALLOC_ARRAY(dis, xdf1->record.length + xdf2->record.length + 2))
 		return -1;
 	dis1 = dis;
-	dis2 = dis1 + xdf1->nrec + 1;
+	dis2 = dis1 + xdf1->record.length + 1;
 
-	if ((mlim = xdl_bogosqrt(xdf1->nrec)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(xdf1->record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xdf1->dstart, recs = &xdf1->recs[xdf1->dstart]; i <= xdf1->dend; i++, recs++) {
 		rcrec = cf->rcrecs[(*recs)->hash];
@@ -326,7 +325,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 		dis1[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	if ((mlim = xdl_bogosqrt(xdf2->nrec)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(xdf2->record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xdf2->dstart, recs = &xdf2->recs[xdf2->dstart]; i <= xdf2->dend; i++, recs++) {
 		rcrec = cf->rcrecs[(*recs)->hash];
@@ -369,21 +368,21 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
 
 	recs1 = xdf1->recs;
 	recs2 = xdf2->recs;
-	for (i = 0, lim = XDL_MIN(xdf1->nrec, xdf2->nrec); i < lim;
+	for (i = 0, lim = XDL_MIN(xdf1->record.length, xdf2->record.length); i < lim;
 	     i++, recs1++, recs2++)
 		if ((*recs1)->hash != (*recs2)->hash)
 			break;
 
 	xdf1->dstart = xdf2->dstart = i;
 
-	recs1 = xdf1->recs + xdf1->nrec - 1;
-	recs2 = xdf2->recs + xdf2->nrec - 1;
+	recs1 = xdf1->recs + xdf1->record.length - 1;
+	recs2 = xdf2->recs + xdf2->record.length - 1;
 	for (lim -= i, i = 0; i < lim; i++, recs1--, recs2--)
 		if ((*recs1)->hash != (*recs2)->hash)
 			break;
 
-	xdf1->dend = xdf1->nrec - i - 1;
-	xdf2->dend = xdf2->nrec - i - 1;
+	xdf1->dend = xdf1->record.length - i - 1;
+	xdf2->dend = xdf2->record.length - i - 1;
 
 	return 0;
 }
