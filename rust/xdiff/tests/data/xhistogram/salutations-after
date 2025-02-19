@@ -1,0 +1,9 @@
+void hello(void)
+{
+    printf("hello\n");
+}
+
+void bye(void)
+{
+    printf("goodbye\n");
+}
