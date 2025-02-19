@@ -161,8 +161,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	rust_ivec_resize_exact(&xdf->rchg_vec, xdf->record.length + 2, &default_value);
 
-	if ((XDF_DIFF_ALG(flags) != XDF_PATIENCE_DIFF) &&
-	    (XDF_DIFF_ALG(flags) != XDF_HISTOGRAM_DIFF)) {
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length + 1);
 		rust_ivec_reserve_exact(&xdf->hash, xdf->record.length + 1);
 	}
