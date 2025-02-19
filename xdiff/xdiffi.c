@@ -337,7 +337,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = xe->xdf1.nreff + xe->xdf2.nreff + 3;
+	ndiags = xe->xdf1.rindex.length + xe->xdf2.rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
 		xdl_free_env(xe);
@@ -345,8 +345,8 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += xe->xdf2.nreff + 1;
-	kvdb += xe->xdf2.nreff + 1;
+	kvdf += xe->xdf2.rindex.length + 1;
+	kvdb += xe->xdf2.rindex.length + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -354,14 +354,14 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.snake_cnt = XDL_SNAKE_CNT;
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
-	dd1.nrec = xe->xdf1.nreff;
+	dd1.nrec = xe->xdf1.rindex.length;
 	dd1.hash = xe->xdf1.hash;
 	dd1.rchg = xe->xdf1.rchg;
-	dd1.rindex = xe->xdf1.rindex;
-	dd2.nrec = xe->xdf2.nreff;
+	dd1.rindex = xe->xdf1.rindex.ptr;
+	dd2.nrec = xe->xdf2.rindex.length;
 	dd2.hash = xe->xdf2.hash;
 	dd2.rchg = xe->xdf2.rchg;
-	dd2.rindex = xe->xdf2.rindex;
+	dd2.rindex = xe->xdf2.rindex.ptr;
 
 	res = xdl_recs_cmp(&dd1, 0, dd1.nrec, &dd2, 0, dd2.nrec,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,

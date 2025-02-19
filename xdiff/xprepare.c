@@ -21,7 +21,7 @@
  */
 
 #include "xinclude.h"
-
+#include "ivec.h"
 
 #define XDL_KPDIS_RUN 4
 #define XDL_MAX_EQLIMIT 1024
@@ -160,10 +160,9 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 	xrecord_t **rhash;
 	u64 *hash;
 	char *rchg;
-	long *rindex;
 
+	IVEC_INIT(xdf->rindex);
 	hash = NULL;
-	rindex = NULL;
 	rchg = NULL;
 	rhash = NULL;
 	recs = NULL;
@@ -201,8 +200,7 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 
 	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF)) {
-		if (!XDL_ALLOC_ARRAY(rindex, nrec + 1))
-			goto abort;
+		rust_ivec_reserve_exact(&xdf->rindex, nrec + 1);
 		if (!XDL_ALLOC_ARRAY(hash, nrec + 1))
 			goto abort;
 	}
@@ -212,8 +210,6 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 	xdf->hbits = hbits;
 	xdf->rhash = rhash;
 	xdf->rchg = rchg + 1;
-	xdf->rindex = rindex;
-	xdf->nreff = 0;
 	xdf->hash = hash;
 	xdf->dstart = 0;
 	xdf->dend = nrec - 1;
@@ -222,8 +218,8 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 
 abort:
 	xdl_free(hash);
-	xdl_free(rindex);
 	xdl_free(rchg);
+	rust_ivec_free(&xdf->rindex);
 	xdl_free(rhash);
 	xdl_free(recs);
 	xdl_cha_free(&xdf->rcha);
@@ -234,8 +230,8 @@ abort:
 static void xdl_free_ctx(xdfile_t *xdf) {
 
 	xdl_free(xdf->rhash);
-	xdl_free(xdf->rindex);
 	xdl_free(xdf->rchg - 1);
+	rust_ivec_free(&xdf->rindex);
 	xdl_free(xdf->hash);
 	xdl_free(xdf->recs);
 	xdl_cha_free(&xdf->rcha);
@@ -394,25 +390,25 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 	     i <= xdf1->dend; i++, recs++) {
 		if (dis1[i] == 1 ||
 		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, xdf1->dstart, xdf1->dend))) {
-			xdf1->rindex[nreff] = i;
+			xdf1->rindex.ptr[nreff] = i;
 			xdf1->hash[nreff] = (*recs)->hash;
 			nreff++;
 		} else
 			xdf1->rchg[i] = 1;
 	}
-	xdf1->nreff = nreff;
+	xdf1->rindex.length = nreff;
 
 	for (nreff = 0, i = xdf2->dstart, recs = &xdf2->recs[xdf2->dstart];
 	     i <= xdf2->dend; i++, recs++) {
 		if (dis2[i] == 1 ||
 		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, xdf2->dstart, xdf2->dend))) {
-			xdf2->rindex[nreff] = i;
+			xdf2->rindex.ptr[nreff] = i;
 			xdf2->hash[nreff] = (*recs)->hash;
 			nreff++;
 		} else
 			xdf2->rchg[i] = 1;
 	}
-	xdf2->nreff = nreff;
+	xdf2->rindex.length = nreff;
 
 	xdl_free(dis);
 

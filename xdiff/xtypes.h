@@ -24,6 +24,7 @@
 #define XTYPES_H
 
 #include "../rust/header/types.h"
+#include "ivec.h"
 
 typedef struct s_chanode {
 	struct s_chanode *next;
@@ -53,8 +54,7 @@ typedef struct s_xdfile {
 	long dstart, dend;
 	xrecord_t **recs;
 	char *rchg;
-	long *rindex;
-	long nreff;
+	ivec_isize rindex;
 	u64 *hash;
 } xdfile_t;
 
