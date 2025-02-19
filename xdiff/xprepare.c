@@ -133,10 +133,16 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, xrecord_t
 }
 
 
+#ifndef NO_RUST
+u64 rust_xdl_hash_record(char const **data, char const *top, long flags);
+#endif
+
+
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	long bsize;
-	u64 hav;
-	char const *blk, *cur, *top, *prev;
+	u64 c_hash;
+	u64 rust_hash;
+	char const *blk, *cur, *top, *prev, *tmp;
 	u8 default_value = 0;
 
 	IVEC_INIT(xdf->record);
@@ -148,10 +154,21 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		for (top = blk + bsize; cur < top; ) {
 			xrecord_t crec;
 			prev = cur;
-			hav = xdl_hash_record(&cur, top, flags);
+#ifdef NO_RUST
+			c_hash = xdl_hash_record(&cur, top, flags);
+#else
+			tmp = cur;
+			rust_hash = rust_xdl_hash_record(&tmp, top, flags);
+			tmp = cur;
+			c_hash = xdl_hash_record(&tmp, top, flags);
+			if (rust_hash != c_hash) {
+				BUG("c and rust disagree on the line hash");
+			}
+			cur = tmp;
+#endif
 			crec.ptr = (u8 *) prev;
 			crec.size = (long) (cur - prev);
-			crec.hash = hav;
+			crec.hash = c_hash;
 			crec.flags = flags;
 			rust_ivec_push(&xdf->record, &crec);
 		}

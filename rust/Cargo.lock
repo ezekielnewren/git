@@ -20,4 +20,5 @@ name = "xdiff"
 version = "0.1.0"
 dependencies = [
  "interop",
+ "libc",
 ]
