@@ -46,11 +46,15 @@ typedef struct {
 	u64 flags;
 } xrecord_t;
 
+DEFINE_IVEC_TYPE(xrecord_t, xrecord_t);
+DEFINE_IVEC_TYPE(xrecord_t*, xrecord_ptr_t);
+
 typedef struct s_xdfile {
-	chastore_t rcha;
+	ivec_xrecord_t record;
+	ivec_xrecord_ptr_t useless;
 	long nrec;
-	long dstart, dend;
 	xrecord_t **recs;
+	long dstart, dend;
 	ivec_u8 rchg_vec;
 	char *rchg;
 	ivec_isize rindex;

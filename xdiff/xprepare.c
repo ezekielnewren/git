@@ -134,66 +134,51 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, xrecord_t
 
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
-	long narec;
-	long nrec, bsize;
+	long bsize;
 	u64 hav;
 	char const *blk, *cur, *top, *prev;
-	xrecord_t *crec;
-	xrecord_t **recs;
 	u8 default_value = 0;
 
+	IVEC_INIT(xdf->record);
+	IVEC_INIT(xdf->useless);
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->hash);
 	IVEC_INIT(xdf->rchg_vec);
-	recs = NULL;
-	narec = 4;
 
-	if (xdl_cha_init(&xdf->rcha, sizeof(xrecord_t), narec / 4 + 1) < 0)
-		goto abort;
-	if (!XDL_ALLOC_ARRAY(recs, narec))
-		goto abort;
-
-	nrec = 0;
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
 		for (top = blk + bsize; cur < top; ) {
+			xrecord_t crec;
 			prev = cur;
 			hav = xdl_hash_record(&cur, top, flags);
-			if (XDL_ALLOC_GROW(recs, nrec + 1, narec))
-				goto abort;
-			if (!(crec = xdl_cha_alloc(&xdf->rcha)))
-				goto abort;
-			crec->ptr = (u8 *) prev;
-			crec->size = (long) (cur - prev);
-			crec->hash = hav;
-			crec->flags = flags;
-			recs[nrec++] = crec;
+			crec.ptr = (u8 *) prev;
+			crec.size = (long) (cur - prev);
+			crec.hash = hav;
+			crec.flags = flags;
+			rust_ivec_push(&xdf->record, &crec);
 		}
 	}
 
 
-	rust_ivec_resize_exact(&xdf->rchg_vec, nrec + 2, &default_value);
+	rust_ivec_resize_exact(&xdf->rchg_vec, xdf->record.length + 2, &default_value);
 
 	if ((XDF_DIFF_ALG(flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(flags) != XDF_HISTOGRAM_DIFF)) {
-		rust_ivec_reserve_exact(&xdf->rindex, nrec + 1);
-		rust_ivec_reserve_exact(&xdf->hash, nrec + 1);
+		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length + 1);
+		rust_ivec_reserve_exact(&xdf->hash, xdf->record.length + 1);
 	}
 
-	xdf->nrec = nrec;
-	xdf->recs = recs;
+	for (usize i = 0; i < xdf->record.length; i++) {
+		xrecord_t *rec = &xdf->record.ptr[i];
+		rust_ivec_push(&xdf->useless, &rec);
+	}
+
+	xdf->nrec = xdf->record.length;
+	xdf->recs = xdf->useless.ptr;
 	xdf->rchg = (char *) (xdf->rchg_vec.ptr + 1);
 	xdf->dstart = 0;
-	xdf->dend = nrec - 1;
+	xdf->dend = xdf->record.length - 1;
 
 	return 0;
-
-abort:
-	rust_ivec_free(&xdf->rchg_vec);
-	rust_ivec_free(&xdf->rindex);
-	rust_ivec_free(&xdf->hash);
-	xdl_free(recs);
-	xdl_cha_free(&xdf->rcha);
-	return -1;
 }
 
 
@@ -202,8 +187,8 @@ static void xdl_free_ctx(xdfile_t *xdf) {
 	rust_ivec_free(&xdf->rchg_vec);
 	rust_ivec_free(&xdf->rindex);
 	rust_ivec_free(&xdf->hash);
-	xdl_free(xdf->recs);
-	xdl_cha_free(&xdf->rcha);
+	rust_ivec_free(&xdf->useless);
+	rust_ivec_free(&xdf->record);
 }
 
 
