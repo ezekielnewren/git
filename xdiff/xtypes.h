@@ -39,11 +39,11 @@ typedef struct s_chastore {
 	long scurr;
 } chastore_t;
 
-typedef struct s_xrecord {
-	struct s_xrecord *next;
+typedef struct {
 	u8 const* ptr;
 	usize size;
 	u64 hash;
+	u64 flags;
 } xrecord_t;
 
 typedef struct s_xdfile {
