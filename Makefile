@@ -910,6 +910,11 @@ TEST_SHELL_PATH = $(SHELL_PATH)
 
 LIB_FILE = libgit.a
 XDIFF_LIB = xdiff/lib.a
+ifeq ($(DEBUG), 1)
+RUST_LIB = rust/target/debug/libxdiff.a
+else
+RUST_LIB = rust/target/release/libxdiff.a
+endif
 REFTABLE_LIB = reftable/libreftable.a
 
 GENERATED_H += command-list.h
@@ -1374,6 +1379,10 @@ UNIT_TEST_OBJS += $(UNIT_TEST_DIR)/lib-reftable.o
 GITLIBS = common-main.o $(LIB_FILE) $(XDIFF_LIB) $(REFTABLE_LIB) $(LIB_FILE)
 EXTLIBS =
 
+ifneq ($(NO_RUST), 1)
+	GITLIBS += $(RUST_LIB)
+endif
+
 GIT_USER_AGENT = git/$(GIT_VERSION)
 
 ifeq ($(wildcard sha1collisiondetection/lib/sha1.h),sha1collisiondetection/lib/sha1.h)
@@ -1384,7 +1393,11 @@ endif
 # tweaked by config.* below as well as the command-line, both of
 # which'll override these defaults.
 # Older versions of GCC may require adding "-std=gnu99" at the end.
+ifeq ($(DEBUG), 1)
+CFLAGS = -g -O0 -Wall
+else
 CFLAGS = -g -O2 -Wall
+endif
 LDFLAGS =
 CC_LD_DYNPATH = -Wl,-rpath,
 BASIC_CFLAGS = -I.
@@ -1956,6 +1969,10 @@ endif
 
 ifdef NO_POSIX_GOODIES
 	BASIC_CFLAGS += -DNO_POSIX_GOODIES
+endif
+
+ifeq ($(NO_RUST), 1)
+	BASIC_CFLAGS += -DNO_RUST
 endif
 
 ifdef APPLE_COMMON_CRYPTO_SHA1
@@ -2876,6 +2893,16 @@ $(LIB_FILE): $(LIB_OBJS)
 $(XDIFF_LIB): $(XDIFF_OBJS)
 	$(QUIET_AR)$(RM) $@ && $(AR) $(ARFLAGS) $@ $^
 
+ifneq ($(NO_RUST), 1)
+.PHONY: $(RUST_LIB)
+$(RUST_LIB):
+ifeq ($(DEBUG), 1)
+	cd rust && cargo build --verbose
+else
+	cd rust && cargo build --verbose --release
+endif
+endif
+
 $(REFTABLE_LIB): $(REFTABLE_OBJS)
 	$(QUIET_AR)$(RM) $@ && $(AR) $(ARFLAGS) $@ $^
 
@@ -3701,7 +3728,10 @@ cocciclean:
 	$(RM) -r .build/contrib/coccinelle
 	$(RM) contrib/coccinelle/*.cocci.patch
 
-clean: profile-clean coverage-clean cocciclean
+rustclean:
+	cd rust && cargo clean
+
+clean: profile-clean coverage-clean cocciclean rustclean
 	$(RM) -r .build $(UNIT_TEST_BIN)
 	$(RM) GIT-TEST-SUITES
 	$(RM) po/git.pot po/git-core.pot
