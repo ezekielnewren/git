@@ -32,9 +32,7 @@
 
 typedef struct s_xdlclass {
 	struct s_xdlclass *next;
-	u64 hash;
-	char const *line;
-	long size;
+	xrecord_t rec;
 	long idx;
 	long len1, len2;
 } xdlclass_t;
@@ -107,14 +105,12 @@ static void xdl_free_classifier(xdlclassifier_t *cf) {
 
 static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, xrecord_t *rec) {
 	long hi;
-	char const *line;
 	xdlclass_t *rcrec;
 
-	line = (char const *) rec->ptr;
 	hi = (long) XDL_HASHLONG(rec->hash, cf->hbits);
 	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
-		if (rcrec->hash == rec->hash &&
-				xdl_recmatch(rcrec->line, rcrec->size,
+		if (rcrec->rec.hash == rec->hash &&
+				xdl_recmatch((const char *) rcrec->rec.ptr, rcrec->rec.size,
 					(const char *) rec->ptr, rec->size, cf->flags))
 			break;
 
@@ -127,9 +123,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, xrecord_t
 		if (XDL_ALLOC_GROW(cf->rcrecs, cf->count, cf->alloc))
 				return -1;
 		cf->rcrecs[rcrec->idx] = rcrec;
-		rcrec->line = line;
-		rcrec->size = rec->size;
-		rcrec->hash = rec->hash;
+		rcrec->rec = *rec;
 		rcrec->len1 = rcrec->len2 = 0;
 		rcrec->next = cf->rchash[hi];
 		cf->rchash[hi] = rcrec;
@@ -174,6 +168,7 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 			crec->ptr = (u8 *) prev;
 			crec->size = (long) (cur - prev);
 			crec->hash = hav;
+			crec->flags = xpp->flags;
 			recs[nrec++] = crec;
 			if (xdl_classify_record(pass, cf, crec) < 0)
 				goto abort;
