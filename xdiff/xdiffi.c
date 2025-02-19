@@ -356,11 +356,11 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 	dd1.nrec = xe->xdf1.rindex.length;
 	dd1.hash = xe->xdf1.hash.ptr;
-	dd1.rchg = xe->xdf1.rchg;
+	dd1.rchg = (char *) xe->xdf1.rchg;
 	dd1.rindex = xe->xdf1.rindex.ptr;
 	dd2.nrec = xe->xdf2.rindex.length;
 	dd2.hash = xe->xdf2.hash.ptr;
-	dd2.rchg = xe->xdf2.rchg;
+	dd2.rchg = (char *) xe->xdf2.rchg;
 	dd2.rindex = xe->xdf2.rindex.ptr;
 
 	res = xdl_recs_cmp(&dd1, 0, dd1.nrec, &dd2, 0, dd2.nrec,
@@ -941,7 +941,7 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
 	xdchange_t *cscr = NULL, *xch;
-	char *rchg1 = xe->xdf1.rchg, *rchg2 = xe->xdf2.rchg;
+	char *rchg1 = (char *) xe->xdf1.rchg, *rchg2 = (char *) xe->xdf2.rchg;
 	long i1, i2, l1, l2;
 
 	/*

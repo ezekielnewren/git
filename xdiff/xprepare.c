@@ -165,7 +165,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		rust_ivec_reserve_exact(&xdf->hash, xdf->record.length + 1);
 	}
 
-	xdf->rchg = (char *) (xdf->rchg_vec.ptr + 1);
+	xdf->rchg = xdf->rchg_vec.ptr + 1;
 	xdf->dstart = 0;
 	xdf->dend = xdf->record.length - 1;
 

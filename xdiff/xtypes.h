@@ -51,11 +51,11 @@ DEFINE_IVEC_TYPE(xrecord_t*, xrecord_ptr_t);
 
 typedef struct s_xdfile {
 	ivec_xrecord_t record;
-	long dstart, dend;
 	ivec_u8 rchg_vec;
-	char *rchg;
 	ivec_isize rindex;
 	ivec_u64 hash;
+	isize dstart, dend;
+	u8 *rchg;
 } xdfile_t;
 
 typedef struct s_xdfenv {
