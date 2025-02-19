@@ -51,6 +51,7 @@ typedef struct s_xdfile {
 	long nrec;
 	long dstart, dend;
 	xrecord_t **recs;
+	ivec_u8 rchg_vec;
 	char *rchg;
 	ivec_isize rindex;
 	ivec_u64 hash;

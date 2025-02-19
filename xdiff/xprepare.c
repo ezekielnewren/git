@@ -140,11 +140,11 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	char const *blk, *cur, *top, *prev;
 	xrecord_t *crec;
 	xrecord_t **recs;
-	char *rchg;
+	u8 default_value = 0;
 
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->hash);
-	rchg = NULL;
+	IVEC_INIT(xdf->rchg_vec);
 	recs = NULL;
 	narec = 4;
 
@@ -170,8 +170,8 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		}
 	}
 
-	if (!XDL_CALLOC_ARRAY(rchg, nrec + 2))
-		goto abort;
+
+	rust_ivec_resize_exact(&xdf->rchg_vec, nrec + 2, &default_value);
 
 	if ((XDF_DIFF_ALG(flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(flags) != XDF_HISTOGRAM_DIFF)) {
@@ -181,14 +181,14 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	xdf->nrec = nrec;
 	xdf->recs = recs;
-	xdf->rchg = rchg + 1;
+	xdf->rchg = (char *) (xdf->rchg_vec.ptr + 1);
 	xdf->dstart = 0;
 	xdf->dend = nrec - 1;
 
 	return 0;
 
 abort:
-	xdl_free(rchg);
+	rust_ivec_free(&xdf->rchg_vec);
 	rust_ivec_free(&xdf->rindex);
 	rust_ivec_free(&xdf->hash);
 	xdl_free(recs);
@@ -199,7 +199,7 @@ abort:
 
 static void xdl_free_ctx(xdfile_t *xdf) {
 
-	xdl_free(xdf->rchg - 1);
+	rust_ivec_free(&xdf->rchg_vec);
 	rust_ivec_free(&xdf->rindex);
 	rust_ivec_free(&xdf->hash);
 	xdl_free(xdf->recs);
