@@ -15,7 +15,7 @@ static void _rust_ivec_resize(void* self, usize new_length, void* default_value,
 		}
 	}
 
-	for (isize i = 0; i < (isize) (new_length - this->length); i++) {
+	for (usize i = this->length; i < new_length; i++) {
 		void* dst = (u8*) this->ptr + (this->length + i) * this->element_size;
 		memcpy(dst, default_value, this->element_size);
 	}
