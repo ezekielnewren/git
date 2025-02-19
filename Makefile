@@ -2703,6 +2703,7 @@ XDIFF_OBJS += xdiff/xmerge.o
 XDIFF_OBJS += xdiff/xpatience.o
 XDIFF_OBJS += xdiff/xprepare.o
 XDIFF_OBJS += xdiff/xutils.o
+XDIFF_OBJS += xdiff/ivec.o
 .PHONY: xdiff-objs
 xdiff-objs: $(XDIFF_OBJS)
 
