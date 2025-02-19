@@ -2,8 +2,24 @@
 #include <string.h>
 #include "ivec.h"
 
-static void rust_ivec_grow(rawivec_t* self) {
-	rust_ivec_reserve(self, self->capacity == 0 ? 8 : self->capacity);
+#include "xmacros.h"
+
+static void _rust_ivec_resize(void* self, usize new_length, void* default_value, bool exact) {
+	rawivec_t *this = self;
+	isize additional = (isize) (new_length - this->capacity);
+	if (additional > 0) {
+		if (exact) {
+			rust_ivec_reserve_exact(self, additional);
+		} else {
+			rust_ivec_reserve(self, additional);
+		}
+	}
+
+	for (isize i = 0; i < (isize) (new_length - this->length); i++) {
+		void* dst = (u8*) this->ptr + (this->length + i) * this->element_size;
+		memcpy(dst, default_value, this->element_size);
+	}
+	this->length = new_length;
 }
 
 void rust_ivec_init(void* self, usize element_size) {
@@ -15,6 +31,11 @@ void rust_ivec_init(void* self, usize element_size) {
 }
 
 void rust_ivec_reserve(void* self, usize additional) {
+	rawivec_t *this = self;
+	rust_ivec_reserve_exact(self, XDL_MAX(additional, this->capacity));
+}
+
+void rust_ivec_reserve_exact(void* self, usize additional) {
 	rawivec_t *this = self;
 	void* t;
 	usize new_capacity = this->capacity + additional;
@@ -36,17 +57,11 @@ void rust_ivec_shrink_to_fit(void* self) {
 }
 
 void rust_ivec_resize(void* self, usize new_length, void* default_value) {
-	rawivec_t *this = self;
-	isize additional = (isize) (new_length - this->capacity);
-	if (additional > 0) {
-		rust_ivec_reserve(self, additional);
-	}
+	_rust_ivec_resize(self, new_length, default_value, false);
+}
 
-	for (isize i = 0; i < (isize) (new_length - this->length); i++) {
-		void* dst = (u8*) this->ptr + (this->length + i) * this->element_size;
-		memcpy(dst, default_value, this->element_size);
-	}
-	this->length = new_length;
+void rust_ivec_resize_exact(void* self, usize new_length, void* default_value) {
+	_rust_ivec_resize(self, new_length, default_value, true);
 }
 
 void rust_ivec_push(void* self, void* value) {
@@ -54,7 +69,7 @@ void rust_ivec_push(void* self, void* value) {
 	u8* dst;
 
 	if (this->length + 1 >= this->capacity) {
-		rust_ivec_grow(self);
+		rust_ivec_reserve(self, 1);
 	}
 	dst = (u8*) this->ptr + this->length * this->element_size;
 	memcpy(dst, value, this->element_size);
