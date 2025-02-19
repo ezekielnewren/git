@@ -55,7 +55,7 @@ typedef struct s_xdfile {
 	xrecord_t **recs;
 	char *rchg;
 	ivec_isize rindex;
-	u64 *hash;
+	ivec_u64 hash;
 } xdfile_t;
 
 typedef struct s_xdfenv {

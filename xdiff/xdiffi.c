@@ -355,11 +355,11 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 	dd1.nrec = xe->xdf1.rindex.length;
-	dd1.hash = xe->xdf1.hash;
+	dd1.hash = xe->xdf1.hash.ptr;
 	dd1.rchg = xe->xdf1.rchg;
 	dd1.rindex = xe->xdf1.rindex.ptr;
 	dd2.nrec = xe->xdf2.rindex.length;
-	dd2.hash = xe->xdf2.hash;
+	dd2.hash = xe->xdf2.hash.ptr;
 	dd2.rchg = xe->xdf2.rchg;
 	dd2.rindex = xe->xdf2.rindex.ptr;
 

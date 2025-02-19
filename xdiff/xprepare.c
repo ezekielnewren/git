@@ -158,11 +158,10 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 	xrecord_t *crec;
 	xrecord_t **recs;
 	xrecord_t **rhash;
-	u64 *hash;
 	char *rchg;
 
 	IVEC_INIT(xdf->rindex);
-	hash = NULL;
+	IVEC_INIT(xdf->hash);
 	rchg = NULL;
 	rhash = NULL;
 	recs = NULL;
@@ -201,8 +200,7 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF)) {
 		rust_ivec_reserve_exact(&xdf->rindex, nrec + 1);
-		if (!XDL_ALLOC_ARRAY(hash, nrec + 1))
-			goto abort;
+		rust_ivec_reserve_exact(&xdf->hash, nrec + 1);
 	}
 
 	xdf->nrec = nrec;
@@ -210,16 +208,15 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 	xdf->hbits = hbits;
 	xdf->rhash = rhash;
 	xdf->rchg = rchg + 1;
-	xdf->hash = hash;
 	xdf->dstart = 0;
 	xdf->dend = nrec - 1;
 
 	return 0;
 
 abort:
-	xdl_free(hash);
 	xdl_free(rchg);
 	rust_ivec_free(&xdf->rindex);
+	rust_ivec_free(&xdf->hash);
 	xdl_free(rhash);
 	xdl_free(recs);
 	xdl_cha_free(&xdf->rcha);
@@ -232,7 +229,7 @@ static void xdl_free_ctx(xdfile_t *xdf) {
 	xdl_free(xdf->rhash);
 	xdl_free(xdf->rchg - 1);
 	rust_ivec_free(&xdf->rindex);
-	xdl_free(xdf->hash);
+	rust_ivec_free(&xdf->hash);
 	xdl_free(xdf->recs);
 	xdl_cha_free(&xdf->rcha);
 }
@@ -360,7 +357,7 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
  * might be potentially discarded if they happear in a run of discardable.
  */
 static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2) {
-	long i, nm, nreff, mlim;
+	long i, nm, mlim;
 	xrecord_t **recs;
 	xdlclass_t *rcrec;
 	char *dis, *dis1, *dis2;
@@ -386,29 +383,25 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 		dis2[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	for (nreff = 0, i = xdf1->dstart, recs = &xdf1->recs[xdf1->dstart];
+	for (i = xdf1->dstart, recs = &xdf1->recs[xdf1->dstart];
 	     i <= xdf1->dend; i++, recs++) {
 		if (dis1[i] == 1 ||
 		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, xdf1->dstart, xdf1->dend))) {
-			xdf1->rindex.ptr[nreff] = i;
-			xdf1->hash[nreff] = (*recs)->hash;
-			nreff++;
+			rust_ivec_push(&xdf1->rindex, &i);
+			rust_ivec_push(&xdf1->hash, &(*recs)->hash);
 		} else
 			xdf1->rchg[i] = 1;
 	}
-	xdf1->rindex.length = nreff;
 
-	for (nreff = 0, i = xdf2->dstart, recs = &xdf2->recs[xdf2->dstart];
+	for (i = xdf2->dstart, recs = &xdf2->recs[xdf2->dstart];
 	     i <= xdf2->dend; i++, recs++) {
 		if (dis2[i] == 1 ||
 		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, xdf2->dstart, xdf2->dend))) {
-			xdf2->rindex.ptr[nreff] = i;
-			xdf2->hash[nreff] = (*recs)->hash;
-			nreff++;
+			rust_ivec_push(&xdf2->rindex, &i);
+			rust_ivec_push(&xdf2->hash, &(*recs)->hash);
 		} else
 			xdf2->rchg[i] = 1;
 	}
-	xdf2->rindex.length = nreff;
 
 	xdl_free(dis);
 
