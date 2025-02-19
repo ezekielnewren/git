@@ -100,10 +100,10 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	 * So we multiply ha by 2 in the hope that the hashing was
 	 * "unique enough".
 	 */
-	int index = (int)((record->ha << 1) % map->alloc);
+	int index = (int)((record->hash << 1) % map->alloc);
 
 	while (map->entries[index].line1) {
-		if (map->entries[index].hash != record->ha) {
+		if (map->entries[index].hash != record->hash) {
 			if (++index >= map->alloc)
 				index = 0;
 			continue;
@@ -119,8 +119,8 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	if (pass == 2)
 		return;
 	map->entries[index].line1 = line;
-	map->entries[index].hash = record->ha;
-	map->entries[index].anchor = is_anchor(xpp, map->env->xdf1.recs[line - 1]->ptr);
+	map->entries[index].hash = record->hash;
+	map->entries[index].anchor = is_anchor(xpp, (const char *) map->env->xdf1.recs[line - 1]->ptr);
 	if (!map->first)
 		map->first = map->entries + index;
 	if (map->last) {
@@ -247,7 +247,7 @@ static int match(struct hashmap *map, int line1, int line2)
 {
 	xrecord_t *record1 = map->env->xdf1.recs[line1 - 1];
 	xrecord_t *record2 = map->env->xdf2.recs[line2 - 1];
-	return record1->ha == record2->ha;
+	return record1->hash == record2->hash;
 }
 
 static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,

@@ -23,7 +23,7 @@
 #if !defined(XTYPES_H)
 #define XTYPES_H
 
-
+#include "../rust/header/types.h"
 
 typedef struct s_chanode {
 	struct s_chanode *next;
@@ -40,9 +40,9 @@ typedef struct s_chastore {
 
 typedef struct s_xrecord {
 	struct s_xrecord *next;
-	char const *ptr;
-	long size;
-	unsigned long ha;
+	u8 const* ptr;
+	usize size;
+	u64 hash;
 } xrecord_t;
 
 typedef struct s_xdfile {
@@ -55,7 +55,7 @@ typedef struct s_xdfile {
 	char *rchg;
 	long *rindex;
 	long nreff;
-	unsigned long *ha;
+	u64 *hash;
 } xdfile_t;
 
 typedef struct s_xdfenv {

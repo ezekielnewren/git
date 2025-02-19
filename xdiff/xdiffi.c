@@ -257,7 +257,7 @@ static long xdl_split(unsigned long const *ha1, long off1, long lim1,
 int xdl_recs_cmp(diffdata_t *dd1, long off1, long lim1,
 		 diffdata_t *dd2, long off2, long lim2,
 		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv) {
-	unsigned long const *ha1 = dd1->ha, *ha2 = dd2->ha;
+	u64 const *ha1 = dd1->hash, *ha2 = dd2->hash;
 
 	/*
 	 * Shrink the box by walking through each diagonal snake (SW and NE).
@@ -355,11 +355,11 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 	dd1.nrec = xe->xdf1.nreff;
-	dd1.ha = xe->xdf1.ha;
+	dd1.hash = xe->xdf1.hash;
 	dd1.rchg = xe->xdf1.rchg;
 	dd1.rindex = xe->xdf1.rindex;
 	dd2.nrec = xe->xdf2.nreff;
-	dd2.ha = xe->xdf2.ha;
+	dd2.hash = xe->xdf2.hash;
 	dd2.rchg = xe->xdf2.rchg;
 	dd2.rindex = xe->xdf2.rindex;
 
@@ -394,7 +394,7 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 
 static int recs_match(xrecord_t *rec1, xrecord_t *rec2)
 {
-	return (rec1->ha == rec2->ha);
+	return rec1->hash == rec2->hash;
 }
 
 /*
@@ -1002,11 +1002,11 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
 
 		rec = &xe->xdf1.recs[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
-			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
+			ignore = xdl_blankline((const char *) rec[i]->ptr, rec[i]->size, flags);
 
 		rec = &xe->xdf2.recs[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
-			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
+			ignore = xdl_blankline((const char *) rec[i]->ptr, rec[i]->size, flags);
 
 		xch->ignore = ignore;
 	}
@@ -1017,7 +1017,7 @@ static int record_matches_regex(xrecord_t *rec, xpparam_t const *xpp) {
 	int i;
 
 	for (i = 0; i < xpp->ignore_regex_nr; i++)
-		if (!regexec_buf(xpp->ignore_regex[i], rec->ptr, rec->size, 1,
+		if (!regexec_buf(xpp->ignore_regex[i], (const char *) rec->ptr, rec->size, 1,
 				 &regmatch, 0))
 			return 1;
 

@@ -25,7 +25,7 @@
 
 #define DISABLE_SIGN_COMPARE_WARNINGS
 
-#include "git-compat-util.h"
+#include "../rust/header/types.h"
 #include "xmacros.h"
 #include "xdiff.h"
 #include "xtypes.h"
@@ -33,6 +33,5 @@
 #include "xprepare.h"
 #include "xdiffi.h"
 #include "xemit.h"
-
 
 #endif /* #if !defined(XINCLUDE_H) */
