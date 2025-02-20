@@ -87,6 +87,31 @@ void* rust_ivec_steal_memory(void* self) {
 }
 
 
+bool rust_ivec_equal(void* self, void* other) {
+	rawivec_t *lhs = self;
+	rawivec_t *rhs = other;
+
+	if (lhs->element_size != rhs->element_size) {
+		return false;
+	}
+
+	if (lhs->length != rhs->length) {
+		return false;
+	}
+
+
+	for (usize i = 0; i < lhs->length; i++) {
+		void* left = lhs->ptr + i * lhs->element_size;
+		void* right = rhs->ptr + i * rhs->element_size;
+		if (memcmp(left, right, lhs->element_size) != 0) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+
 void rust_ivec_free(void* self) {
 	rawivec_t *this = self;
 	free(this->ptr);
@@ -94,6 +119,3 @@ void rust_ivec_free(void* self) {
 	this->length = 0;
 	// don't modify self->element_size
 }
-
-
-

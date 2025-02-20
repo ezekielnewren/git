@@ -87,10 +87,22 @@ impl mmfile_t {
 	}
 
 	pub unsafe fn from_raw<'a>(mf: *const Self) -> &'a [u8] {
-		if mf.is_null() {
-			panic!("null pointer")
+		let ptr = (*mf).ptr as *const u8;
+		let size = (*mf).size as usize;
+
+		if ptr.is_null() {
+			return &[];
 		}
-		std::slice::from_raw_parts((*mf).ptr as *const u8, (*mf).size as usize)
+		#[cfg(debug_assertions)]
+		{
+			if size > isize::MAX as usize {
+				panic!("mmfile_t is too big!");
+			}
+			if (mf as usize) % align_of::<Self>() != 0 {
+				panic!("misaligned mmfile_t pointer");
+			}
+		}
+		std::slice::from_raw_parts(ptr , size)
 	}
 
 	pub unsafe fn malloc(size: usize) -> Self {

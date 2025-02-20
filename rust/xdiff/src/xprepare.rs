@@ -5,7 +5,6 @@ use crate::xutils::{LineReader};
 
 
 pub(crate) fn xdl_prepare_ctx(mf: &[u8], xdf: &mut xdfile_t, flags: u64) {
-
     for (line, eol_len) in LineReader::new(mf) {
         let rec = xrecord_t::new(line, eol_len, flags);
         xdf.record.push(rec);
@@ -20,7 +19,7 @@ pub(crate) fn xdl_prepare_ctx(mf: &[u8], xdf: &mut xdfile_t, flags: u64) {
 
     xdf.rchg = unsafe { xdf.rchg_vec.as_mut_ptr().add(1) };
     xdf.dstart = 0;
-    xdf.dend = (xdf.record.len() - 1) as isize;
+    xdf.dend = xdf.record.len().wrapping_sub(1) as isize;
 }
 
 
