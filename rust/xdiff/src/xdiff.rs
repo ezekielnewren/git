@@ -86,6 +86,13 @@ impl mmfile_t {
 		}
 	}
 
+	pub unsafe fn from_raw<'a>(mf: *const Self) -> &'a [u8] {
+		if mf.is_null() {
+			panic!("null pointer")
+		}
+		std::slice::from_raw_parts((*mf).ptr as *const u8, (*mf).size as usize)
+	}
+
 	pub unsafe fn malloc(size: usize) -> Self {
 		Self {
 			ptr: malloc_array::<u8>(size) as *mut libc::c_char,

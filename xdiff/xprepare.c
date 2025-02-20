@@ -138,42 +138,47 @@ u64 rust_xdl_hash_record(char const **data, char const *top, long flags);
 #endif
 
 #ifndef NO_RUST
-extern void rust_readlines(mmfile_t *mf, xdfile_t *xdf, u64 flags);
-extern void rust_init(mmfile_t *mf, xdfile_t *xdf, u64 flags);
+extern void rust_dump_file(u8 *ptr, usize size);
 extern int rust_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags);
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	long bsize;
-	char const *blk, *cur, *top, *prev, *tmp0, *tmp1;
+	char const *blk, *cur, *top, *prev, *tmp0, *tmp1 = 0;
+	usize c_width, rust_width = 0;
+	usize line_idx = 0;
 	u8 default_value = 0;
 
-	xdfile_t xdf_alt;
-	rust_init(mf, &xdf_alt, flags);
-	rust_init(mf, xdf, flags);
+	IVEC_INIT(xdf->record);
+	IVEC_INIT(xdf->rindex);
+	IVEC_INIT(xdf->hash);
+	IVEC_INIT(xdf->rchg_vec);
 
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
-		u64 c_hash;
-		u64 rust_hash;
+		u64 c_hash = 0, rust_hash = 0;
 		for (top = blk + bsize; cur < top; ) {
 			xrecord_t crec;
 			prev = cur;
 			tmp0 = cur;
 			tmp1 = cur;
 			c_hash = xdl_hash_record(&tmp0, top, flags);
+			c_width = tmp0 - prev;
 			rust_hash = rust_xdl_hash_record(&tmp1, top, flags);
-			if (tmp0 != tmp1) {
+			rust_width = tmp1 - prev;
+			if (tmp0 != tmp1 || c_width != rust_width) {
 				BUG("c and rust increment cur by different amounts");
 			}
 			if (c_hash != rust_hash) {
 				BUG("c hash and rust hash disagree");
 			}
-			cur = tmp1;
+			cur = tmp0;
 			crec.ptr = (u8 *) prev;
 			crec.size = (long) (cur - prev);
 			crec.hash = rust_hash;
 			crec.flags = flags;
 			rust_ivec_push(&xdf->record, &crec);
+
+			line_idx += 1;
 		}
-		if (tmp0 != tmp1) {
+		if (blk < top && tmp0 != tmp1) {
 			BUG("c and rust increment cur by different amounts");
 		}
 		if (c_hash != rust_hash) {
@@ -181,7 +186,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		}
 	}
 
-	// rust_readlines(mf, &xdf, flags);
+
 
 	rust_ivec_resize_exact(&xdf->rchg_vec, xdf->record.length + 2, &default_value);
 
@@ -196,7 +201,8 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	return 0;
 
-	return rust_xdl_prepare_ctx(mf, xdf, flags);
+
+	// return rust_xdl_prepare_ctx(mf, xdf, flags);
 }
 #else
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {

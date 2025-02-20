@@ -1,6 +1,9 @@
-use libc::memset;
-use interop::ivec::IVec;
-use crate::xdiff::{XDF_HISTOGRAM_DIFF, XDF_PATIENCE_DIFF};
+use std::fs::{create_dir_all, File};
+use std::io::Write;
+use std::path::Path;
+use sha2::{Digest, Sha256};
+use crate::xdfenv::xdfile_t;
+use crate::xdiff::{mmfile_t};
 use crate::xprepare::xdl_prepare_ctx;
 use crate::xutils::xdl_hash_record;
 
@@ -9,47 +12,9 @@ pub(crate) mod xdiff;
 pub(crate) mod xprepare;
 pub(crate) mod xrecord;
 pub(crate) mod xtypes;
-
-#[repr(C)]
-pub struct mmfile_t {
-    pub ptr: *const libc::c_char,
-    pub size: libc::c_long,
-}
+pub(crate) mod xdfenv;
 
 
-#[repr(C)]
-pub struct xrecord_t {
-    pub ptr: *const u8,
-    pub size: usize,
-    pub hash: u64,
-    pub flags: u64,
-}
-
-
-#[repr(C)]
-pub struct xdfile_t {
-    pub record: IVec<xrecord_t>,
-    pub rchg_vec: IVec<u8>,
-    pub rindex: IVec<isize>,
-    pub hash: IVec<u64>,
-    pub dstart: isize,
-    pub dend: isize,
-    pub rchg: *mut u8,
-}
-
-impl Default for xdfile_t {
-    fn default() -> Self {
-        Self {
-            record: IVec::new(),
-            rchg_vec: IVec::new(),
-            rindex: IVec::new(),
-            hash: IVec::new(),
-            dstart: 0,
-            dend: 0,
-            rchg: std::ptr::null_mut(),
-        }
-    }
-}
 
 #[no_mangle]
 unsafe extern "C" fn rust_xdl_hash_record(
@@ -66,55 +31,36 @@ unsafe extern "C" fn rust_xdl_hash_record(
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn rust_readlines(_mf: *const mmfile_t, _xdf: *mut xdfile_t, flags: u64) {
-    if _mf.is_null() {
-        panic!("null pointer");
-    }
-    let mf = std::slice::from_raw_parts((*_mf).ptr as *const u8, (*_mf).size as usize);
-
-    if _xdf.is_null() {
-        panic!("null pointer");
-    }
-    std::ptr::write(_xdf, xdfile_t::default());
-    let xdf = &mut *_xdf;
-
-
-    let mut off = 0;
-    while off < mf.len() {
-        let (line_hash, with_eol) = xdl_hash_record(&mf[off..], flags);
-        // if with_eol == 0 {
-        //     break;
-        // }
-        let crec = xrecord_t {
-            ptr: &mf[off],
-            size: with_eol,
-            hash: line_hash,
-            flags,
-        };
-        xdf.record.push(crec);
-        off += with_eol;
-    }
-
-}
 
 #[no_mangle]
-unsafe extern "C" fn rust_init(_mf: *const mmfile_t, _xdf: *mut xdfile_t, flags: u64) {
-    std::ptr::write(_xdf, xdfile_t::default());
+extern "C" fn rust_dump_file(ptr: *const u8, size: usize) {
+    let data = unsafe {
+        std::slice::from_raw_parts(ptr, size)
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let hash = hasher.finalize();
+
+    let dir_path = "/tmp/gitdump";
+    let t = format!("{}/{:x}.txt", dir_path, hash);
+    let file_path = Path::new(t.as_str());
+
+    create_dir_all(dir_path).unwrap();
+
+    if !file_path.exists() {
+        let mut file = File::create(&file_path).unwrap();
+        file.write_all(data).unwrap();
+        drop(file);  // i.e. close the file
+    }
 }
+
+
 
 #[no_mangle]
 unsafe extern "C" fn rust_xdl_prepare_ctx(_mf: *const mmfile_t, _xdf: *mut xdfile_t, flags: u64) -> i32 {
-    if _mf.is_null() {
-        panic!("null pointer");
-    }
-	let mf = std::slice::from_raw_parts((*_mf).ptr as *const u8, (*_mf).size as usize);
-
-    if _xdf.is_null() {
-        panic!("null pointer");
-    }
-    std::ptr::write(_xdf, xdfile_t::default());
-	let xdf = &mut *_xdf;
+    let mf: &[u8] = mmfile_t::from_raw(_mf);
+    let xdf: &mut xdfile_t = xdfile_t::from_raw(_xdf, true);
 
 	xdl_prepare_ctx(mf, xdf, flags);
 
