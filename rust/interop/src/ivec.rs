@@ -53,8 +53,8 @@ impl<T> IVec<T> {
             panic!("null pointer");
         }
         let vec = &mut *raw;
-        #[cfg(test)]
-        vec._test_invariance();
+        #[cfg(debug_assertions)]
+        vec.test_invariants();
         vec
     }
 
@@ -63,8 +63,8 @@ impl<T> IVec<T> {
             panic!("null pointer");
         }
         let vec = &*raw;
-        #[cfg(test)]
-        vec._test_invariance();
+        #[cfg(debug_assertions)]
+        vec.test_invariants();
         vec
     }
 
@@ -76,7 +76,7 @@ impl<T> IVec<T> {
  */
 impl<T> IVec<T> {
 
-    fn _test_invariance(&self) {
+    pub fn test_invariants(&self) {
         if !self.ptr.is_null() && (self.ptr as usize) % align_of::<T>() != 0 {
             panic!("misaligned pointer: expected {:x}, got {:x}",
                    align_of::<T>(), self.ptr as usize
@@ -119,6 +119,7 @@ impl<T> IVec<T> {
     }
 
     fn _set_capacity(&mut self, new_capacity: usize) {
+        let slice: &mut [T];
         unsafe {
             if new_capacity == self.capacity {
                 return;
@@ -126,12 +127,14 @@ impl<T> IVec<T> {
             if new_capacity == 0 {
                 libc::free(self.ptr as *mut libc::c_void);
                 self.ptr = std::ptr::null_mut();
+                slice = &mut [];
             } else {
                 let t = libc::realloc(self.ptr as *mut libc::c_void, new_capacity * size_of::<T>());
                 if t.is_null() {
                     panic!("out of memory");
                 }
                 self.ptr = t as *mut T;
+                slice = std::slice::from_raw_parts_mut(self.ptr, new_capacity);
             }
             self.capacity = new_capacity;
         }
@@ -196,7 +199,7 @@ impl<T> IVec<T> {
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        let new_capacity = self.capacity + std::cmp::max(additional, self.capacity);
+        let mut new_capacity = self.capacity + std::cmp::max(additional, self.capacity);
         self._set_capacity(new_capacity);
     }
 

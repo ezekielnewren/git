@@ -137,12 +137,71 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, xrecord_t
 u64 rust_xdl_hash_record(char const **data, char const *top, long flags);
 #endif
 
-
+#ifndef NO_RUST
+extern void rust_readlines(mmfile_t *mf, xdfile_t *xdf, u64 flags);
+extern void rust_init(mmfile_t *mf, xdfile_t *xdf, u64 flags);
+extern int rust_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags);
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	long bsize;
-	u64 c_hash;
-	u64 rust_hash;
-	char const *blk, *cur, *top, *prev, *tmp;
+	char const *blk, *cur, *top, *prev, *tmp0, *tmp1;
+	u8 default_value = 0;
+
+	xdfile_t xdf_alt;
+	rust_init(mf, &xdf_alt, flags);
+	rust_init(mf, xdf, flags);
+
+	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
+		u64 c_hash;
+		u64 rust_hash;
+		for (top = blk + bsize; cur < top; ) {
+			xrecord_t crec;
+			prev = cur;
+			tmp0 = cur;
+			tmp1 = cur;
+			c_hash = xdl_hash_record(&tmp0, top, flags);
+			rust_hash = rust_xdl_hash_record(&tmp1, top, flags);
+			if (tmp0 != tmp1) {
+				BUG("c and rust increment cur by different amounts");
+			}
+			if (c_hash != rust_hash) {
+				BUG("c hash and rust hash disagree");
+			}
+			cur = tmp1;
+			crec.ptr = (u8 *) prev;
+			crec.size = (long) (cur - prev);
+			crec.hash = rust_hash;
+			crec.flags = flags;
+			rust_ivec_push(&xdf->record, &crec);
+		}
+		if (tmp0 != tmp1) {
+			BUG("c and rust increment cur by different amounts");
+		}
+		if (c_hash != rust_hash) {
+			BUG("c hash and rust hash disagree");
+		}
+	}
+
+	// rust_readlines(mf, &xdf, flags);
+
+	rust_ivec_resize_exact(&xdf->rchg_vec, xdf->record.length + 2, &default_value);
+
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length + 1);
+		rust_ivec_reserve_exact(&xdf->hash, xdf->record.length + 1);
+	}
+
+	xdf->rchg = xdf->rchg_vec.ptr + 1;
+	xdf->dstart = 0;
+	xdf->dend = xdf->record.length - 1;
+
+	return 0;
+
+	return rust_xdl_prepare_ctx(mf, xdf, flags);
+}
+#else
+static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
+	long bsize;
+	char const *blk, *cur, *top, *prev;
 	u8 default_value = 0;
 
 	IVEC_INIT(xdf->record);
@@ -152,23 +211,13 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
 		for (top = blk + bsize; cur < top; ) {
+			u64 line_hash;
 			xrecord_t crec;
 			prev = cur;
-#ifdef NO_RUST
-			c_hash = xdl_hash_record(&cur, top, flags);
-#else
-			tmp = cur;
-			rust_hash = rust_xdl_hash_record(&tmp, top, flags);
-			tmp = cur;
-			c_hash = xdl_hash_record(&tmp, top, flags);
-			if (rust_hash != c_hash) {
-				BUG("c and rust disagree on the line hash");
-			}
-			cur = tmp;
-#endif
+			line_hash = xdl_hash_record(&cur, top, flags);
 			crec.ptr = (u8 *) prev;
 			crec.size = (long) (cur - prev);
-			crec.hash = c_hash;
+			crec.hash = line_hash;
 			crec.flags = flags;
 			rust_ivec_push(&xdf->record, &crec);
 		}
@@ -188,7 +237,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	return 0;
 }
-
+#endif
 
 static void xdl_free_ctx(xdfile_t *xdf) {
 
@@ -204,6 +253,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xdlclassifier_t cf;
 
 	memset(&cf, 0, sizeof(cf));
+
+	usize s_xdfile_t = sizeof(xdfile_t);
 
 	if (xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags) < 0) {
 
