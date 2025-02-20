@@ -5,7 +5,8 @@ use sha2::{Digest, Sha256};
 use crate::xdfenv::xdfile_t;
 use crate::xdiff::{mmfile_t};
 use crate::xprepare::xdl_prepare_ctx;
-use crate::xutils::xdl_hash_record;
+use crate::xrecord::xrecord_t;
+use crate::xutils::{line_length, xdl_hash_record};
 
 pub(crate) mod xutils;
 pub(crate) mod xdiff;
@@ -16,19 +17,41 @@ pub(crate) mod xdfenv;
 
 
 
+// #[no_mangle]
+// unsafe extern "C" fn rust_xdl_hash_record(
+//     data: *mut *const libc::c_char,
+//     top: *const libc::c_char,
+//     flags: libc::c_long
+// ) -> u64 {
+//     let slice: &[u8] = unsafe {
+//         std::slice::from_raw_parts(*data as *const u8, top.sub(*data as usize) as usize)
+//     };
+//     let (line_hash, with_eol) = xdl_hash_record(slice, flags as u64);
+//     *data = (*data).add(with_eol);
+//     line_hash
+// }
+
 #[no_mangle]
 unsafe extern "C" fn rust_xdl_hash_record(
     data: *mut *const libc::c_char,
     top: *const libc::c_char,
     flags: libc::c_long
 ) -> u64 {
-    let slice: &[u8] = unsafe {
+    let slice = unsafe {
         std::slice::from_raw_parts(*data as *const u8, top.sub(*data as usize) as usize)
     };
-    let (line_hash, with_eol) = xdl_hash_record(slice, flags as u64);
+
+    let (no_eol, with_eol) = line_length(slice);
+    let line = &slice[0..no_eol];
+    let eol_len = with_eol - no_eol;
+    let rec = xrecord_t::new(line, eol_len, flags as u64);
+
     *data = (*data).add(with_eol);
-    line_hash
+
+    rec.hash
 }
+
+
 
 
 

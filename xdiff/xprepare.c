@@ -169,7 +169,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 			if (c_hash != rust_hash) {
 				BUG("c hash and rust hash disagree");
 			}
-			cur = tmp0;
+			cur = tmp1;
 			crec.ptr = (u8 *) prev;
 			crec.size = (long) (cur - prev);
 			crec.hash = rust_hash;

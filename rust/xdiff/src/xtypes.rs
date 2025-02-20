@@ -75,9 +75,12 @@ impl Hasher for DJB2a {
 
 	fn write(&mut self, bytes: &[u8]) {
 		for b in bytes {
-			self.hash = self.hash.wrapping_add(self.hash<<5);
-			self.hash ^= *b as u64;
+			self.write_u8(*b);
 		}
+	}
+
+	fn write_u8(&mut self, value: u8) {
+		self.hash = self.hash.wrapping_mul(33) ^ value as u64;
 	}
 }
 
@@ -92,7 +95,7 @@ impl Default for DJB2a {
 
 #[cfg(test)]
 mod tests {
-	use std::hash::Hasher;
+	use std::hash::{Hash, Hasher};
 	use crate::xdiff::{XDF_IGNORE_WHITESPACE_CHANGE};
 	use crate::xtypes::{xrecord_t, DJB2a};
 
@@ -126,6 +129,21 @@ mod tests {
 			hasher.write(input.as_bytes());
 			let hash = hasher.finish();
 			assert_eq!(expected, hash);
+
+			let mut hasher = DJB2a::default();
+			for b in input.as_bytes().iter() {
+				hasher.write_u8(*b);
+			}
+			let hash = hasher.finish();
+			assert_eq!(expected, hash);
+
+			/*
+			 * For the purposes of git hashing, this is the wrong way.
+			 */
+			// let mut hasher = DJB2a::default();
+			// input.as_bytes().hash(&mut hasher);
+			// let hash = hasher.finish();
+			// assert_eq!(expected, hash);
 		}
 	}
 

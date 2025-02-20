@@ -60,32 +60,43 @@ impl xrecord_t {
             flags,
         };
         let mut state;
-        #[cfg(test)]
+        #[cfg(debug_assertions)]
         {
             state = DJB2a::default();
         }
-        #[cfg(not(test))]
+        #[cfg(not(debug_assertions))]
         {
             state = AHasher::default();
         }
         if (flags & XDF_WHITESPACE_FLAGS) == 0 {
-            slice.hash(&mut state);
+            state.write(slice);
         } else {
             for b in line.iter() {
-                b.hash(&mut state);
+                state.write_u8(*b);
             }
         }
         line.hash = state.finish();
         line
     }
 
+    pub fn has_lf(&self) -> bool {
+        self.size > 0 && unsafe { *self.ptr.add(self.size - 1) } == b'\n'
+    }
+
+    pub fn len_no_eol(&self) -> usize {
+        match self.has_lf() {
+            true => self.size - 1,
+            false => self.size,
+        }
+    }
+
+    pub fn len_with_eol(&self) -> usize {
+        self.size
+    }
+
     pub fn as_ref(&self) -> &[u8] {
         unsafe {
-            let len = match self.size > 0 && *self.ptr == b'\n' {
-                true => self.size - 1,
-                false => self.size,
-            };
-            std::slice::from_raw_parts(self.ptr, len)
+            std::slice::from_raw_parts(self.ptr, self.len_no_eol())
         }
     }
 
