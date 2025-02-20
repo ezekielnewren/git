@@ -1,12 +1,99 @@
 #![allow(non_snake_case)]
 
+use std::collections::{Bound, HashMap};
+use std::hash::{BuildHasher, Hash};
+use std::ops::{Range, RangeBounds};
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
 
+pub fn line_length(data: &[u8]) -> (usize, usize) {
+	let (mut no_eol, mut with_eol) = (data.len(), data.len());
+	for i in 0..data.len() {
+		if data[i] == b'\n' {
+			no_eol = i;
+			with_eol = i+1;
+			break;
+		}
+	}
+
+	(no_eol, with_eol)
+}
+
+
+pub struct LineReader<'a> {
+	content: &'a [u8],
+	off: usize,
+}
+
+impl<'a> LineReader<'a> {
+	pub fn new(content: &'a [u8]) -> Self {
+		Self {
+			content,
+			off: 0,
+		}
+	}
+}
+
+
+impl<'a> Iterator for LineReader<'a> {
+	type Item = (&'a [u8], usize);
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if self.off == self.content.len() {
+			return None;
+		}
+
+		let (no_eol, with_eol) = line_length(&self.content[self.off..]);
+		let slice = &self.content[self.off..self.off+no_eol];
+		self.off += with_eol;
+		let eol_len = with_eol-no_eol;
+		Some((slice, eol_len))
+	}
+}
+
 pub(crate) fn XDL_ISSPACE(v: u8) -> bool {
-    match v {
-        b'\t' | b'\n' | b'\r' | b' ' => true,
-        _ => false,
-    }
+	match v {
+		b'\t' | b'\n' | b'\r' | b' ' => true,
+		_ => false,
+	}
+}
+
+
+/// HashMap.entry(key).or_default() is discouraged because it requires an owned key
+/// this function only clones the key if it doesn't already exist
+pub(crate) fn get_or_default<'b, K, V, S>(map: &'b mut HashMap<K, V, S>, key: &K) -> &'b mut V
+where K: Clone, K: Eq, K: Hash, V: Default, S: BuildHasher
+{
+	if !map.contains_key(key) {
+		map.insert(key.clone(), Default::default());
+	}
+	map.get_mut(key).unwrap()
+}
+
+
+pub fn get_index_range<R>(bound: R, or_else: Range<usize>) -> Range<usize>
+where R: RangeBounds<usize>
+{
+	let range = if or_else.start >= or_else.end {
+		or_else
+	} else {
+		let s = match bound.start_bound() {
+			Bound::Included(v) => *v,
+			Bound::Excluded(v) => *v + 1,
+			Bound::Unbounded => or_else.start,
+		};
+
+		let e = match bound.end_bound() {
+			Bound::Included(v) => *v + 1,
+			Bound::Excluded(v) => *v,
+			Bound::Unbounded => or_else.end,
+		};
+
+		s..e
+	};
+	if range.start > range.end {
+		panic!("start must be <= end");
+	}
+	range
 }
 
 
@@ -53,7 +140,7 @@ pub(crate) fn xdl_hash_record(slice: &[u8], flags: u64) -> (u64, usize) {
 
 	if (flags & XDF_WHITESPACE_FLAGS) != 0 {
 		return xdl_hash_record_with_whitespace(slice, flags);
-    }
+	}
 
 	let mut range = 0..slice.len();
 	while range.start < range.end {

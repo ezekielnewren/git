@@ -4,9 +4,11 @@ use crate::xdiff::{XDF_HISTOGRAM_DIFF, XDF_PATIENCE_DIFF};
 use crate::xprepare::xdl_prepare_ctx;
 use crate::xutils::xdl_hash_record;
 
-pub mod xutils;
-pub mod xdiff;
-mod xprepare;
+pub(crate) mod xutils;
+pub(crate) mod xdiff;
+pub(crate) mod xprepare;
+pub(crate) mod xrecord;
+pub(crate) mod xtypes;
 
 #[repr(C)]
 pub struct mmfile_t {
