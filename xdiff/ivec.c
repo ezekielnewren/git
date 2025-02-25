@@ -68,7 +68,7 @@ void rust_ivec_push(void* self, void* value) {
 	rawivec_t *this = self;
 	u8* dst;
 
-	if (this->length + 1 >= this->capacity) {
+	if (this->length + 1 > this->capacity) {
 		rust_ivec_reserve(self, 1);
 	}
 	dst = (u8*) this->ptr + this->length * this->element_size;
@@ -101,8 +101,8 @@ bool rust_ivec_equal(void* self, void* other) {
 
 
 	for (usize i = 0; i < lhs->length; i++) {
-		void* left = lhs->ptr + i * lhs->element_size;
-		void* right = rhs->ptr + i * rhs->element_size;
+		void* left = (u8 *) lhs->ptr + i * lhs->element_size;
+		void* right = (u8 *) rhs->ptr + i * rhs->element_size;
 		if (memcmp(left, right, lhs->element_size) != 0) {
 			return false;
 		}
