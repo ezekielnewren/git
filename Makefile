@@ -2898,9 +2898,9 @@ ifneq ($(NO_RUST), 1)
 .PHONY: $(RUST_LIB)
 $(RUST_LIB):
 ifeq ($(DEBUG), 1)
-	cd rust && cargo build --verbose
+	cd rust && RUSTFLAGS="-Aunused_imports -Adead_code" cargo build --verbose
 else
-	cd rust && cargo build --verbose --release
+	cd rust && RUSTFLAGS="-Aunused_imports -Adead_code" cargo build --verbose --release
 endif
 endif
 
