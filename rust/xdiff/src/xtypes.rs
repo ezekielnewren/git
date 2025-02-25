@@ -32,11 +32,30 @@ impl Hasher for NOOPHasher {
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ConsiderLine {
-	NONE_MATCH,
+	NO,
 	YES,
 	TOO_MANY,
-	NO,
 }
+
+impl PartialEq<u8> for ConsiderLine {
+	fn eq(&self, other: &u8) -> bool {
+		*self as u8 == *other
+	}
+}
+
+impl PartialEq<ConsiderLine> for u8 {
+	fn eq(&self, other: &ConsiderLine) -> bool {
+		*self == *other as u8
+	}
+}
+
+
+impl Into<u8> for ConsiderLine {
+	fn into(self) -> u8 {
+		self as u8
+	}
+}
+
 
 #[repr(C)]
 #[derive(Default)]
