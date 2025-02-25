@@ -197,8 +197,8 @@ void xdl_free_env(xdfenv_t *xe) {
 }
 
 
-static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
-	long r, rdis0, rpdis0, rdis1, rpdis1;
+static int xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
+	isize r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
 	 * Limits the window the is examined during the similar-lines
@@ -219,9 +219,9 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	 * current line (i) is already a multimatch line.
 	 */
 	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
-		if (!dis[i - r])
+		if (!dis->ptr[i - r])
 			rdis0++;
-		else if (dis[i - r] == 2)
+		else if (dis->ptr[i - r] == 2)
 			rpdis0++;
 		else
 			break;
@@ -235,9 +235,9 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	if (rdis0 == 0)
 		return 0;
 	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
-		if (!dis[i + r])
+		if (!dis->ptr[i + r])
 			rdis1++;
-		else if (dis[i + r] == 2)
+		else if (dis->ptr[i + r] == 2)
 			rpdis1++;
 		else
 			break;
@@ -262,7 +262,6 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
  */
 static int xdl_cleanup_records(xdfenv_t *xe) {
 	isize i, nm, mlim1, mlim2;
-	// xdlclass_t *rcrec;
 
 	ivec_u8 dis1;
 	ivec_u8 dis2;
@@ -292,7 +291,7 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 
 	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
 		if (dis1.ptr[i] == 1 ||
-		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xe->xdf1.dstart, xe->xdf1.dend))) {
+		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch(&dis1, i, xe->xdf1.dstart, xe->xdf1.dend))) {
 			rust_ivec_push(&xe->xdf1.rindex, &i);
 		} else
 			xe->xdf1.rchg[i] = 1;
@@ -300,7 +299,7 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 
 	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
 		if (dis2.ptr[i] == 1 ||
-		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xe->xdf2.dstart, xe->xdf2.dend))) {
+		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch(&dis2, i, xe->xdf2.dstart, xe->xdf2.dend))) {
 			rust_ivec_push(&xe->xdf2.rindex, &i);
 		} else
 			xe->xdf2.rchg[i] = 1;
