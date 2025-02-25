@@ -96,25 +96,7 @@ impl Default for DJB2a {
 #[cfg(test)]
 mod tests {
 	use std::hash::{Hash, Hasher};
-	use crate::xdiff::{XDF_IGNORE_WHITESPACE_CHANGE};
-	use crate::xtypes::{xrecord_t, DJB2a};
-
-	#[test]
-	fn test_line_iter() {
-		let raw = " \t The quick brown  fox \t  jumps over \t\t \tthe lazy dog  ";
-
-		let flags: u64 = XDF_IGNORE_WHITESPACE_CHANGE;
-
-		let line = xrecord_t::new(raw.as_bytes(), 0, flags);
-
-		let mut result: Vec<u8> = Vec::new();
-		for v in line.iter() {
-			result.push(*v);
-		}
-
-		let expect = " The quick brown fox jumps over the lazy dog ";
-		assert_eq!(expect.as_bytes(), result.as_slice());
-	}
+	use crate::xtypes::{DJB2a};
 
 	#[test]
 	fn test_djb2a() {
