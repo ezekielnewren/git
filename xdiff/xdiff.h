@@ -27,6 +27,13 @@
 extern "C" {
 #endif /* #ifdef __cplusplus */
 
+#define INVALID_INDEX SIZE_MAX
+#define LINE_SHIFT 1
+
+#define NO 0
+#define YES 1
+#define TOO_MANY 2
+
 /* xpparm_t.flags */
 #define XDF_NEED_MINIMAL (1 << 0)
 
