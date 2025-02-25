@@ -133,7 +133,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->rindex);
-	IVEC_INIT(xdf->hash);
 	IVEC_INIT(xdf->rchg_vec);
 
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
@@ -155,7 +154,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length + 1);
-		rust_ivec_reserve_exact(&xdf->hash, xdf->record.length + 1);
 	}
 
 	xdf->rchg = xdf->rchg_vec.ptr + 1;
@@ -169,7 +167,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 static void xdl_free_ctx(xdfile_t *xdf) {
 	rust_ivec_free(&xdf->rchg_vec);
 	rust_ivec_free(&xdf->rindex);
-	rust_ivec_free(&xdf->hash);
 	rust_ivec_free(&xdf->record);
 }
 
@@ -276,7 +273,6 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 		if (dis1[i] == 1 ||
 		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, xdf1->dstart, xdf1->dend))) {
 			rust_ivec_push(&xdf1->rindex, &i);
-			rust_ivec_push(&xdf1->hash, &recs->hash);
 		} else
 			xdf1->rchg[i] = 1;
 	}
@@ -286,7 +282,6 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 		if (dis2[i] == 1 ||
 		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, xdf2->dstart, xdf2->dend))) {
 			rust_ivec_push(&xdf2->rindex, &i);
-			rust_ivec_push(&xdf2->hash, &recs->hash);
 		} else
 			xdf2->rchg[i] = 1;
 	}
