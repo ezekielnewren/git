@@ -90,7 +90,7 @@ impl xdfenv_t {
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		xe.count_occurrences();
+		// xe.count_occurrences();
 
 		xe
 	}

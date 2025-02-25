@@ -27,7 +27,6 @@
 #define XDL_MAX_EQLIMIT 1024
 #define XDL_SIMSCAN_WINDOW 100
 
-
 typedef struct {
 	xrecord_t key;
 	u64 value;
@@ -136,13 +135,7 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 	xdl_mph_free(&mph);
 }
 
-
-#ifndef NO_RUST
-extern int rust_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags);
-static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
-	return rust_xdl_prepare_ctx(mf, xdf, flags);
-}
-#else
+#ifdef NO_RUST
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	long bsize;
 	char const *blk, *cur, *top, *prev;
@@ -258,7 +251,7 @@ static int xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdfenv_t *xe) {
+static void xdl_cleanup_records(xdfenv_t *xe) {
 	isize i, nm, mlim1, mlim2;
 
 	ivec_u8 dis1;
@@ -307,8 +300,6 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 
 	rust_ivec_free(&dis1);
 	rust_ivec_free(&dis2);
-
-	return 0;
 }
 
 
@@ -337,17 +328,26 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 
 
 
-static int xdl_optimize_ctxs(xdfenv_t *xe) {
+static void xdl_optimize_ctxs(xdfenv_t *xe) {
 	xdl_trim_ends(xe);
-	if (xdl_cleanup_records(xe) < 0) {
+	xdl_cleanup_records(xe);
+}
 
-		return -1;
+#ifndef NO_RUST
+extern i32 rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe);
+i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
+	rust_xdl_prepare_env(mf1, mf2, flags, xe);
+
+	xdl_count_occurrences(xe);
+
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(xe);
 	}
 
 	return 0;
 }
-
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
+#else
+i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	IVEC_INIT(xe->occurrence);
 	xe->delta_start = 0;
 	xe->delta_end = 0;
@@ -363,11 +363,10 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 
 	xdl_count_occurrences(xe);
 
-	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 &&
-	    xdl_optimize_ctxs(xe) < 0) {
-		xdl_free_env(xe);
-		return -1;
-	    }
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(xe);
+	}
 
 	return 0;
 }
+#endif
