@@ -243,7 +243,6 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
  */
 static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2) {
 	long i, nm, mlim;
-	xrecord_t *recs;
 	xdlclass_t *rcrec;
 
 	ivec_u8 dis1;
@@ -260,22 +259,23 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 
 	if ((mlim = xdl_bogosqrt(xdf1->record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xdf1->dstart, recs = &xdf1->record.ptr[xdf1->dstart]; i <= xdf1->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->hash];
+	for (i = xdf1->dstart; i <= xdf1->dend; i++) {
+		xrecord_t *rec = &xdf1->record.ptr[i];
+		rcrec = cf->rcrecs[rec->hash];
 		nm = rcrec ? rcrec->len2 : 0;
 		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
 	if ((mlim = xdl_bogosqrt(xdf2->record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xdf2->dstart, recs = &xdf2->record.ptr[xdf2->dstart]; i <= xdf2->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->hash];
+	for (i = xdf2->dstart; i <= xdf2->dend; i++) {
+		xrecord_t *rec = &xdf2->record.ptr[i];
+		rcrec = cf->rcrecs[rec->hash];
 		nm = rcrec ? rcrec->len1 : 0;
 		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	for (i = xdf1->dstart, recs = &xdf1->record.ptr[xdf1->dstart];
-	     i <= xdf1->dend; i++, recs++) {
+	for (i = xdf1->dstart; i <= xdf1->dend; i++) {
 		if (dis1.ptr[i] == 1 ||
 		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xdf1->dstart, xdf1->dend))) {
 			rust_ivec_push(&xdf1->rindex, &i);
@@ -283,8 +283,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 			xdf1->rchg[i] = 1;
 	}
 
-	for (i = xdf2->dstart, recs = &xdf2->record.ptr[xdf2->dstart];
-	     i <= xdf2->dend; i++, recs++) {
+	for (i = xdf2->dstart; i <= xdf2->dend; i++) {
 		if (dis2.ptr[i] == 1 ||
 		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xdf2->dstart, xdf2->dend))) {
 			rust_ivec_push(&xdf2->rindex, &i);
