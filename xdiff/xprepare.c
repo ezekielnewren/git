@@ -245,19 +245,25 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 	long i, nm, mlim;
 	xrecord_t *recs;
 	xdlclass_t *rcrec;
-	char *dis, *dis1, *dis2;
 
-	if (!XDL_CALLOC_ARRAY(dis, xdf1->record.length + xdf2->record.length + 2))
-		return -1;
-	dis1 = dis;
-	dis2 = dis1 + xdf1->record.length + 1;
+	ivec_u8 dis1;
+	ivec_u8 dis2;
+
+	u8 default_value = NO;
+
+	IVEC_INIT(dis1);
+	rust_ivec_resize_exact(&dis1, xdf1->rchg_vec.length, &default_value);
+
+	IVEC_INIT(dis2);
+	rust_ivec_resize_exact(&dis2, xdf2->rchg_vec.length, &default_value);
+
 
 	if ((mlim = xdl_bogosqrt(xdf1->record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xdf1->dstart, recs = &xdf1->record.ptr[xdf1->dstart]; i <= xdf1->dend; i++, recs++) {
 		rcrec = cf->rcrecs[recs->hash];
 		nm = rcrec ? rcrec->len2 : 0;
-		dis1[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
+		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
 	if ((mlim = xdl_bogosqrt(xdf2->record.length)) > XDL_MAX_EQLIMIT)
@@ -265,13 +271,13 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 	for (i = xdf2->dstart, recs = &xdf2->record.ptr[xdf2->dstart]; i <= xdf2->dend; i++, recs++) {
 		rcrec = cf->rcrecs[recs->hash];
 		nm = rcrec ? rcrec->len1 : 0;
-		dis2[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
+		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
 	for (i = xdf1->dstart, recs = &xdf1->record.ptr[xdf1->dstart];
 	     i <= xdf1->dend; i++, recs++) {
-		if (dis1[i] == 1 ||
-		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, xdf1->dstart, xdf1->dend))) {
+		if (dis1.ptr[i] == 1 ||
+		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xdf1->dstart, xdf1->dend))) {
 			rust_ivec_push(&xdf1->rindex, &i);
 		} else
 			xdf1->rchg[i] = 1;
@@ -279,14 +285,15 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 
 	for (i = xdf2->dstart, recs = &xdf2->record.ptr[xdf2->dstart];
 	     i <= xdf2->dend; i++, recs++) {
-		if (dis2[i] == 1 ||
-		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, xdf2->dstart, xdf2->dend))) {
+		if (dis2.ptr[i] == 1 ||
+		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xdf2->dstart, xdf2->dend))) {
 			rust_ivec_push(&xdf2->rindex, &i);
 		} else
 			xdf2->rchg[i] = 1;
 	}
 
-	xdl_free(dis);
+	rust_ivec_free(&dis1);
+	rust_ivec_free(&dis2);
 
 	return 0;
 }
