@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use interop::ivec::IVec;
 use crate::xrecord::xrecord_t;
 use crate::xtypes::ConsiderLine::*;
-use crate::xtypes::Occurrence;
+use crate::xtypes::{MinimalPerfectHash, Occurrence};
 use crate::xutils::LineReader;
 
 const XDL_KPDIS_RUN: u64 = 4;
@@ -90,7 +90,7 @@ impl xdfenv_t {
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		// xe.count_occurrences();
+		xe.count_occurrences();
 
 		xe
 	}
@@ -131,40 +131,23 @@ impl xdfenv_t {
 
 
 	pub(crate) fn count_occurrences(&mut self) {
-		let mut mph = HashMap::<xrecord_t, u64>::new();
-		let mut count = 0;
+		let mut mph = MinimalPerfectHash::<xrecord_t>::default();
 
 		for rec in self.xdf1.record.as_slice() {
-			let minimal_perfect_hash;
-			if let Some(v) = mph.get(rec) {
-				self.occurrence[*v as usize].file1 += 1;
-				minimal_perfect_hash = *v;
-			} else {
-				minimal_perfect_hash = count;
-				self.occurrence.push(Occurrence {
-					file1: 1,
-					file2: 0,
-				});
-				mph.insert(rec.clone(), count);
-				count += 1;
+			let minimal_perfect_hash = mph.hash(rec);
+			if minimal_perfect_hash == self.occurrence.len() as u64 {
+				self.occurrence.push(Occurrence::default());
 			}
+			self.occurrence[minimal_perfect_hash as usize].file1 += 1;
 			self.xdf1.minimal_perfect_hash.push(minimal_perfect_hash);
 		}
 
 		for rec in self.xdf2.record.as_slice() {
-			let minimal_perfect_hash;
-			if let Some(v) = mph.get(rec) {
-				self.occurrence[*v as usize].file2 += 1;
-				minimal_perfect_hash = *v;
-			} else {
-				minimal_perfect_hash = count;
-				self.occurrence.push(Occurrence {
-					file1: 0,
-					file2: 1,
-				});
-				mph.insert(rec.clone(), count);
-				count += 1;
+			let minimal_perfect_hash = mph.hash(rec);
+			if minimal_perfect_hash == self.occurrence.len() as u64 {
+				self.occurrence.push(Occurrence::default());
 			}
+			self.occurrence[minimal_perfect_hash as usize].file2 += 1;
 			self.xdf2.minimal_perfect_hash.push(minimal_perfect_hash);
 		}
 	}

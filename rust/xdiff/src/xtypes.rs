@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use std::hash::{BuildHasherDefault, Hasher};
+use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hash, Hasher};
 use crate::xrecord::xrecord_t;
 
 
@@ -110,6 +111,35 @@ impl Default for DJB2a {
 		}
 	}
 }
+
+pub struct MinimalPerfectHash<T: Hash + Eq + Clone> {
+	map: HashMap<T, u64>,
+	count: u64,
+}
+
+impl<T: Hash + Eq + Clone> Default for MinimalPerfectHash<T> {
+	fn default() -> Self {
+		Self {
+			map: HashMap::new(),
+			count: 0,
+		}
+	}
+}
+
+
+impl<T: Hash + Eq + Clone> MinimalPerfectHash<T> {
+
+	pub fn hash(&mut self, key: &T) -> u64 {
+		if !self.map.contains_key(key) {
+			self.map.insert(key.clone(), self.count);
+			self.count += 1;
+		}
+		self.map[key]
+	}
+
+}
+
+
 
 
 #[cfg(test)]

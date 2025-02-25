@@ -96,9 +96,7 @@ static u64 xdl_mph_hash(xdlmph_t *mph, xrecord_t *key) {
 
 static void xdl_count_occurrences(xdfenv_t *xe) {
 	xdlmph_t mph;
-
 	xdl_mph_init(&mph, xe->xdf1.record.length + xe->xdf2.record.length);
-
 
 	for (usize i = 0; i < xe->xdf1.record.length; i++) {
 		u64 minimal_perfect_hash;
@@ -334,7 +332,7 @@ extern i32 rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_
 i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	rust_xdl_prepare_env(mf1, mf2, flags, xe);
 
-	xdl_count_occurrences(xe);
+	// xdl_count_occurrences(xe);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		xdl_optimize_ctxs(xe);
