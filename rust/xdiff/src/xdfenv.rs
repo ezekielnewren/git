@@ -14,6 +14,8 @@ pub struct xdfenv_t {
 	pub xdf1: xdfile_t,
 	pub xdf2: xdfile_t,
 	pub occurrence: IVec<Occurrence>,
+	pub delta_start: isize,
+	pub delta_end: isize,
 }
 
 
@@ -23,8 +25,6 @@ pub struct xdfile_t {
 	pub minimal_perfect_hash: IVec<u64>,
 	pub rchg_vec: IVec<u8>,
 	pub rindex: IVec<isize>,
-	pub dstart: isize,
-	pub dend: isize,
 	pub rchg: *mut u8,
 }
 
@@ -36,8 +36,6 @@ impl Default for xdfile_t {
 			minimal_perfect_hash: IVec::new(),
 			rchg_vec: IVec::new(),
 			rindex: IVec::new(),
-			dstart: 0,
-			dend: 0,
 			rchg: std::ptr::null_mut(),
 		}
 	}

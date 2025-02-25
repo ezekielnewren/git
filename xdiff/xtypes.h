@@ -60,13 +60,14 @@ typedef struct s_xdfile {
 	ivec_u64 minimal_perfect_hash;
 	ivec_u8 rchg_vec;
 	ivec_isize rindex;
-	isize dstart, dend;
 	u8 *rchg;
 } xdfile_t;
 
 typedef struct s_xdfenv {
 	xdfile_t xdf1, xdf2;
 	ivec_xdloccurrence_t occurrence;
+	isize delta_start;
+	isize delta_end;
 } xdfenv_t;
 
 

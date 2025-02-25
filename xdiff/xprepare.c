@@ -175,8 +175,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	}
 
 	xdf->rchg = xdf->rchg_vec.ptr + 1;
-	xdf->dstart = 0;
-	xdf->dend = xdf->record.length - 1;
 
 	return 0;
 }
@@ -267,6 +265,8 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 	ivec_u8 dis2;
 
 	u8 default_value = NO;
+	isize end1 = xe->xdf1.record.length - 1 - xe->delta_end;
+	isize end2 = xe->xdf2.record.length - 1 - xe->delta_end;
 
 	IVEC_INIT(dis1);
 	rust_ivec_resize_exact(&dis1, xe->xdf1.rchg_vec.length, &default_value);
@@ -276,30 +276,30 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 
 
 	mlim1 = XDL_MIN(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe->xdf1.record.length));
-	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
+	for (i = xe->delta_start; i <= end1; i++) {
 		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
 		nm = xe->occurrence.ptr[mph].file1;
 		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim1) ? 2: 1;
 	}
 
 	mlim2 = XDL_MIN(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe->xdf2.record.length));
-	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
+	for (i = xe->delta_start; i <= end2; i++) {
 		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
 		nm = xe->occurrence.ptr[mph].file1;
 		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim2) ? 2: 1;
 	}
 
-	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
+	for (i = xe->delta_start; i <= end1; i++) {
 		if (dis1.ptr[i] == 1 ||
-		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch(&dis1, i, xe->xdf1.dstart, xe->xdf1.dend))) {
+		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch(&dis1, i, xe->delta_start, end1))) {
 			rust_ivec_push(&xe->xdf1.rindex, &i);
 		} else
 			xe->xdf1.rchg[i] = 1;
 	}
 
-	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
+	for (i = xe->delta_start; i <= end2; i++) {
 		if (dis2.ptr[i] == 1 ||
-		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch(&dis2, i, xe->xdf2.dstart, xe->xdf2.dend))) {
+		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch(&dis2, i, xe->delta_start, end2))) {
 			rust_ivec_push(&xe->xdf2.rindex, &i);
 		} else
 			xe->xdf2.rchg[i] = 1;
@@ -320,18 +320,16 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 	ivec_u64 *mph2 = &xe->xdf2.minimal_perfect_hash;
 
 	usize lim = XDL_MIN(mph1->length, mph2->length);
-	for (usize i = 0; i < lim; i++) {
+	for (isize i = 0; i < lim; i++) {
 		if (mph1->ptr[i] != mph2->ptr[i]) {
-			xe->xdf1.dstart = i;
-			xe->xdf2.dstart = i;
+			xe->delta_start = i;
 			break;
 		}
 	}
 
-	for (usize i = 0; i < lim; i++) {
+	for (isize i = 0; i < lim; i++) {
 		if (mph1->ptr[mph1->length - 1 - i] != mph2->ptr[mph2->length - 1 - i]) {
-			xe->xdf1.dend = mph1->length - 1 - i;
-			xe->xdf2.dend = mph2->length - 1 - i;
+			xe->delta_end = i;
 			break;
 		}
 	}
@@ -351,6 +349,8 @@ static int xdl_optimize_ctxs(xdfenv_t *xe) {
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	IVEC_INIT(xe->occurrence);
+	xe->delta_start = 0;
+	xe->delta_end = 0;
 
 	if (xdl_prepare_ctx(mf1, &xe->xdf1, flags) < 0) {
 		return -1;
