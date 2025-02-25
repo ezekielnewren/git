@@ -73,8 +73,8 @@ static u64 xdl_mph_hash(xdlmph_t *mph, xrecord_t *key) {
 	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
 		node = &mph->kv.ptr[index];
 		if (node->key.line_hash == key->line_hash &&
-				xdl_recmatch((const char *) node->key.ptr, node->key.size,
-					(const char *) key->ptr, key->size, key->flags))
+				xdl_recmatch(node->key.ptr, node->key.size,
+					key->ptr, key->size, key->flags))
 			break;
 		index = node->next;
 	}
@@ -132,7 +132,7 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 #ifdef NO_RUST
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	long bsize;
-	char const *blk, *cur, *top, *prev;
+	u8 const *blk, *cur, *top, *prev;
 	u8 default_value = 0;
 
 	IVEC_INIT(xdf->record);

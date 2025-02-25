@@ -135,28 +135,27 @@ int xdl_blankline(const char *line, long size, long flags)
  * Have we eaten everything on the line, except for an optional
  * CR at the very end?
  */
-static int ends_with_optional_cr(const char *l, long s, long i)
+static bool ends_with_optional_cr(u8 const* l, usize s, usize i)
 {
-	int complete = s && l[s-1] == '\n';
+	bool complete = s && l[s-1] == '\n';
 
 	if (complete)
 		s--;
 	if (s == i)
-		return 1;
+		return true;
 	/* do not ignore CR at the end of an incomplete line */
 	if (complete && s == i + 1 && l[i] == '\r')
-		return 1;
-	return 0;
+		return true;
+	return false;
 }
 
-int xdl_recmatch(const char *l1, long s1, const char *l2, long s2, long flags)
-{
-	int i1, i2;
+bool xdl_recmatch(u8 const* l1, usize s1, u8 const* l2, usize s2, u64 flags) {
+	usize i1, i2;
 
 	if (s1 == s2 && !memcmp(l1, l2, s1))
-		return 1;
+		return true;
 	if (!(flags & XDF_WHITESPACE_FLAGS))
-		return 0;
+		return false;
 
 	i1 = 0;
 	i2 = 0;
@@ -228,11 +227,10 @@ int xdl_recmatch(const char *l1, long s1, const char *l2, long s2, long flags)
 	return 1;
 }
 
-static unsigned long xdl_hash_record_with_whitespace(char const **data,
-		char const *top, long flags) {
-	unsigned long ha = 5381;
-	char const *ptr = *data;
-	int cr_at_eol_only = (flags & XDF_WHITESPACE_FLAGS) == XDF_IGNORE_CR_AT_EOL;
+static u64 xdl_hash_record_with_whitespace(u8 const** data, u8 const* top, u64 flags) {
+	u64 hash = 5381;
+	u8 const* ptr = *data;
+	bool cr_at_eol_only = (flags & XDF_WHITESPACE_FLAGS) == XDF_IGNORE_CR_AT_EOL;
 
 	for (; ptr < top && *ptr != '\n'; ptr++) {
 		if (cr_at_eol_only) {
@@ -242,8 +240,8 @@ static unsigned long xdl_hash_record_with_whitespace(char const **data,
 				continue;
 		}
 		else if (XDL_ISSPACE(*ptr)) {
-			const char *ptr2 = ptr;
-			int at_eol;
+			u8 const* ptr2 = ptr;
+			bool at_eol;
 			while (ptr + 1 < top && XDL_ISSPACE(ptr[1])
 					&& ptr[1] != '\n')
 				ptr++;
@@ -252,41 +250,41 @@ static unsigned long xdl_hash_record_with_whitespace(char const **data,
 				; /* already handled */
 			else if (flags & XDF_IGNORE_WHITESPACE_CHANGE
 				 && !at_eol) {
-				ha += (ha << 5);
-				ha ^= (unsigned long) ' ';
+				hash += (hash << 5);
+				hash ^= (u64) ' ';
 			}
 			else if (flags & XDF_IGNORE_WHITESPACE_AT_EOL
 				 && !at_eol) {
 				while (ptr2 != ptr + 1) {
-					ha += (ha << 5);
-					ha ^= (unsigned long) *ptr2;
+					hash += (hash << 5);
+					hash ^= (u64) *ptr2;
 					ptr2++;
 				}
 			}
 			continue;
 		}
-		ha += (ha << 5);
-		ha ^= (unsigned long) *ptr;
+		hash += (hash << 5);
+		hash ^= (u64) *ptr;
 	}
 	*data = ptr < top ? ptr + 1: ptr;
 
-	return ha;
+	return hash;
 }
 
-unsigned long xdl_hash_record(char const **data, char const *top, long flags) {
-	unsigned long ha = 5381;
-	char const *ptr = *data;
+u64 xdl_hash_record(u8 const** data, u8 const* top, u64 flags) {
+	u64 hash = 5381;
+	u8 const* ptr = *data;
 
 	if (flags & XDF_WHITESPACE_FLAGS)
 		return xdl_hash_record_with_whitespace(data, top, flags);
 
 	for (; ptr < top && *ptr != '\n'; ptr++) {
-		ha += (ha << 5);
-		ha ^= (unsigned long) *ptr;
+		hash += (hash << 5);
+		hash ^= (u64) *ptr;
 	}
 	*data = ptr < top ? ptr + 1: ptr;
 
-	return ha;
+	return hash;
 }
 
 unsigned int xdl_hashbits(unsigned int size) {
