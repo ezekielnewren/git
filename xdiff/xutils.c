@@ -250,21 +250,18 @@ static u64 xdl_hash_record_with_whitespace(u8 const** data, u8 const* top, u64 f
 				; /* already handled */
 			else if (flags & XDF_IGNORE_WHITESPACE_CHANGE
 				 && !at_eol) {
-				hash += (hash << 5);
-				hash ^= (u64) ' ';
+				hash = hash * 33 ^ (u64) ' ';
 			}
 			else if (flags & XDF_IGNORE_WHITESPACE_AT_EOL
 				 && !at_eol) {
 				while (ptr2 != ptr + 1) {
-					hash += (hash << 5);
-					hash ^= (u64) *ptr2;
+					hash = hash * 33 ^ (u64) *ptr2;
 					ptr2++;
 				}
 			}
 			continue;
 		}
-		hash += (hash << 5);
-		hash ^= (u64) *ptr;
+		hash = hash * 33 ^ (u64) *ptr;
 	}
 	*data = ptr < top ? ptr + 1: ptr;
 
@@ -279,8 +276,7 @@ u64 xdl_hash_record(u8 const** data, u8 const* top, u64 flags) {
 		return xdl_hash_record_with_whitespace(data, top, flags);
 
 	for (; ptr < top && *ptr != '\n'; ptr++) {
-		hash += (hash << 5);
-		hash ^= (u64) *ptr;
+		hash = hash * 33 ^ (u64) *ptr;
 	}
 	*data = ptr < top ? ptr + 1: ptr;
 
