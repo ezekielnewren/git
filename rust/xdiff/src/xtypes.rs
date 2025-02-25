@@ -38,6 +38,7 @@ pub enum ConsiderLine {
 	NO,
 }
 
+#[repr(C)]
 #[derive(Default)]
 pub struct Occurrence {
 	pub file1: usize,
@@ -61,7 +62,6 @@ impl Occurrence {
 		}
 	}
 }
-
 
 /// This is the same hash algorithm that was used in the c version of xdiff
 pub struct DJB2a {

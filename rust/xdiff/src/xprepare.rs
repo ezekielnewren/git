@@ -14,7 +14,6 @@ pub(crate) fn xdl_prepare_ctx(mf: &[u8], xdf: &mut xdfile_t, flags: u64) {
 
     if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
         xdf.rindex.reserve_exact(xdf.record.len() + 1);
-        xdf.hash.reserve_exact(xdf.record.len() + 1);
     }
 
     xdf.rchg = unsafe { xdf.rchg_vec.as_mut_ptr().add(1) };

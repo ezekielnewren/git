@@ -3,7 +3,7 @@
 use interop::ivec::IVec;
 use crate::xrecord::xrecord_t;
 use crate::xtypes::ConsiderLine::*;
-
+use crate::xtypes::Occurrence;
 
 const XDL_KPDIS_RUN: u64 = 4;
 const XDL_MAX_EQLIMIT: u64 = 1024;
@@ -13,16 +13,16 @@ const XDL_SIMSCAN_WINDOW: u64 = 100;
 pub struct xdfenv_t {
 	pub xdf1: xdfile_t,
 	pub xdf2: xdfile_t,
-	pub minimal_perfect_hash_size: usize,
+	pub occurrence: IVec<Occurrence>,
 }
 
 
 #[repr(C)]
 pub struct xdfile_t {
 	pub record: IVec<xrecord_t>,
+	pub minimal_perfect_hash: IVec<u64>,
 	pub rchg_vec: IVec<u8>,
 	pub rindex: IVec<isize>,
-	pub hash: IVec<u64>,
 	pub dstart: isize,
 	pub dend: isize,
 	pub rchg: *mut u8,
@@ -33,9 +33,9 @@ impl Default for xdfile_t {
 	fn default() -> Self {
 		Self {
 			record: IVec::new(),
+			minimal_perfect_hash: IVec::new(),
 			rchg_vec: IVec::new(),
 			rindex: IVec::new(),
-			hash: IVec::new(),
 			dstart: 0,
 			dend: 0,
 			rchg: std::ptr::null_mut(),
@@ -57,9 +57,9 @@ impl xdfile_t {
 		#[cfg(debug_assertions)]
 		if !do_init {
 			out.record.test_invariants();
+			out.minimal_perfect_hash.test_invariants();
 			out.rindex.test_invariants();
 			out.rchg_vec.test_invariants();
-			out.hash.test_invariants();
 		}
 		out
 	}
