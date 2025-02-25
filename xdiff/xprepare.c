@@ -350,23 +350,21 @@ static int xdl_optimize_ctxs(xdfenv_t *xe) {
 	return 0;
 }
 
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		    xdfenv_t *xe) {
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	IVEC_INIT(xe->occurrence);
 
-	if (xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags) < 0) {
+	if (xdl_prepare_ctx(mf1, &xe->xdf1, flags) < 0) {
 		return -1;
 	}
 
-	if (xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags) < 0) {
+	if (xdl_prepare_ctx(mf2, &xe->xdf2, flags) < 0) {
 		xdl_free_ctx(&xe->xdf1);
 		return -1;
 	}
 
 	xdl_count_occurrences(xe);
 
-	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
-	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 &&
 	    xdl_optimize_ctxs(xe) < 0) {
 		xdl_free_env(xe);
 		return -1;
