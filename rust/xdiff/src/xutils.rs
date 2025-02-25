@@ -4,6 +4,7 @@ use std::collections::{Bound, HashMap};
 use std::hash::{BuildHasher, Hash};
 use std::ops::{Range, RangeBounds};
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
+use crate::xrecord::IterWhiteSpace;
 
 pub fn line_length(data: &[u8]) -> (usize, usize) {
 	let (mut no_eol, mut with_eol) = (data.len(), data.len());
@@ -155,9 +156,51 @@ pub(crate) fn xdl_hash_record(slice: &[u8], flags: u64) -> (u64, usize) {
 	(hash, with_eol)
 }
 
+pub fn chunked_iter_equal<'a, T, IT0, IT1>(mut it0: IT0, mut it1: IT1) -> bool
+where
+	T: Eq + 'a,
+	IT0: Iterator<Item = &'a [T]>,
+	IT1: Iterator<Item = &'a [T]>,
+{
+	let mut run_option0: Option<&[T]> = it0.next();
+	let mut run_option1: Option<&[T]> = it1.next();
+	let mut i0 = 0;
+	let mut i1 = 0;
+
+	while let (Some(run0), Some(run1)) = (run_option0, run_option1) {
+		while i0 < run0.len() && i1 < run1.len() {
+			if run0[i0] != run1[i1] {
+				return false;
+			}
+
+			i0 += 1;
+			i1 += 1;
+		}
+
+		if i0 == run0.len() {
+			i0 = 0;
+			run_option0 = it0.next();
+		}
+		if i1 == run1.len() {
+			i1 = 0;
+			run_option1 = it1.next();
+		}
+	}
+
+	run_option0.is_none() && run_option1.is_none()
+}
+
 #[cfg(test)]
 mod tests {
-	use crate::xutils::xdl_hash_record;
+	use crate::xutils::{chunked_iter_equal, xdl_hash_record};
+
+	#[test]
+	fn test_chunked_iter_equal() {
+		let a = [b"ab".as_slice(), b"cde".as_slice(), b"fghi".as_slice()].into_iter();
+		let b = [b"abcdef".as_slice(), b"ghi".as_slice()].into_iter();
+		let r = chunked_iter_equal(a, b);
+		assert!(r);
+	}
 
 	#[test]
 	fn test_xdl_hash_record() {
