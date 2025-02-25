@@ -35,7 +35,7 @@ typedef struct s_xdpsplit {
 } xdpsplit_t;
 
 static u64 get_mph(xdfile_t *xdf, isize index) {
-	return xdf->record.ptr[xdf->rindex.ptr[(usize) index]].hash;
+	return xdf->minimal_perfect_hash.ptr[xdf->rindex.ptr[(usize) index]];
 }
 
 /*
@@ -380,11 +380,6 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 	return xch;
 }
 
-
-static int recs_match(xrecord_t *rec1, xrecord_t *rec2)
-{
-	return rec1->hash == rec2->hash;
-}
 
 /*
  * If a line is indented more than this, get_indent() just returns this value.
@@ -747,10 +742,11 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
  * following group, expand this group to include it. Return 0 on success or -1
  * if g cannot be slid down.
  */
-static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
-{
-	if (g->end < xdf->record.length &&
-	    recs_match(&xdf->record.ptr[g->start], &xdf->record.ptr[g->end])) {
+static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g) {
+	u64 mph1 = xdf->minimal_perfect_hash.ptr[g->start];
+	u64 mph2 = xdf->minimal_perfect_hash.ptr[g->end];
+
+	if (g->end < xdf->record.length && mph1 == mph2) {
 		xdf->rchg[g->start++] = 0;
 		xdf->rchg[g->end++] = 1;
 
@@ -768,10 +764,11 @@ static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
  * into a previous group, expand this group to include it. Return 0 on success
  * or -1 if g cannot be slid up.
  */
-static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g)
-{
-	if (g->start > 0 &&
-	    recs_match(&xdf->record.ptr[g->start - 1], &xdf->record.ptr[g->end - 1])) {
+static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g) {
+	u64 mph1 = xdf->minimal_perfect_hash.ptr[g->start - 1];
+	u64 mph2 = xdf->minimal_perfect_hash.ptr[g->end - 1];
+
+	if (g->start > 0 && mph1 == mph2) {
 		xdf->rchg[--g->start] = 1;
 		xdf->rchg[--g->end] = 0;
 

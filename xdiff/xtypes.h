@@ -40,17 +40,24 @@ typedef struct s_chastore {
 } chastore_t;
 
 typedef struct {
+	usize file1;
+	usize file2;
+} xdloccurrence_t;
+
+DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
+
+typedef struct {
 	u8 const* ptr;
 	usize size;
-	u64 hash;
+	u64 line_hash;
 	u64 flags;
 } xrecord_t;
 
 DEFINE_IVEC_TYPE(xrecord_t, xrecord_t);
-DEFINE_IVEC_TYPE(xrecord_t*, xrecord_ptr_t);
 
 typedef struct s_xdfile {
 	ivec_xrecord_t record;
+	ivec_u64 minimal_perfect_hash;
 	ivec_u8 rchg_vec;
 	ivec_isize rindex;
 	isize dstart, dend;
@@ -59,6 +66,7 @@ typedef struct s_xdfile {
 
 typedef struct s_xdfenv {
 	xdfile_t xdf1, xdf2;
+	ivec_xdloccurrence_t occurrence;
 } xdfenv_t;
 
 

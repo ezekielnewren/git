@@ -47,7 +47,7 @@
 struct hashmap {
 	int nr, alloc;
 	struct entry {
-		unsigned long hash;
+		u64 minimal_perfect_hash;
 		/*
 		 * 0 = unused entry, 1 = first line, 2 = second, etc.
 		 * line2 is NON_UNIQUE if the line is not unique
@@ -87,9 +87,9 @@ static int is_anchor(xpparam_t const *xpp, const char *line)
 static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 			  int pass)
 {
-	xrecord_t *records = pass == 1 ?
-		map->env->xdf1.record.ptr : map->env->xdf2.record.ptr;
-	xrecord_t *record = &records[line - 1];
+	ivec_u64 mph_vec = pass == 1 ?
+		map->env->xdf1.minimal_perfect_hash : map->env->xdf2.minimal_perfect_hash;
+	u64 mph = mph_vec.ptr[line - 1];
 	/*
 	 * After xdl_prepare_env() (or more precisely, due to
 	 * xdl_classify_record()), the "ha" member of the records (AKA lines)
@@ -100,10 +100,10 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	 * So we multiply ha by 2 in the hope that the hashing was
 	 * "unique enough".
 	 */
-	int index = (int)((record->hash << 1) % map->alloc);
+	int index = (int)((mph << 1) % map->alloc);
 
 	while (map->entries[index].line1) {
-		if (map->entries[index].hash != record->hash) {
+		if (map->entries[index].minimal_perfect_hash != mph) {
 			if (++index >= map->alloc)
 				index = 0;
 			continue;
@@ -119,7 +119,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	if (pass == 2)
 		return;
 	map->entries[index].line1 = line;
-	map->entries[index].hash = record->hash;
+	map->entries[index].minimal_perfect_hash = mph;
 	map->entries[index].anchor = is_anchor(xpp, (const char *) map->env->xdf1.record.ptr[line - 1].ptr);
 	if (!map->first)
 		map->first = map->entries + index;
@@ -245,9 +245,9 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 
 static int match(struct hashmap *map, int line1, int line2)
 {
-	xrecord_t *record1 = &map->env->xdf1.record.ptr[line1 - 1];
-	xrecord_t *record2 = &map->env->xdf2.record.ptr[line2 - 1];
-	return record1->hash == record2->hash;
+	u64 mph1 = map->env->xdf1.minimal_perfect_hash.ptr[line1 - 1];
+	u64 mph2 = map->env->xdf2.minimal_perfect_hash.ptr[line2 - 1];
+	return mph1 == mph2;
 }
 
 static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
