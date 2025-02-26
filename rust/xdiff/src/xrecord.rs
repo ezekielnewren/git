@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use ahash::AHasher;
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
 use crate::xtypes::DJB2a;
-use crate::xutils::XDL_ISSPACE;
+use crate::xutils::{chunked_iter_equal, XDL_ISSPACE};
 
 #[repr(C)]
 #[derive(Clone)]
@@ -37,17 +37,9 @@ impl PartialEq<Self> for xrecord_t {
         if (self.flags&XDF_WHITESPACE_FLAGS) == 0 {
             self.as_ref() == other.as_ref()
         } else {
-            let mut lhs = Vec::new();
-            for run in IterWhiteSpace::new(self.as_ref(), self.flags) {
-                lhs.extend_from_slice(run);
-            }
-
-            let mut rhs = Vec::new();
-            for run in IterWhiteSpace::new(other.as_ref(), other.flags) {
-                rhs.extend_from_slice(run);
-            }
-
-            lhs.as_slice() == rhs.as_slice()
+            let lhs = IterWhiteSpace::new(self.as_ref(), self.flags);
+            let rhs = IterWhiteSpace::new(other.as_ref(), other.flags);
+            chunked_iter_equal(lhs, rhs)
         }
     }
 }
