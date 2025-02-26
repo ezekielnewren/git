@@ -196,10 +196,27 @@ mod tests {
 
 	#[test]
 	fn test_chunked_iter_equal() {
-		let a = [b"ab".as_slice(), b"cde".as_slice(), b"fghi".as_slice()].into_iter();
-		let b = [b"abcdef".as_slice(), b"ghi".as_slice()].into_iter();
-		let r = chunked_iter_equal(a, b);
-		assert!(r);
+		let tv = vec![
+			/* should be true */
+			(true, vec!["hello ", "world"], vec!["hel", "lo wo", "rld"]),
+			(true, vec!["hel", "lo wo", "rld"], vec!["hello ", "world"]),
+			(true, vec!["hello world"], vec!["hello world"]),
+			(true, vec![], vec![]),
+
+			/* should be false */
+			(false, vec!["abc"], vec!["abc", "de"]),
+			(false, vec!["abc", "de"], vec!["abc"]),
+			(false, vec![], vec!["a"]),
+			(false, vec!["a"], vec![]),
+			(false, vec!["abc", "kj"], vec!["abc", "de"]),
+		];
+
+		for (expected, lhs, rhs) in tv.into_iter() {
+			let it0 = lhs.into_iter().map(|s| s.as_bytes());
+			let it1 = rhs.into_iter().map(|s| s.as_bytes());
+			let actual = chunked_iter_equal(it0, it1);
+			assert_eq!(expected, actual);
+		}
 	}
 
 	#[test]
