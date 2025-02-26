@@ -187,6 +187,22 @@ where
 		}
 	}
 
+	while let Some(run0) = run_option0 {
+		if run0.len() == 0 {
+			run_option0 = it0.next();
+		} else {
+			break;
+		}
+	}
+
+	while let Some(run1) = run_option1 {
+		if run1.len() == 0 {
+			run_option1 = it1.next();
+		} else {
+			break;
+		}
+	}
+
 	run_option0.is_none() && run_option1.is_none()
 }
 
@@ -204,14 +220,28 @@ mod tests {
 	#[test]
 	fn test_chunked_iter_equal() {
 		let tv_str: Vec<(Vec<&str>, Vec<&str>)> = vec![
-			/* should be true */
+			/* equal cases */
+			(vec!["", "", "abc"],         vec!["", "abc"]),
+			(vec!["c", "", "a"],          vec!["c", "a"]),
+			(vec!["a", "", "b", "", "c"], vec!["a", "b", "c"]),
+			(vec!["", "", "a"],           vec!["a"]),
+			(vec!["", "a"],               vec!["a"]),
+			(vec![""],                    vec![]),
+			(vec!["", ""],                vec![""]),
+			(vec!["a"],                   vec!["", "", "a"]),
+			(vec!["a"],                   vec!["", "a"]),
+			(vec![],                      vec![""]),
+			(vec![""],                    vec!["", ""]),
 			(vec!["hello ", "world"],     vec!["hel", "lo wo", "rld"]),
 			(vec!["hel", "lo wo", "rld"], vec!["hello ", "world"]),
 			(vec!["hello world"],         vec!["hello world"]),
 			(vec!["abc", "def"],          vec!["def", "abc"]),
 			(vec![],                      vec![]),
 
-			/* should be false */
+			/* different cases */
+			(vec!["abc"],       vec![]),
+			(vec!["", "", ""],  vec!["", "a"]),
+			(vec!["", "a"],     vec!["b", ""]),
 			(vec!["abc"],       vec!["abc", "de"]),
 			(vec!["abc", "de"], vec!["abc"]),
 			(vec![],            vec!["a"]),
