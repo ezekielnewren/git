@@ -423,7 +423,7 @@ void* xdl_alloc_grow_helper(void *p, long nr, long *alloc, size_t size)
 	return tmp;
 }
 
-void line_length(u8 const* start, u8 const* end, usize *no_eol, usize *with_eol) {
+void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol) {
 	usize size = end - start;
 	*no_eol = size;
 	*with_eol = size;
@@ -433,6 +433,10 @@ void line_length(u8 const* start, u8 const* end, usize *no_eol, usize *with_eol)
 			*with_eol = i+1;
 			break;
 		}
+	}
+
+	if (ignore_cr_at_eol && *no_eol > 0 && start[*no_eol - 1] == '\r') {
+		*no_eol -= 1;
 	}
 }
 

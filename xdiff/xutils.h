@@ -43,6 +43,6 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 
 /* Do not call this function, use XDL_ALLOC_GROW instead */
 void* xdl_alloc_grow_helper(void* p, long nr, long* alloc, size_t size);
-void line_length(u8 const* start, u8 const* end, usize *no_eol, usize *with_eol);
+void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol);
 
 #endif /* #if !defined(XUTILS_H) */
