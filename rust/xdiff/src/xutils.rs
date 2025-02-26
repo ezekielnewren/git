@@ -190,58 +190,44 @@ where
 	run_option0.is_none() && run_option1.is_none()
 }
 
+
 #[cfg(test)]
 mod tests {
+	use std::iter::Map;
+	use std::slice::Iter;
 	use crate::xutils::{chunked_iter_equal, xdl_hash_record};
+
+	fn get_str_it<'a>(vec: &'a Vec<&str>) -> Map<Iter<'a, &'a str>, fn(&'a &str) -> &'a [u8]> {
+		vec.iter().map(|v| (*v).as_bytes())
+	}
 
 	#[test]
 	fn test_chunked_iter_equal() {
-		let tv_str = vec![
+		let tv_str: Vec<(Vec<&str>, Vec<&str>)> = vec![
 			/* should be true */
-			(true, vec!["hello ", "world"],     vec!["hel", "lo wo", "rld"]),
-			(true, vec!["hel", "lo wo", "rld"], vec!["hello ", "world"]),
-			(true, vec!["hello world"],         vec!["hello world"]),
-			(true, vec!["abc", "def"],          vec!["def", "abc"]),
-			(true, vec![],                      vec![]),
+			(vec!["hello ", "world"],     vec!["hel", "lo wo", "rld"]),
+			(vec!["hel", "lo wo", "rld"], vec!["hello ", "world"]),
+			(vec!["hello world"],         vec!["hello world"]),
+			(vec!["abc", "def"],          vec!["def", "abc"]),
+			(vec![],                      vec![]),
 
 			/* should be false */
-			(false, vec!["abc"],       vec!["abc", "de"]),
-			(false, vec!["abc", "de"], vec!["abc"]),
-			(false, vec![],            vec!["a"]),
-			(false, vec!["a"],         vec![]),
-			(false, vec!["abc", "kj"], vec!["abc", "de"]),
+			(vec!["abc"],       vec!["abc", "de"]),
+			(vec!["abc", "de"], vec!["abc"]),
+			(vec![],            vec!["a"]),
+			(vec!["a"],         vec![]),
+			(vec!["abc", "kj"], vec!["abc", "de"]),
 		];
 
-		for (expected, lhs, rhs) in tv_str.into_iter() {
-			let it0 = lhs.into_iter().map(|s| s.as_bytes());
-			let it1 = rhs.into_iter().map(|s| s.as_bytes());
+		for (lhs, rhs) in tv_str.iter() {
+			let a: Vec<u8> = get_str_it(lhs).flatten().copied().collect();
+			let b: Vec<u8> = get_str_it(rhs).flatten().copied().collect();
+			let expected = a.as_slice() == b.as_slice();
+
+			let it0 = get_str_it(lhs);
+			let it1 = get_str_it(rhs);
 			let actual = chunked_iter_equal(it0, it1);
 			assert_eq!(expected, actual);
-		}
-
-		let tv_int = vec![
-			(
-				true,
-			 	vec![vec![1, 2, 3], vec![4, 5], vec![6, 7]],
-			 	vec![vec![1, 2, 3], vec![4, 5, 6, 7]]
-			),
-			(
-				true,
-			 	vec![vec![1], vec![2, 3]],
-			 	vec![vec![1, 2, 3]]
-			),
-			(
-				true,
-				vec![vec![1, 2], vec![3]],
-				vec![vec![1, 2, 3]]
-			),
-		];
-
-		for (expected, lhs, rhs) in tv_int {
-			let a = lhs.iter().map(|v| v.as_slice());
-			let b = rhs.iter().map(|v| v.as_slice());
-			let r = chunked_iter_equal(a, b);
-			assert_eq!(expected, r);
 		}
 	}
 
