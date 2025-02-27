@@ -162,7 +162,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		rec.flags = flags;
 		rust_ivec_push(&xdf->record, &rec);
 	}
-	xdl_linereader_done(&it);
+	xdl_linereader_assert_done(&it);
 
 	rust_ivec_resize_exact(&xdf->rchg_vec, xdf->record.length + 2, &default_value);
 

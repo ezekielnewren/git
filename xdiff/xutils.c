@@ -308,7 +308,7 @@ bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol
 	return true;
 }
 
-void xdl_linereader_done(struct xlinereader_t *it) {
+void xdl_linereader_assert_done(struct xlinereader_t *it) {
 	u8 const* cur = it->start + it->off;
 	if (cur < it->end) {
 		BUG("not all lines were read");
@@ -438,7 +438,7 @@ bool xdl_whitespace_iter_next(struct xwhitespaceiter_t* it, u8 const** ptr, usiz
 	}
 }
 
-void xdl_whitespace_iter_done(struct xwhitespaceiter_t* it) {
+void xdl_whitespace_iter_assert_done(struct xwhitespaceiter_t* it) {
 #ifdef DEBUG
 	if (it->index < it->size) {
 		BUG("xlineiter_t: didn't consume the whole iterator");
@@ -470,7 +470,7 @@ u64 xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags) {
 			hash = hash * 33 ^ (u64) run_start[i];
 		}
 	}
-	xdl_whitespace_iter_done(&it);
+	xdl_whitespace_iter_assert_done(&it);
 
 	return hash;
 }
