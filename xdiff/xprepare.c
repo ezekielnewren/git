@@ -129,29 +129,25 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 	xdl_mph_free(&mph);
 }
 
-#ifdef NO_RUST
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
-	long bsize;
-	u8 const *blk, *cur, *top, *prev;
+	usize no_eol, with_eol;
+	u8 const* end = (u8 const*) (mf->ptr + mf->size);
 	u8 default_value = 0;
+	bool ignore = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
 
 	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->minimal_perfect_hash);
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->rchg_vec);
 
-	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
-		for (top = blk + bsize; cur < top; ) {
-			u64 line_hash;
-			xrecord_t crec;
-			prev = cur;
-			line_hash = xdl_hash_record(&cur, top, flags);
-			crec.ptr = (u8 *) prev;
-			crec.size = (long) (cur - prev);
-			crec.line_hash = line_hash;
-			crec.flags = flags;
-			rust_ivec_push(&xdf->record, &crec);
-		}
+	for (u8 const* cur = (u8 const*) mf->ptr; cur < end; cur += with_eol) {
+		xrecord_t rec;
+		xdl_line_length(cur, end, ignore, &no_eol, &with_eol);
+		rec.ptr = cur;
+		rec.size = no_eol;
+		rec.line_hash = xdl_line_hash(cur, no_eol, flags);
+		rec.flags = flags;
+		rust_ivec_push(&xdf->record, &rec);
 	}
 
 
@@ -165,7 +161,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	return 0;
 }
-#endif
 
 static void xdl_free_ctx(xdfile_t *xdf) {
 	rust_ivec_free(&xdf->rchg_vec);
