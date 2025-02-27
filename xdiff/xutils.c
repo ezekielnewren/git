@@ -440,3 +440,129 @@ void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usiz
 	}
 }
 
+/*
+ * line_size_without_eol means that for the line "ab\r\n" the size is 3
+ * if XDF_IGNORE_CR_AT_EOL is set then the size is 2
+ */
+void xdl_line_iter_init(struct xlineiter_t* it,
+	u8 const* ptr, usize line_size_without_eol, u64 flags
+) {
+#ifdef DEBUG
+	if (it == NULL) {
+		BUG("xlineiter_t is null");
+	}
+	if (ptr == NULL) {
+		BUG("xdl_line_iter_init() ptr is null");
+	}
+	if (line_size_without_eol > 0) {
+		for (usize i = 0; i < line_size_without_eol - 1; i++) {
+			if (ptr[i] == '\n') {
+				BUG("line_size_without_eol incorrect: found lf in the middle of the line");
+			}
+		}
+		if (ptr[line_size_without_eol - 1] == '\n') {
+			BUG("line_size_without_eol incorrect: found trailing lf");
+		}
+		if ((flags & XDF_IGNORE_CR_AT_EOL) != 0 && ptr[line_size_without_eol - 1] == '\r') {
+			BUG("line_size_without_eol incorrect: found trailing cr with flag XDF_IGNORE_CR_AT_EOL set");
+		}
+	}
+#endif
+	it->ptr = ptr;
+	it->size = line_size_without_eol;
+	it->index = 0;
+	it->flags = flags;
+}
+
+bool xdl_line_iter_next(struct xlineiter_t* it, u8 const** ptr, usize *run_size) {
+	if (it->index >= it->size) {
+		*ptr = NULL;
+		*run_size = 0;
+		return false;
+	}
+
+	if ((it->flags & XDF_WHITESPACE_FLAGS) == XDF_IGNORE_CR_AT_EOL
+		|| (it->flags & XDF_WHITESPACE_FLAGS) == 0) {
+		it->index = it->size;
+		*ptr = it->ptr;
+		*run_size = it->size;
+		return true;
+	}
+
+	while (true) {
+		usize start = it->index;
+		if (it->index == it->size) {
+			*ptr = NULL;
+			*run_size = 0;
+			return false;
+		}
+
+		/* return contiguous run of not space bytes */
+		while (it->index < it->size) {
+			if XDL_ISSPACE(it->ptr[it->index]) {
+				break;
+			}
+			it->index += 1;
+		}
+		if (it->index > start) {
+			*ptr = it->ptr + start;
+			*run_size = it->index - start;
+			return true;
+		}
+		/* the current byte had better be a space */
+#ifdef DEBUG
+		if (!XDL_ISSPACE(it->ptr[it->index])) {
+			BUG("xdl_line_iter_next XDL_ISSPACE() is false")
+		}
+#endif
+
+		for (; it->index < it->size; it->index++) {
+			if (!XDL_ISSPACE(it->ptr[it->index])) {
+				break;
+			}
+		}
+
+#ifdef DEBUG
+		if (it->index <= start) {
+			BUG("XDL_ISSPACE() cannot simultaneously be true and false");
+		}
+#endif
+		if ((it->flags & XDF_IGNORE_WHITESPACE_AT_EOL) != 0
+		    && it->index == it->size)
+		{
+			*ptr = NULL;
+			*run_size = 0;
+			return false;
+		}
+		if ((it->flags & XDF_IGNORE_WHITESPACE) != 0) {
+			continue;
+		}
+		if ((it->flags & XDF_IGNORE_WHITESPACE_CHANGE) != 0) {
+			const u8 *SINGLE_SPACE = " ";
+			if (it->index == it->size) {
+				continue;
+			}
+			*ptr = SINGLE_SPACE;
+			*run_size = 1;
+			return true;
+		}
+		*ptr = it->ptr + start;
+		*run_size = it->index - start;
+		return true;
+	}
+}
+
+void xdl_line_iter_done(struct xlineiter_t* it) {
+#ifdef DEBUG
+	if (it->index < it->size) {
+		BUG("xlineiter_t: didn't consume the whole iterator");
+	}
+	if (it->index > it->size) {
+		BUG("xlineiter_t: index was incremented too much");
+	}
+#endif
+	it->ptr = NULL;
+	it->size = 0;
+	it->index = 0;
+	it->flags = 0;
+}
