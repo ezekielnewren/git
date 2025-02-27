@@ -2,9 +2,7 @@
 
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-#[cfg(not(debug_assertions))]
-use ahash::AHasher;
-use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
+use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN, XDF_WHITESPACE_FLAGS};
 use crate::xtypes::DJB2a;
 use crate::xutils::{chunked_iter_equal, XDL_ISSPACE};
 
@@ -57,25 +55,27 @@ impl Hash for xrecord_t {
 impl xrecord_t {
 
     pub fn hash(slice: &[u8], flags: u64) -> u64 {
-        let mut state;
-        #[cfg(debug_assertions)]
-        {
-            state = DJB2a::default();
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            state = AHasher::default();
-        }
-        if (flags & XDF_WHITESPACE_FLAGS) == 0 {
-            state.write(slice);
+        if (flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+            #[cfg(debug_assertions)]
+            {
+                let mut state = DJB2a::default();
+                state.write(slice);
+                state.finish()
+            }
+            #[cfg(not(debug_assertions))]
+            xxhash_rust::xxh3::xxh3_64(slice)
         } else {
+            #[cfg(debug_assertions)]
+            let mut state = DJB2a::default();
+            #[cfg(not(debug_assertions))]
+            let mut state = xxhash_rust::xxh3::Xxh3::default();
             for run in IterWhiteSpace::new(slice, flags) {
                 #[cfg(test)]
                 let _view = unsafe { std::str::from_utf8_unchecked(run) };
                 state.write(run);
             }
+            state.finish()
         }
-        state.finish()
     }
 
     pub fn new(slice: &[u8], eol_len: usize, flags: u64) -> Self {
@@ -290,14 +290,5 @@ mod tests {
             let actual = extract_string(input.as_bytes(), flags, &mut buffer);
             assert_eq!(expected, actual, "input: {:?} flags: 0x{:x}", input, flags);
         }
-
-
-
-
     }
-
-
-
-
-
 }

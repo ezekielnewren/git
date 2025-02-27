@@ -158,7 +158,7 @@ mod tests {
 	use std::path::Path;
 	use crate::mock::helper::read_test_file;
 	use crate::xdfenv::{xdfenv_t, xdfile_t};
-	use crate::xdiff::{XDF_HISTOGRAM_DIFF, XDF_INDENT_HEURISTIC};
+	use crate::xdiff::{XDF_HISTOGRAM_DIFF, XDF_IGNORE_WHITESPACE_CHANGE, XDF_INDENT_HEURISTIC};
 
 	#[test]
 	fn test_prepare() {
@@ -167,6 +167,7 @@ mod tests {
 		// let mut xpp: xpparam_t = Default::default();
 		let mut _flags = XDF_HISTOGRAM_DIFF;
 		_flags |= XDF_INDENT_HEURISTIC;
+		_flags |= XDF_IGNORE_WHITESPACE_CHANGE;
 
 		let tv_name = ["salutations"];
 
