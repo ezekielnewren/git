@@ -26,7 +26,7 @@ static long xdl_get_rec(xdfile_t *xdf, long ri, char const **rec) {
 
 	*rec = (char const *) xdf->record.ptr[ri].ptr;
 
-	return xdf->record.ptr[ri].size;
+	return xdf->record.ptr[ri].size_with_eol;
 }
 
 

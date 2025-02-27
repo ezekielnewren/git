@@ -73,8 +73,8 @@ static u64 xdl_mph_hash(xdlmph_t *mph, xrecord_t *key) {
 	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
 		node = &mph->kv.ptr[index];
 		if (node->key.line_hash == key->line_hash &&
-				xdl_line_equal(node->key.ptr, node->key.size,
-					key->ptr, key->size, key->flags))
+				xdl_line_equal(node->key.ptr, node->key.size_no_eol,
+					key->ptr, key->size_no_eol, key->flags))
 			break;
 		index = node->next;
 	}
@@ -144,7 +144,8 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		xrecord_t rec;
 		xdl_line_length(cur, end, ignore, &no_eol, &with_eol);
 		rec.ptr = cur;
-		rec.size = with_eol;
+		rec.size_no_eol = no_eol;
+		rec.size_with_eol = with_eol;
 		rec.line_hash = xdl_line_hash(cur, no_eol, flags);
 		rec.flags = flags;
 		rust_ivec_push(&xdf->record, &rec);
