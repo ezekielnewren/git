@@ -1379,7 +1379,7 @@ UNIT_TEST_OBJS += $(UNIT_TEST_DIR)/lib-reftable.o
 GITLIBS = common-main.o $(LIB_FILE) $(XDIFF_LIB) $(REFTABLE_LIB) $(LIB_FILE)
 EXTLIBS =
 
-ifneq ($(NO_RUST), 1)
+ifeq ($(WITH_RUST), 1)
 	GITLIBS += $(RUST_LIB)
 endif
 
@@ -1971,8 +1971,8 @@ ifdef NO_POSIX_GOODIES
 	BASIC_CFLAGS += -DNO_POSIX_GOODIES
 endif
 
-ifeq ($(NO_RUST), 1)
-	BASIC_CFLAGS += -DNO_RUST
+ifeq ($(WITH_RUST), 1)
+	BASIC_CFLAGS += -DWITH_RUST
 endif
 
 ifdef APPLE_COMMON_CRYPTO_SHA1
@@ -2894,7 +2894,7 @@ $(LIB_FILE): $(LIB_OBJS)
 $(XDIFF_LIB): $(XDIFF_OBJS)
 	$(QUIET_AR)$(RM) $@ && $(AR) $(ARFLAGS) $@ $^
 
-ifneq ($(NO_RUST), 1)
+ifeq ($(WITH_RUST), 1)
 .PHONY: $(RUST_LIB)
 $(RUST_LIB):
 ifeq ($(DEBUG), 1)

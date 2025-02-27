@@ -40,7 +40,7 @@ void xdl_free_env(xdfenv_t *xe) {
 	rust_ivec_free(&xe->occurrence);
 }
 
-#ifdef NO_RUST
+#ifndef WITH_RUST
 typedef struct {
 	xrecord_t key;
 	u64 value;
@@ -321,7 +321,7 @@ static void xdl_optimize_ctxs(xdfenv_t *xe) {
 	xdl_cleanup_records(xe);
 }
 
-#ifndef NO_RUST
+#ifdef WITH_RUST
 extern i32 rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe);
 i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	rust_xdl_prepare_env(mf1, mf2, flags, xe);
