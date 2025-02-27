@@ -440,17 +440,10 @@ void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usiz
 	}
 }
 
-/*
- * line_size_without_eol means that for the line "ab\r\n" the size is 3
- * if XDF_IGNORE_CR_AT_EOL is set then the size is 2
- */
-void xdl_line_iter_init(struct xlineiter_t* it,
+#ifdef DEBUG
+static void validate_line_arguments(
 	u8 const* ptr, usize line_size_without_eol, u64 flags
 ) {
-#ifdef DEBUG
-	if (it == NULL) {
-		BUG("xlineiter_t is null");
-	}
 	if (ptr == NULL) {
 		BUG("xdl_line_iter_init() ptr is null");
 	}
@@ -467,6 +460,21 @@ void xdl_line_iter_init(struct xlineiter_t* it,
 			BUG("line_size_without_eol incorrect: found trailing cr with flag XDF_IGNORE_CR_AT_EOL set");
 		}
 	}
+}
+#endif
+
+/*
+ * line_size_without_eol means that for the line "ab\r\n" the size is 3
+ * if XDF_IGNORE_CR_AT_EOL is set then the size is 2
+ */
+void xdl_line_iter_init(struct xlineiter_t* it,
+	u8 const* ptr, usize line_size_without_eol, u64 flags
+) {
+#ifdef DEBUG
+	if (it == NULL) {
+		BUG("xlineiter_t is null");
+	}
+	validate_line_arguments(ptr, line_size_without_eol, flags);
 #endif
 	it->ptr = ptr;
 	it->size = line_size_without_eol;
@@ -481,8 +489,7 @@ bool xdl_line_iter_next(struct xlineiter_t* it, u8 const** ptr, usize *run_size)
 		return false;
 	}
 
-	if ((it->flags & XDF_WHITESPACE_FLAGS) == XDF_IGNORE_CR_AT_EOL
-		|| (it->flags & XDF_WHITESPACE_FLAGS) == 0) {
+	if ((it->flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
 		it->index = it->size;
 		*ptr = it->ptr;
 		*run_size = it->size;
@@ -538,7 +545,7 @@ bool xdl_line_iter_next(struct xlineiter_t* it, u8 const** ptr, usize *run_size)
 			continue;
 		}
 		if ((it->flags & XDF_IGNORE_WHITESPACE_CHANGE) != 0) {
-			const u8 *SINGLE_SPACE = " ";
+			const u8 *SINGLE_SPACE = (const u8 *) " ";
 			if (it->index == it->size) {
 				continue;
 			}
@@ -572,6 +579,10 @@ u64 xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags) {
 	u8 const* run_start;
 	usize run_size;
 
+#ifdef DEBUG
+	validate_line_arguments(ptr, line_size_without_eol, flags);
+#endif
+
 	u64 hash = 5381;
 
 	xdl_line_iter_init(&it, ptr, line_size_without_eol, flags);
@@ -591,6 +602,15 @@ bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, 
 	usize run_size1, run_size2;
 	usize i1, i2;
 	bool has_next1, has_next2;
+
+#ifdef DEBUG
+	validate_line_arguments(line1, size1, flags);
+	validate_line_arguments(line2, size2, flags);
+#endif
+
+	if ((flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
+		return memcmp(line1, line2, size1) == 0;
+	}
 
 	xdl_line_iter_init(&it1, line1, size1, flags);
 	xdl_line_iter_init(&it2, line2, size2, flags);
