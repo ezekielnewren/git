@@ -47,15 +47,6 @@ typedef struct s_xdmerge {
 	long chg0;
 } xdmerge_t;
 
-static bool recmatch(xrecord_t *rec1, xrecord_t *rec2, u64 flags) {
-	if (rec1->line_hash != rec2->line_hash) {
-		return false;
-	}
-
-	return xdl_line_equal(rec1->ptr, rec1->size_no_eol,
-			    rec2->ptr, rec2->size_no_eol, flags);
-}
-
 static int xdl_append_merge(xdmerge_t **merge, int mode,
 			    long i0, long chg0,
 			    long i1, long chg1,
@@ -103,14 +94,14 @@ static int xdl_cleanup_merge(xdmerge_t *c)
 }
 
 static int xdl_merge_cmp_lines(xdfenv_t *xe1, int i1, xdfenv_t *xe2, int i2,
-		int line_count, long flags)
+		int line_count)
 {
 	int i;
 	xrecord_t *rec1 = &xe1->xdf2.record.ptr[i1];
 	xrecord_t *rec2 = &xe2->xdf2.record.ptr[i2];
 
 	for (i = 0; i < line_count; i++) {
-		int result = recmatch(&rec1[i], &rec2[i], flags);
+		int result = xdl_record_equal(&rec1[i], &rec2[i]);
 		if (!result)
 			return -1;
 	}
@@ -334,9 +325,7 @@ static int xdl_fill_merge_buffer(xdfenv_t *xe1, const char *name1,
 /*
  * Remove any common lines from the beginning and end of the conflicted region.
  */
-static void xdl_refine_zdiff3_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
-		xpparam_t const *xpp)
-{
+static void xdl_refine_zdiff3_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m) {
 	xrecord_t *rec1 = xe1->xdf2.record.ptr, *rec2 = xe2->xdf2.record.ptr;
 	for (; m; m = m->next) {
 		/* let's handle just the conflicts */
@@ -344,15 +333,15 @@ static void xdl_refine_zdiff3_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t 
 			continue;
 
 		while(m->chg1 && m->chg2 &&
-		      recmatch(&rec1[m->i1], &rec2[m->i2], xpp->flags)) {
+		      xdl_record_equal(&rec1[m->i1], &rec2[m->i2])) {
 			m->chg1--;
 			m->chg2--;
 			m->i1++;
 			m->i2++;
 		}
 		while (m->chg1 && m->chg2 &&
-		       recmatch(&rec1[m->i1 + m->chg1 - 1],
-				&rec2[m->i2 + m->chg2 - 1], xpp->flags)) {
+		       xdl_record_equal(&rec1[m->i1 + m->chg1 - 1],
+				&rec2[m->i2 + m->chg2 - 1])) {
 			m->chg1--;
 			m->chg2--;
 		}
@@ -583,7 +572,7 @@ static int xdl_do_merge(xdfenv_t *xe1, xdchange_t *xscr1,
 				xscr1->chg2 != xscr2->chg2 ||
 				xdl_merge_cmp_lines(xe1, xscr1->i2,
 					xe2, xscr2->i2,
-					xscr1->chg2, xpp->flags)) {
+					xscr1->chg2)) {
 			/* conflict */
 			int off = xscr1->i1 - xscr2->i1;
 			int ffo = off + xscr1->chg1 - xscr2->chg1;
@@ -656,7 +645,7 @@ static int xdl_do_merge(xdfenv_t *xe1, xdchange_t *xscr1,
 		changes = c;
 	/* refine conflicts */
 	if (style == XDL_MERGE_ZEALOUS_DIFF3) {
-		xdl_refine_zdiff3_conflicts(xe1, xe2, changes, xpp);
+		xdl_refine_zdiff3_conflicts(xe1, xe2, changes);
 	} else if (XDL_MERGE_ZEALOUS <= level &&
 		   (xdl_refine_conflicts(xe1, xe2, changes, xpp) < 0 ||
 		    xdl_simplify_non_conflicts(xe1, changes,

@@ -500,3 +500,16 @@ bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, 
 
 	return !has_next1 && !has_next2;
 }
+
+bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs) {
+	if (lhs->flags != rhs->flags) {
+		BUG("xdl_record_equal flags do not match");
+	}
+
+	if (lhs->line_hash != rhs->line_hash) {
+		return false;
+	}
+
+	return xdl_line_equal(lhs->ptr, lhs->size_no_eol,
+		rhs->ptr, rhs->size_no_eol, rhs->flags);
+}

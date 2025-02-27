@@ -53,5 +53,6 @@ bool xdl_line_iter_next(struct xlineiter_t* it, u8 const** ptr, usize *run_size)
 void xdl_line_iter_done(struct xlineiter_t* it);
 u64  xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags);
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags);
+bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs);
 
 #endif /* #if !defined(XUTILS_H) */
