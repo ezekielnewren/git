@@ -53,6 +53,7 @@ void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usiz
 void xdl_line_iter_init(struct xlineiter_t* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
 bool xdl_line_iter_next(struct xlineiter_t* it, u8 const** ptr, usize *run_size);
 void xdl_line_iter_done(struct xlineiter_t* it);
-u64 xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags);
+u64  xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags);
+bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags);
 
 #endif /* #if !defined(XUTILS_H) */
