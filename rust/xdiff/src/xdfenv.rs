@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use interop::ivec::IVec;
+use crate::xdiff::XDF_IGNORE_CR_AT_EOL;
 use crate::xrecord::xrecord_t;
 use crate::xtypes::ConsiderLine::*;
 use crate::xtypes::{MinimalPerfectHash, Occurrence};
@@ -57,7 +58,8 @@ impl xdfile_t {
 	pub(crate) fn new(mf: &[u8], flags: u64) -> Self {
 		let mut xdf = Self::default();
 
-		for (line, eol_len) in LineReader::new(mf) {
+		let ignore = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
+		for (line, eol_len) in LineReader::new(mf, ignore) {
 			let rec = xrecord_t::new(line, eol_len, flags);
 			xdf.record.push(rec);
 		}

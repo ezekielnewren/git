@@ -4,9 +4,8 @@ use std::collections::{Bound, HashMap};
 use std::hash::{BuildHasher, Hash};
 use std::ops::{Range, RangeBounds};
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
-use crate::xrecord::IterWhiteSpace;
 
-pub fn line_length(data: &[u8]) -> (usize, usize) {
+pub fn line_length(data: &[u8], ignore_cr_at_eol: bool) -> (usize, usize) {
 	let (mut no_eol, mut with_eol) = (data.len(), data.len());
 	for i in 0..data.len() {
 		if data[i] == b'\n' {
@@ -16,6 +15,10 @@ pub fn line_length(data: &[u8]) -> (usize, usize) {
 		}
 	}
 
+	if ignore_cr_at_eol && 0 < no_eol && data[no_eol - 1] == b'\r' {
+		no_eol -= 1;
+	}
+
 	(no_eol, with_eol)
 }
 
@@ -23,13 +26,15 @@ pub fn line_length(data: &[u8]) -> (usize, usize) {
 pub struct LineReader<'a> {
 	content: &'a [u8],
 	off: usize,
+	ignore_cr_at_eol: bool,
 }
 
 impl<'a> LineReader<'a> {
-	pub fn new(content: &'a [u8]) -> Self {
+	pub fn new(content: &'a [u8], ignore_cr_at_eol: bool) -> Self {
 		Self {
 			content,
 			off: 0,
+			ignore_cr_at_eol,
 		}
 	}
 }
@@ -43,7 +48,7 @@ impl<'a> Iterator for LineReader<'a> {
 			return None;
 		}
 
-		let (no_eol, with_eol) = line_length(&self.content[self.off..]);
+		let (no_eol, with_eol) = line_length(&self.content[self.off..], self.ignore_cr_at_eol);
 		let slice = &self.content[self.off..self.off+no_eol];
 		self.off += with_eol;
 		let eol_len = with_eol-no_eol;
