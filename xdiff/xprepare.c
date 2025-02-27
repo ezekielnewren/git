@@ -27,6 +27,20 @@
 #define XDL_MAX_EQLIMIT 1024
 #define XDL_SIMSCAN_WINDOW 100
 
+static void xdl_free_ctx(xdfile_t *xdf) {
+	rust_ivec_free(&xdf->rchg_vec);
+	rust_ivec_free(&xdf->minimal_perfect_hash);
+	rust_ivec_free(&xdf->rindex);
+	rust_ivec_free(&xdf->record);
+}
+
+void xdl_free_env(xdfenv_t *xe) {
+	xdl_free_ctx(&xe->xdf2);
+	xdl_free_ctx(&xe->xdf1);
+	rust_ivec_free(&xe->occurrence);
+}
+
+#ifdef NO_RUST
 typedef struct {
 	xrecord_t key;
 	u64 value;
@@ -160,21 +174,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	return 0;
 }
-
-static void xdl_free_ctx(xdfile_t *xdf) {
-	rust_ivec_free(&xdf->rchg_vec);
-	rust_ivec_free(&xdf->minimal_perfect_hash);
-	rust_ivec_free(&xdf->rindex);
-	rust_ivec_free(&xdf->record);
-}
-
-
-void xdl_free_env(xdfenv_t *xe) {
-	xdl_free_ctx(&xe->xdf2);
-	xdl_free_ctx(&xe->xdf1);
-	rust_ivec_free(&xe->occurrence);
-}
-
+#endif
 
 static int xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
 	isize r, rdis0, rpdis0, rdis1, rpdis1;
@@ -358,3 +358,5 @@ i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	return 0;
 }
 #endif
+
+

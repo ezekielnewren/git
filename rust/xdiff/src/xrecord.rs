@@ -12,7 +12,8 @@ use crate::xutils::{chunked_iter_equal, XDL_ISSPACE};
 #[derive(Clone)]
 pub struct xrecord_t {
     pub ptr: *const u8,
-    pub size: usize,
+    pub size_no_eol: usize,
+    pub size_with_eol: usize,
     pub line_hash: u64,
     pub flags: u64,
 }
@@ -80,30 +81,24 @@ impl xrecord_t {
     pub fn new(slice: &[u8], eol_len: usize, flags: u64) -> Self {
         Self {
             ptr: slice.as_ptr(),
-            size: slice.len() + eol_len,
+            size_no_eol: slice.len(),
+            size_with_eol: slice.len() + eol_len,
             line_hash: Self::hash(slice, flags),
             flags,
         }
     }
 
-    pub fn has_lf(&self) -> bool {
-        self.size > 0 && unsafe { *self.ptr.add(self.size - 1) } == b'\n'
-    }
-
     pub fn len_no_eol(&self) -> usize {
-        match self.has_lf() {
-            true => self.size - 1,
-            false => self.size,
-        }
+        self.size_no_eol
     }
 
     pub fn len_with_eol(&self) -> usize {
-        self.size
+        self.size_with_eol
     }
 
     pub fn as_ref(&self) -> &[u8] {
         unsafe {
-            std::slice::from_raw_parts(self.ptr, self.len_no_eol())
+            std::slice::from_raw_parts(self.ptr, self.size_no_eol)
         }
     }
 
