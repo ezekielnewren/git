@@ -73,7 +73,7 @@ static u64 xdl_mph_hash(xdlmph_t *mph, xrecord_t *key) {
 	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
 		node = &mph->kv.ptr[index];
 		if (node->key.line_hash == key->line_hash &&
-				xdl_recmatch(node->key.ptr, node->key.size,
+				xdl_line_equal(node->key.ptr, node->key.size,
 					key->ptr, key->size, key->flags))
 			break;
 		index = node->next;

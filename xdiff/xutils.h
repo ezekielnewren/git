@@ -38,7 +38,6 @@ int xdl_cha_init(chastore_t *cha, long isize, long icount);
 void xdl_cha_free(chastore_t *cha);
 void *xdl_cha_alloc(chastore_t *cha);
 int xdl_blankline(const char *line, long size, long flags);
-bool xdl_recmatch(u8 const* l1, usize s1, u8 const* l2, usize s2, u64 flags);
 unsigned int xdl_hashbits(unsigned int size);
 int xdl_num_out(char *out, long val);
 int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,

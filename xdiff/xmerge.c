@@ -47,6 +47,15 @@ typedef struct s_xdmerge {
 	long chg0;
 } xdmerge_t;
 
+static bool recmatch(xrecord_t *rec1, xrecord_t *rec2, u64 flags) {
+	if (rec1->line_hash != rec2->line_hash) {
+		return false;
+	}
+
+	return xdl_line_equal(rec1->ptr, rec1->size,
+			    rec2->ptr, rec2->size, flags);
+}
+
 static int xdl_append_merge(xdmerge_t **merge, int mode,
 			    long i0, long chg0,
 			    long i1, long chg1,
@@ -101,8 +110,7 @@ static int xdl_merge_cmp_lines(xdfenv_t *xe1, int i1, xdfenv_t *xe2, int i2,
 	xrecord_t *rec2 = &xe2->xdf2.record.ptr[i2];
 
 	for (i = 0; i < line_count; i++) {
-		int result = xdl_recmatch(rec1[i].ptr, rec1[i].size,
-			rec2[i].ptr, rec2[i].size, flags);
+		int result = recmatch(&rec1[i], &rec2[i], flags);
 		if (!result)
 			return -1;
 	}
@@ -322,11 +330,6 @@ static int xdl_fill_merge_buffer(xdfenv_t *xe1, const char *name1,
 	return size;
 }
 
-static int recmatch(xrecord_t *rec1, xrecord_t *rec2, unsigned long flags)
-{
-	return xdl_recmatch(rec1->ptr, rec1->size,
-			    rec2->ptr, rec2->size, flags);
-}
 
 /*
  * Remove any common lines from the beginning and end of the conflicted region.

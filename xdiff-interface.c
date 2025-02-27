@@ -309,7 +309,20 @@ u64 xdiff_hash_string(const char *s, size_t len, long flags) {
 int xdiff_compare_lines(const char *l1, long s1,
 			const char *l2, long s2, long flags)
 {
-	return xdl_recmatch((u8 const*) l1, s1, (u8 const*) l2, s2, flags);
+	usize no_eol, with_eol;
+	bool ignore = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
+	u8 const* start1 = (u8 const*) l1;
+	u8 const* start2 = (u8 const*) l2;
+	u8 const* end1 = (u8 const*) (l1 + s1);
+	u8 const* end2 = (u8 const*) (l2 + s2);
+
+	xdl_line_length(start1, end1, ignore, &no_eol, &with_eol);
+	s1 = no_eol;
+
+	xdl_line_length(start2, end2, ignore, &no_eol, &with_eol);
+	s2 = no_eol;
+
+	return xdl_line_equal(start1, s1, start2, s2, flags);
 }
 
 int parse_conflict_style_name(const char *value)
