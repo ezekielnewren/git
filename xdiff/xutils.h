@@ -23,7 +23,7 @@
 #if !defined(XUTILS_H)
 #define XUTILS_H
 
-struct xlineiter_t {
+struct xwhitespaceiter_t {
 	u8 const* ptr;
 	usize size;
 	usize index;
@@ -48,9 +48,9 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 /* Do not call this function, use XDL_ALLOC_GROW instead */
 void* xdl_alloc_grow_helper(void* p, long nr, long* alloc, size_t size);
 void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol);
-void xdl_line_iter_init(struct xlineiter_t* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
-bool xdl_line_iter_next(struct xlineiter_t* it, u8 const** ptr, usize *run_size);
-void xdl_line_iter_done(struct xlineiter_t* it);
+void xdl_whitespace_iter_init(struct xwhitespaceiter_t* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
+bool xdl_whitespace_iter_next(struct xwhitespaceiter_t* it, u8 const** ptr, usize *run_size);
+void xdl_whitespace_iter_done(struct xwhitespaceiter_t* it);
 u64  xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags);
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags);
 bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs);
