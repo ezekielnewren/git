@@ -566,3 +566,21 @@ void xdl_line_iter_done(struct xlineiter_t* it) {
 	it->index = 0;
 	it->flags = 0;
 }
+
+u64 xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags) {
+	struct xlineiter_t it;
+	u8 const* run_start;
+	usize run_size;
+
+	u64 hash = 5381;
+
+	xdl_line_iter_init(&it, ptr, line_size_without_eol, flags);
+	while (xdl_line_iter_next(&it, &run_start, &run_size)) {
+		for (usize i = 0; i < run_size; i++) {
+			hash = hash * 33 ^ (u64) run_start[i];
+		}
+	}
+	xdl_line_iter_done(&it);
+
+	return hash;
+}
