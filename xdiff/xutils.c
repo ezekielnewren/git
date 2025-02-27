@@ -290,6 +290,35 @@ void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usiz
 	}
 }
 
+void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size, bool ignore_cr_at_eol) {
+	it->start = ptr;
+	it->end = ptr + size;
+	it->off = 0;
+	it->ignore_cr_at_eol = ignore_cr_at_eol;
+}
+
+bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol) {
+	*cur = it->start + it->off;
+	if (*cur == it->end)
+		return false;
+
+	xdl_line_length(*cur, it->end, it->ignore_cr_at_eol, no_eol, with_eol);
+	it->off += *with_eol;
+
+	return true;
+}
+
+void xdl_linereader_done(struct xlinereader_t *it) {
+	u8 const* cur = it->start + it->off;
+	if (cur < it->end) {
+		BUG("not all lines were read");
+	}
+
+	if (cur > it->end) {
+		BUG("xlinereader_t::off was over incremented");
+	}
+}
+
 #ifdef DEBUG
 static void validate_line_arguments(
 	u8 const* ptr, usize line_size_without_eol, u64 flags

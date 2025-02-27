@@ -31,6 +31,14 @@ struct xwhitespaceiter_t {
 };
 
 
+struct xlinereader_t {
+	u8 const* start;
+	u8 const* end;
+	usize off;
+	bool ignore_cr_at_eol;
+};
+
+
 long xdl_bogosqrt(long n);
 int xdl_emit_diffrec(char const *rec, long size, char const *pre, long psize,
 		     xdemitcb_t *ecb);
@@ -48,6 +56,9 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 /* Do not call this function, use XDL_ALLOC_GROW instead */
 void* xdl_alloc_grow_helper(void* p, long nr, long* alloc, size_t size);
 void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol);
+void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size, bool ignore_cr_at_eol);
+bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol);
+void xdl_linereader_done(struct xlinereader_t *it);
 void xdl_whitespace_iter_init(struct xwhitespaceiter_t* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
 bool xdl_whitespace_iter_next(struct xwhitespaceiter_t* it, u8 const** ptr, usize *run_size);
 void xdl_whitespace_iter_done(struct xwhitespaceiter_t* it);

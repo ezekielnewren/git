@@ -142,19 +142,19 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 }
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
+	struct xlinereader_t it;
+	u8 const* cur;
 	usize no_eol, with_eol;
-	u8 const* end = (u8 const*) (mf->ptr + mf->size);
 	u8 default_value = 0;
-	bool ignore = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
 
 	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->minimal_perfect_hash);
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->rchg_vec);
 
-	for (u8 const* cur = (u8 const*) mf->ptr; cur < end; cur += with_eol) {
+	xdl_linereader_init(&it, (u8 const*) mf->ptr, (usize) mf->size, (flags & XDF_IGNORE_CR_AT_EOL) != 0);
+	while (xdl_linereader_next(&it, &cur, &no_eol, &with_eol)) {
 		xrecord_t rec;
-		xdl_line_length(cur, end, ignore, &no_eol, &with_eol);
 		rec.ptr = cur;
 		rec.size_no_eol = no_eol;
 		rec.size_with_eol = with_eol;
@@ -162,7 +162,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		rec.flags = flags;
 		rust_ivec_push(&xdf->record, &rec);
 	}
-
+	xdl_linereader_done(&it);
 
 	rust_ivec_resize_exact(&xdf->rchg_vec, xdf->record.length + 2, &default_value);
 
