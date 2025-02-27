@@ -330,18 +330,19 @@ static void validate_line_arguments(
 	if (ptr == NULL) {
 		BUG("xdl_line_iter_init() ptr is null");
 	}
-	if (line_size_without_eol > 0) {
-		for (usize i = 0; i < line_size_without_eol - 1; i++) {
-			if (ptr[i] == '\n') {
-				BUG("line_size_without_eol incorrect: found lf in the middle of the line");
-			}
-		}
-		if (ptr[line_size_without_eol - 1] == '\n') {
-			BUG("line_size_without_eol incorrect: found trailing lf");
-		}
-		// if ((flags & XDF_IGNORE_CR_AT_EOL) != 0 && ptr[line_size_without_eol - 1] == '\r') {
-		// 	BUG("line_size_without_eol incorrect: found trailing cr with flag XDF_IGNORE_CR_AT_EOL set");
+	if (line_size_without_eol >= 1) {
+		/* this test is a bit excessive, even in DEBUG builds */
+		// for (usize i = 0; i < line_size_without_eol - 1; i++) {
+		// 	if (ptr[i] == '\n') {
+		// 		BUG("line_size_without_eol incorrect: found lf in the middle of the line");
+		// 	}
 		// }
+		if (ptr[line_size_without_eol - 1] == '\n') {
+			if ((flags & XDF_IGNORE_CR_AT_EOL) != 0 && line_size_without_eol >= 2 && ptr[line_size_without_eol - 2] == '\r')
+				BUG("line_size_without_eol incorrect: found trailing crlf with flag XDF_IGNORE_CR_AT_EOL set");
+			else
+				BUG("line_size_without_eol incorrect: found trailing lf");
+		}
 	}
 }
 #endif
