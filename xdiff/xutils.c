@@ -299,8 +299,12 @@ void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size, bo
 
 bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol) {
 	*cur = it->start + it->off;
-	if (*cur == it->end)
+	if (*cur == it->end) {
+		*cur = NULL;
+		*no_eol = 0;
+		*with_eol = 0;
 		return false;
+	}
 
 	xdl_line_length(*cur, it->end, it->ignore_cr_at_eol, no_eol, with_eol);
 	it->off += *with_eol;
