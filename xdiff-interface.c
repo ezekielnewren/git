@@ -297,9 +297,13 @@ void xdiff_clear_find_func(xdemitconf_t *xecfg)
 	}
 }
 
-unsigned long xdiff_hash_string(const char *s, size_t len, long flags)
-{
-	return xdl_hash_record((u8 const**) &s, (u8 const*) (s + len), flags);
+u64 xdiff_hash_string(const char *s, size_t len, long flags) {
+	usize no_eol, with_eol;
+	u8 const* start = (u8 const*) s;
+	u8 const* end = (u8 const*) (s + len);
+	bool ignore = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
+	xdl_line_length(start, end, ignore, &no_eol, &with_eol);
+	return xdl_line_hash(start, no_eol, flags);
 }
 
 int xdiff_compare_lines(const char *l1, long s1,

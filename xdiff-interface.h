@@ -3,6 +3,7 @@
 
 #include "hash.h"
 #include "xdiff/xdiff.h"
+#include "rust/header/types.h"
 
 /*
  * xdiff isn't equipped to handle content over a gigabyte;
@@ -70,6 +71,6 @@ int xdiff_compare_lines(const char *l1, long s1,
  * The `flags` given as XDF_WHITESPACE_FLAGS determine how white spaces
  * are treated for the hash.
  */
-unsigned long xdiff_hash_string(const char *s, size_t len, long flags);
+u64 xdiff_hash_string(const char *s, size_t len, long flags);
 
 #endif

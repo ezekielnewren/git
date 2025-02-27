@@ -227,61 +227,6 @@ bool xdl_recmatch(u8 const* l1, usize s1, u8 const* l2, usize s2, u64 flags) {
 	return 1;
 }
 
-static u64 xdl_hash_record_with_whitespace(u8 const** data, u8 const* top, u64 flags) {
-	u64 hash = 5381;
-	u8 const* ptr = *data;
-	bool cr_at_eol_only = (flags & XDF_WHITESPACE_FLAGS) == XDF_IGNORE_CR_AT_EOL;
-
-	for (; ptr < top && *ptr != '\n'; ptr++) {
-		if (cr_at_eol_only) {
-			/* do not ignore CR at the end of an incomplete line */
-			if (*ptr == '\r' &&
-			    (ptr + 1 < top && ptr[1] == '\n'))
-				continue;
-		}
-		else if (XDL_ISSPACE(*ptr)) {
-			u8 const* ptr2 = ptr;
-			bool at_eol;
-			while (ptr + 1 < top && XDL_ISSPACE(ptr[1])
-					&& ptr[1] != '\n')
-				ptr++;
-			at_eol = (top <= ptr + 1 || ptr[1] == '\n');
-			if (flags & XDF_IGNORE_WHITESPACE)
-				; /* already handled */
-			else if (flags & XDF_IGNORE_WHITESPACE_CHANGE
-				 && !at_eol) {
-				hash = hash * 33 ^ (u64) ' ';
-			}
-			else if (flags & XDF_IGNORE_WHITESPACE_AT_EOL
-				 && !at_eol) {
-				while (ptr2 != ptr + 1) {
-					hash = hash * 33 ^ (u64) *ptr2;
-					ptr2++;
-				}
-			}
-			continue;
-		}
-		hash = hash * 33 ^ (u64) *ptr;
-	}
-	*data = ptr < top ? ptr + 1: ptr;
-
-	return hash;
-}
-
-u64 xdl_hash_record(u8 const** data, u8 const* top, u64 flags) {
-	u64 hash = 5381;
-	u8 const* ptr = *data;
-
-	if (flags & XDF_WHITESPACE_FLAGS)
-		return xdl_hash_record_with_whitespace(data, top, flags);
-
-	for (; ptr < top && *ptr != '\n'; ptr++) {
-		hash = hash * 33 ^ (u64) *ptr;
-	}
-	*data = ptr < top ? ptr + 1: ptr;
-
-	return hash;
-}
 
 unsigned int xdl_hashbits(unsigned int size) {
 	unsigned int val = 1, bits = 0;
