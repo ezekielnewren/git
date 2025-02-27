@@ -144,7 +144,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		xrecord_t rec;
 		xdl_line_length(cur, end, ignore, &no_eol, &with_eol);
 		rec.ptr = cur;
-		rec.size = no_eol;
+		rec.size = with_eol;
 		rec.line_hash = xdl_line_hash(cur, no_eol, flags);
 		rec.flags = flags;
 		rust_ivec_push(&xdf->record, &rec);
