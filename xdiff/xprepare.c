@@ -37,11 +37,17 @@ static void xdl_free_ctx(xdfile_t *xdf) {
 void xdl_free_env(xdfenv_t *xe) {
 	xdl_free_ctx(&xe->xdf2);
 	xdl_free_ctx(&xe->xdf1);
-	rust_ivec_free(&xe->occurrence);
 }
 
+typedef struct {
+	usize file1;
+	usize file2;
+} xdloccurrence_t;
+
+DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
+
 #ifndef WITH_RUST
-static void xdl_count_occurrences(xdfenv_t *xe) {
+static void xdl_count_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
 	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length);
 
@@ -49,13 +55,13 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 		u64 minimal_perfect_hash;
 		xrecord_t *rec = &xe->xdf1.record.ptr[i];
 		minimal_perfect_hash = xdl_mphb_hash(&mphb, rec);
-		if (minimal_perfect_hash == xe->occurrence.length) {
+		if (minimal_perfect_hash == occurrence->length) {
 			xdloccurrence_t occ;
 			occ.file1 = 0;
 			occ.file2 = 0;
-			rust_ivec_push(&xe->occurrence, &occ);
+			rust_ivec_push(occurrence, &occ);
 		}
-		xe->occurrence.ptr[minimal_perfect_hash].file1 += 1;
+		occurrence->ptr[minimal_perfect_hash].file1 += 1;
 		rust_ivec_push(&xe->xdf1.minimal_perfect_hash, &minimal_perfect_hash);
 	}
 
@@ -63,13 +69,13 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 		u64 minimal_perfect_hash;
 		xrecord_t *rec = &xe->xdf2.record.ptr[i];
 		minimal_perfect_hash = xdl_mphb_hash(&mphb, rec);
-		if (minimal_perfect_hash == xe->occurrence.length) {
+		if (minimal_perfect_hash == occurrence->length) {
 			xdloccurrence_t occ;
 			occ.file1 = 0;
 			occ.file2 = 0;
-			rust_ivec_push(&xe->occurrence, &occ);
+			rust_ivec_push(occurrence, &occ);
 		}
-		xe->occurrence.ptr[minimal_perfect_hash].file2 += 1;
+		occurrence->ptr[minimal_perfect_hash].file2 += 1;
 		rust_ivec_push(&xe->xdf2.minimal_perfect_hash, &minimal_perfect_hash);
 	}
 
@@ -174,7 +180,7 @@ static int xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static void xdl_cleanup_records(xdfenv_t *xe) {
+static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	isize i, nm, mlim1, mlim2;
 
 	ivec_u8 dis1;
@@ -194,14 +200,14 @@ static void xdl_cleanup_records(xdfenv_t *xe) {
 	mlim1 = XDL_MIN(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe->xdf1.record.length));
 	for (i = xe->delta_start; i <= end1; i++) {
 		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
-		nm = xe->occurrence.ptr[mph].file1;
+		nm = occurrence->ptr[mph].file1;
 		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim1) ? 2: 1;
 	}
 
 	mlim2 = XDL_MIN(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe->xdf2.record.length));
 	for (i = xe->delta_start; i <= end2; i++) {
 		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
-		nm = xe->occurrence.ptr[mph].file1;
+		nm = occurrence->ptr[mph].file1;
 		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim2) ? 2: 1;
 	}
 
@@ -251,27 +257,29 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 
 
 
-static void xdl_optimize_ctxs(xdfenv_t *xe) {
+static void xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	xdl_trim_ends(xe);
-	xdl_cleanup_records(xe);
+	xdl_cleanup_records(xe, occurrence);
 }
 
 #ifdef WITH_RUST
-extern i32 rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe);
+extern i32 rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe, ivec_xdloccurrence_t *occurrence);
 i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
-	rust_xdl_prepare_env(mf1, mf2, flags, xe);
+	ivec_xdloccurrence_t occurrence;
+	IVEC_INIT(occurrence);
 
-	// xdl_count_occurrences(xe);
+	rust_xdl_prepare_env(mf1, mf2, flags, xe, &occurrence);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		xdl_optimize_ctxs(xe);
+		xdl_optimize_ctxs(xe, &occurrence);
 	}
 
 	return 0;
 }
 #else
 i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
-	IVEC_INIT(xe->occurrence);
+	ivec_xdloccurrence_t occurrence;
+	IVEC_INIT(occurrence);
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
@@ -284,10 +292,10 @@ i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 		return -1;
 	}
 
-	xdl_count_occurrences(xe);
+	xdl_count_occurrences(xe, &occurrence);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		xdl_optimize_ctxs(xe);
+		xdl_optimize_ctxs(xe, &occurrence);
 	}
 
 	return 0;

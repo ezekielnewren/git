@@ -79,7 +79,7 @@ impl xdfile_t {
 pub struct xdfenv_t {
 	pub xdf1: xdfile_t,
 	pub xdf2: xdfile_t,
-	pub occurrence: IVec<Occurrence>,
+	pub minimal_perfect_hash_size: usize,
 	pub delta_start: isize,
 	pub delta_end: isize,
 }
@@ -87,12 +87,12 @@ pub struct xdfenv_t {
 
 impl xdfenv_t {
 
-	pub(crate) fn new(mf1: &[u8], mf2: &[u8], flags: u64) -> Self {
+	pub(crate) fn new(mf1: &[u8], mf2: &[u8], flags: u64, occurrence: &mut IVec<Occurrence>) -> Self {
 		let mut xe = xdfenv_t::default();
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		xe.count_occurrences();
+		xe.count_occurrences(occurrence);
 
 		xe
 	}
@@ -132,24 +132,24 @@ impl xdfenv_t {
 	}
 
 
-	pub(crate) fn count_occurrences(&mut self) {
+	pub(crate) fn count_occurrences(&mut self, occurrence: &mut IVec<Occurrence>) {
 		let mut mph = MinimalPerfectHash::<xrecord_t>::default();
 
 		for rec in self.xdf1.record.as_slice() {
 			let minimal_perfect_hash = mph.hash(rec);
-			if minimal_perfect_hash == self.occurrence.len() as u64 {
-				self.occurrence.push(Occurrence::default());
+			if minimal_perfect_hash == occurrence.len() as u64 {
+				occurrence.push(Occurrence::default());
 			}
-			self.occurrence[minimal_perfect_hash as usize].file1 += 1;
+			occurrence[minimal_perfect_hash as usize].file1 += 1;
 			self.xdf1.minimal_perfect_hash.push(minimal_perfect_hash);
 		}
 
 		for rec in self.xdf2.record.as_slice() {
 			let minimal_perfect_hash = mph.hash(rec);
-			if minimal_perfect_hash == self.occurrence.len() as u64 {
-				self.occurrence.push(Occurrence::default());
+			if minimal_perfect_hash == occurrence.len() as u64 {
+				occurrence.push(Occurrence::default());
 			}
-			self.occurrence[minimal_perfect_hash as usize].file2 += 1;
+			occurrence[minimal_perfect_hash as usize].file2 += 1;
 			self.xdf2.minimal_perfect_hash.push(minimal_perfect_hash);
 		}
 	}
