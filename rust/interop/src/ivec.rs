@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::{Index, IndexMut};
+use crate::xrealloc;
 
 #[repr(C)]
 pub struct IVec<T> {
@@ -125,7 +126,7 @@ impl<T> IVec<T> {
             if new_capacity == 0 {
                 self._free();
             } else {
-                let t = libc::realloc(self.ptr as *mut libc::c_void, new_capacity * size_of::<T>());
+                let t = xrealloc(self.ptr as *mut libc::c_void, new_capacity * size_of::<T>());
                 if t.is_null() {
                     panic!("out of memory");
                 }

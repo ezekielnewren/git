@@ -13,3 +13,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 libc = "0.2.169"
+
+[features]
+default = []
+c_alt = []
