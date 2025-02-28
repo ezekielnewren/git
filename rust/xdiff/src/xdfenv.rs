@@ -5,7 +5,7 @@ use interop::ivec::IVec;
 use crate::xdiff::XDF_IGNORE_CR_AT_EOL;
 use crate::xrecord::xrecord_t;
 use crate::xtypes::ConsiderLine::*;
-use crate::xtypes::{MinimalPerfectHash, Occurrence};
+use crate::xtypes::{MinimalPerfectHashBuilder, Occurrence};
 use crate::xutils::LineReader;
 
 const XDL_KPDIS_RUN: u64 = 4;
@@ -92,7 +92,7 @@ impl xdfenv_t {
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		xe.count_occurrences(occurrence);
+		xe.minimal_perfect_hash_size = xe.count_occurrences(occurrence);
 
 		xe
 	}
@@ -132,11 +132,11 @@ impl xdfenv_t {
 	}
 
 
-	pub(crate) fn count_occurrences(&mut self, occurrence: &mut IVec<Occurrence>) {
-		let mut mph = MinimalPerfectHash::<xrecord_t>::default();
+	pub(crate) fn count_occurrences(&mut self, occurrence: &mut IVec<Occurrence>) -> usize {
+		let mut mphb = MinimalPerfectHashBuilder::<xrecord_t>::default();
 
 		for rec in self.xdf1.record.as_slice() {
-			let minimal_perfect_hash = mph.hash(rec);
+			let minimal_perfect_hash = mphb.hash(rec);
 			if minimal_perfect_hash == occurrence.len() as u64 {
 				occurrence.push(Occurrence::default());
 			}
@@ -145,13 +145,15 @@ impl xdfenv_t {
 		}
 
 		for rec in self.xdf2.record.as_slice() {
-			let minimal_perfect_hash = mph.hash(rec);
+			let minimal_perfect_hash = mphb.hash(rec);
 			if minimal_perfect_hash == occurrence.len() as u64 {
 				occurrence.push(Occurrence::default());
 			}
 			occurrence[minimal_perfect_hash as usize].file2 += 1;
 			self.xdf2.minimal_perfect_hash.push(minimal_perfect_hash);
 		}
+
+		mphb.finish()
 	}
 }
 

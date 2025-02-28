@@ -112,12 +112,12 @@ impl Default for DJB2a {
 	}
 }
 
-pub struct MinimalPerfectHash<T: Hash + Eq + Clone> {
+pub struct MinimalPerfectHashBuilder<T: Hash + Eq + Clone> {
 	map: HashMap<T, u64>,
 	count: u64,
 }
 
-impl<T: Hash + Eq + Clone> Default for MinimalPerfectHash<T> {
+impl<T: Hash + Eq + Clone> Default for MinimalPerfectHashBuilder<T> {
 	fn default() -> Self {
 		Self {
 			map: HashMap::new(),
@@ -127,7 +127,7 @@ impl<T: Hash + Eq + Clone> Default for MinimalPerfectHash<T> {
 }
 
 
-impl<T: Hash + Eq + Clone> MinimalPerfectHash<T> {
+impl<T: Hash + Eq + Clone> MinimalPerfectHashBuilder<T> {
 
 	pub fn hash(&mut self, key: &T) -> u64 {
 		if !self.map.contains_key(key) {
@@ -135,6 +135,10 @@ impl<T: Hash + Eq + Clone> MinimalPerfectHash<T> {
 			self.count += 1;
 		}
 		self.map[key]
+	}
+
+	pub fn finish(self) -> usize {
+		self.count as usize
 	}
 
 }

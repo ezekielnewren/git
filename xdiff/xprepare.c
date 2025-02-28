@@ -47,7 +47,7 @@ typedef struct {
 DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
 
 #ifndef WITH_RUST
-static void xdl_count_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
+static usize xdl_count_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
 	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length);
 
@@ -79,7 +79,7 @@ static void xdl_count_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence
 		rust_ivec_push(&xe->xdf2.minimal_perfect_hash, &minimal_perfect_hash);
 	}
 
-	xdl_mphb_finish(&mphb);
+	return xdl_mphb_finish(&mphb);
 }
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
@@ -292,7 +292,7 @@ i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 		return -1;
 	}
 
-	xdl_count_occurrences(xe, &occurrence);
+	xe->minimal_perfect_hash_size = xdl_count_occurrences(xe, &occurrence);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		xdl_optimize_ctxs(xe, &occurrence);
