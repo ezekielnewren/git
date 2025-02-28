@@ -5,16 +5,15 @@
 
 struct record {
 	usize ptr, cnt;
-	struct record *next;
+	usize next;
 };
 
 DEFINE_IVEC_TYPE(struct record, record);
-DEFINE_IVEC_TYPE(struct record*, record_ptr);
 
 struct histindex {
 	ivec_record record_storage;
-	ivec_record_ptr record_chain;
-	ivec_record_ptr line_map;
+	ivec_usize record_chain;
+	ivec_usize line_map;
 	ivec_usize next_ptrs;
 	u32 table_bits;
 	usize ptr_shift;
@@ -36,33 +35,35 @@ static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
 static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end1) {
 	usize tbl_idx;
 	usize chain_len;
-	struct record **rec_chain, *rec;
-	struct record new_rec;
+	usize rec_cur_idx, rec_new_idx;
+	struct record *rec_cur;
+	struct record rec_new;
 
 	for (usize i = end1; i > start1; i -= 1) {
 		usize ptr = i - 1;
 		tbl_idx = env->xdf1.minimal_perfect_hash.ptr[ptr - LINE_SHIFT];
-		rec_chain = &index->record_chain.ptr[tbl_idx];
-		rec = *rec_chain;
+		rec_cur_idx = index->record_chain.ptr[tbl_idx];
 
 		chain_len = 0;
-		while (rec) {
-			u64 mph1 = env->xdf1.minimal_perfect_hash.ptr[rec->ptr - LINE_SHIFT];
-			u64 mph2 = env->xdf1.minimal_perfect_hash.ptr[ptr - LINE_SHIFT];
+		while (rec_cur_idx != INVALID_INDEX) {
+			u64 mph1, mph2;
+			rec_cur = &index->record_storage.ptr[rec_cur_idx];
+			mph1 = env->xdf1.minimal_perfect_hash.ptr[rec_cur->ptr - LINE_SHIFT];
+			mph2 = env->xdf1.minimal_perfect_hash.ptr[ptr - LINE_SHIFT];
 			if (mph1 == mph2) {
 				/*
 				 * ptr is identical to another element. Insert
 				 * it onto the front of the existing element
 				 * chain.
 				 */
-				index->next_ptrs.ptr[ptr - index->ptr_shift] = rec->ptr;
-				rec->ptr = ptr;
-				rec->cnt = rec->cnt + 1;
-				index->line_map.ptr[ptr - index->ptr_shift] = rec;
+				index->next_ptrs.ptr[ptr - index->ptr_shift] = rec_cur->ptr;
+				rec_cur->ptr = ptr;
+				rec_cur->cnt = rec_cur->cnt + 1;
+				index->line_map.ptr[ptr - index->ptr_shift] = rec_cur_idx;
 				goto continue_scan;
 			}
 
-			rec = rec->next;
+			rec_cur_idx = rec_cur->next;
 			chain_len++;
 		}
 
@@ -73,13 +74,13 @@ static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end
 		 * This is the first time we have ever seen this particular
 		 * element in the sequence. Construct a new chain for it.
 		 */
-		new_rec.ptr = ptr;
-		new_rec.cnt = 1;
-		new_rec.next = *rec_chain;
-		rust_ivec_push(&index->record_storage, &new_rec);
-		rec = &index->record_storage.ptr[index->record_storage.length - 1];
-		*rec_chain = rec;
-		index->line_map.ptr[ptr - index->ptr_shift] = rec;
+		rec_new_idx = index->record_storage.length;
+		rec_new.ptr = ptr;
+		rec_new.cnt = 1;
+		rec_new.next = index->record_chain.ptr[tbl_idx];
+		rust_ivec_push(&index->record_storage, &rec_new);
+		index->record_chain.ptr[tbl_idx] = rec_new_idx;
+		index->line_map.ptr[ptr - index->ptr_shift] = rec_new_idx;
 
 continue_scan:
 		; /* no op */
@@ -91,38 +92,42 @@ continue_scan:
 static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, usize b_ptr,
 	usize start1, usize end1, usize start2, usize end2)
 {
+	struct record *rec_cur;
 	usize b_next = b_ptr + 1;
 	usize tbl_idx = env->xdf2.minimal_perfect_hash.ptr[b_ptr - LINE_SHIFT];
-	struct record *rec = index->record_chain.ptr[tbl_idx];
 	usize as, ae, bs, be, np, rc;
 	bool should_break;
 
-	for (; rec; rec = rec->next) {
-		if (rec->cnt > index->cnt) {
+	for (usize rec_cur_idx = index->record_chain.ptr[tbl_idx];
+		rec_cur_idx != INVALID_INDEX; rec_cur_idx = rec_cur->next) {
+		rec_cur = &index->record_storage.ptr[rec_cur_idx];
+		if (rec_cur->cnt > index->cnt) {
 			if (!index->has_common)
-				index->has_common = mph_equal_by_line_number(env, rec->ptr, b_ptr);
+				index->has_common = mph_equal_by_line_number(env, rec_cur->ptr, b_ptr);
 			continue;
 		}
 
-		as = rec->ptr;
+		as = rec_cur->ptr;
 		if (!mph_equal_by_line_number(env, as, b_ptr))
 			continue;
 
-		index->has_common = 1;
+		index->has_common = true;
 		for (;;) {
-			should_break = 0;
+			should_break = false;
 			np = index->next_ptrs.ptr[as - index->ptr_shift];
 			bs = b_ptr;
 			ae = as;
 			be = bs;
-			rc = rec->cnt;
+			rc = rec_cur->cnt;
 
 			while (start1 < as && start2 < bs
 				&& mph_equal_by_line_number(env, as - 1, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc) {
-					usize cnt = index->line_map.ptr[as - index->ptr_shift]->cnt;
+					usize rec_t_idx = index->line_map.ptr[as - index->ptr_shift];
+					struct record *rec_t = &index->record_storage.ptr[rec_t_idx];
+					usize cnt = rec_t->cnt;
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
@@ -131,7 +136,9 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 				ae++;
 				be++;
 				if (1 < rc) {
-					usize cnt = index->line_map.ptr[ae - index->ptr_shift]->cnt;
+					usize rec_t_idx = index->line_map.ptr[ae - index->ptr_shift];
+					struct record *rec_t = &index->record_storage.ptr[rec_t_idx];
+					usize cnt = rec_t->cnt;
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
@@ -146,12 +153,12 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 				index->cnt = rc;
 			}
 
-			if (np == 0)
+			if (np == 0 || np == INVALID_INDEX)
 				break;
 
 			while (np <= ae) {
 				np = index->next_ptrs.ptr[np - index->ptr_shift];
-				if (np == 0) {
+				if (np == 0 || np == INVALID_INDEX) {
 					should_break = 1;
 					break;
 				}
@@ -191,15 +198,8 @@ static i32 find_lcs(xdfenv_t *env,
 {
 	i32 ret = -1;
 	struct histindex index;
-	struct record default_rec_value;
-	struct record* default_rec_ptr_value = NULL;
-	usize some_fudge = 10;
-	usize default_ptr = 0;
-
-	default_rec_value.ptr = 0;
-	default_rec_value.cnt = 0;
-	default_rec_value.next = NULL;
-
+	usize some_fudge = 4;  /* this breaks if it's less than 4, I don't know why */
+	usize default_value = INVALID_INDEX;
 	memset(&index, 0, sizeof(index));
 
 	IVEC_INIT(index.record_storage);
@@ -207,12 +207,9 @@ static i32 find_lcs(xdfenv_t *env,
 	IVEC_INIT(index.line_map);
 	IVEC_INIT(index.next_ptrs);
 
-
-	rust_ivec_resize_exact(&index.record_storage, env->xdf1.record.length * some_fudge, &default_rec_value);
-	rust_ivec_resize_exact(&index.record_chain, env->minimal_perfect_hash_size + some_fudge, &default_rec_ptr_value);
-
-	rust_ivec_resize_exact(&index.line_map, env->minimal_perfect_hash_size + some_fudge, &default_rec_ptr_value);
-	rust_ivec_resize_exact(&index.next_ptrs, env->minimal_perfect_hash_size + some_fudge, &default_ptr);
+	rust_ivec_resize_exact(&index.record_chain, env->minimal_perfect_hash_size + some_fudge, &default_value);
+	rust_ivec_resize_exact(&index.line_map, env->minimal_perfect_hash_size     + some_fudge, &default_value);
+	rust_ivec_resize_exact(&index.next_ptrs, env->minimal_perfect_hash_size    + some_fudge, &default_value);
 
 	index.ptr_shift = start1;
 
