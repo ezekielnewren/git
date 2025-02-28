@@ -1,75 +1,28 @@
-/*
- * Copyright (C) 2010, Google Inc.
- * and other copyright owners as documented in JGit's IP log.
- *
- * This program and the accompanying materials are made available
- * under the terms of the Eclipse Distribution License v1.0 which
- * accompanies this distribution, is reproduced below, and is
- * available at http://www.eclipse.org/org/documents/edl-v10.php
- *
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or
- * without modification, are permitted provided that the following
- * conditions are met:
- *
- * - Redistributions of source code must retain the above copyright
- *   notice, this list of conditions and the following disclaimer.
- *
- * - Redistributions in binary form must reproduce the above
- *   copyright notice, this list of conditions and the following
- *   disclaimer in the documentation and/or other materials provided
- *   with the distribution.
- *
- * - Neither the name of the Eclipse Foundation, Inc. nor the
- *   names of its contributors may be used to endorse or promote
- *   products derived from this software without specific prior
- *   written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
- * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 
 #include "xinclude.h"
-
-#define MAX_PTR	UINT_MAX
-#define MAX_CNT	UINT_MAX
 
 #define LINE_END(n) (line##n + count##n - 1)
 #define LINE_END_PTR(n) (*line##n + *count##n - 1)
 
+#define MAX_CHAIN_LENGTH 64
+
+struct record {
+	usize ptr, cnt;
+	struct record *next;
+};
+
+DEFINE_IVEC_TYPE(struct record, record);
+DEFINE_IVEC_TYPE(struct record*, record_ptr);
+
 struct histindex {
-	struct record {
-		unsigned int ptr, cnt;
-		struct record *next;
-	} **records, /* an occurrence */
-	  **line_map; /* map of line to record chain */
-	chastore_t rcha;
-	unsigned int *next_ptrs;
-	unsigned int table_bits,
-		     records_size,
-		     line_map_size;
-
-	unsigned int max_chain_length,
-		     key_shift,
-		     ptr_shift;
-
-	unsigned int cnt,
-		     has_common;
-
-	xdfenv_t *env;
-	xpparam_t const *xpp;
+	ivec_record record_storage;
+	ivec_record_ptr record_chain;
+	ivec_record_ptr line_map;
+	ivec_usize next_ptrs;
+	u32 table_bits;
+	usize ptr_shift;
+	usize cnt;
+	bool has_common;
 };
 
 struct region {
@@ -77,10 +30,10 @@ struct region {
 	unsigned int begin2, end2;
 };
 
-#define LINE_MAP(i, a) (i->line_map[(a) - i->ptr_shift])
+#define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
 
-#define NEXT_PTR(index, ptr) \
-	(index->next_ptrs[(ptr) - index->ptr_shift])
+#define NEXT_PTR(index, ptr_off) \
+	(index->next_ptrs.ptr[(ptr_off) - index->ptr_shift])
 
 #define CNT(index, ptr) \
 	((LINE_MAP(index, ptr))->cnt)
@@ -88,26 +41,27 @@ struct region {
 #define MPH(env, s, l) \
 	(env->xdf##s.minimal_perfect_hash.ptr[l - 1])
 
-#define CMP(i, s1, l1, s2, l2) \
-	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
+#define CMP(env, s1, l1, s2, l2) \
+	(MPH(env, s1, l1) == MPH(env, s2, l2))
 
-#define TABLE_HASH(index, side, line) \
-	XDL_HASHLONG((MPH(index->env, side, line)), index->table_bits)
+#define TABLE_HASH(index, env, side, line) \
+	XDL_HASHLONG((MPH(env, side, line)), index->table_bits)
 
-static int scanA(struct histindex *index, int line1, int count1)
+static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 {
 	unsigned int ptr, tbl_idx;
 	unsigned int chain_len;
 	struct record **rec_chain, *rec;
+	struct record new_rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(index, 1, ptr);
-		rec_chain = index->records + tbl_idx;
+		tbl_idx = TABLE_HASH(index, env, 1, ptr);
+		rec_chain = &index->record_chain.ptr[tbl_idx];
 		rec = *rec_chain;
 
 		chain_len = 0;
 		while (rec) {
-			if (CMP(index, 1, rec->ptr, 1, ptr)) {
+			if (CMP(env, 1, rec->ptr, 1, ptr)) {
 				/*
 				 * ptr is identical to another element. Insert
 				 * it onto the front of the existing element
@@ -116,7 +70,7 @@ static int scanA(struct histindex *index, int line1, int count1)
 				NEXT_PTR(index, ptr) = rec->ptr;
 				rec->ptr = ptr;
 				/* cap rec->cnt at MAX_CNT */
-				rec->cnt = XDL_MIN(MAX_CNT, rec->cnt + 1);
+				rec->cnt = rec->cnt + 1;
 				LINE_MAP(index, ptr) = rec;
 				goto continue_scan;
 			}
@@ -125,18 +79,18 @@ static int scanA(struct histindex *index, int line1, int count1)
 			chain_len++;
 		}
 
-		if (chain_len == index->max_chain_length)
+		if (chain_len == MAX_CHAIN_LENGTH)
 			return -1;
 
 		/*
 		 * This is the first time we have ever seen this particular
 		 * element in the sequence. Construct a new chain for it.
 		 */
-		if (!(rec = xdl_cha_alloc(&index->rcha)))
-			return -1;
-		rec->ptr = ptr;
-		rec->cnt = 1;
-		rec->next = *rec_chain;
+		new_rec.ptr = ptr;
+		new_rec.cnt = 1;
+		new_rec.next = *rec_chain;
+		rust_ivec_push(&index->record_storage, &new_rec);
+		rec = &index->record_storage.ptr[index->record_storage.length - 1];
 		*rec_chain = rec;
 		LINE_MAP(index, ptr) = rec;
 
@@ -147,23 +101,23 @@ continue_scan:
 	return 0;
 }
 
-static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
+static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, int b_ptr,
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
-	struct record *rec = index->records[TABLE_HASH(index, 2, b_ptr)];
+	struct record *rec = index->record_chain.ptr[TABLE_HASH(index, env, 2, b_ptr)];
 	unsigned int as, ae, bs, be, np, rc;
 	int should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
 			if (!index->has_common)
-				index->has_common = CMP(index, 1, rec->ptr, 2, b_ptr);
+				index->has_common = CMP(env, 1, rec->ptr, 2, b_ptr);
 			continue;
 		}
 
 		as = rec->ptr;
-		if (!CMP(index, 1, as, 2, b_ptr))
+		if (!CMP(env, 1, as, 2, b_ptr))
 			continue;
 
 		index->has_common = 1;
@@ -176,14 +130,14 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 			rc = rec->cnt;
 
 			while (line1 < as && line2 < bs
-				&& CMP(index, 1, as - 1, 2, bs - 1)) {
+				&& CMP(env, 1, as - 1, 2, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc)
 					rc = XDL_MIN(rc, CNT(index, as));
 			}
 			while (ae < LINE_END(1) && be < LINE_END(2)
-				&& CMP(index, 1, ae + 1, 2, be + 1)) {
+				&& CMP(env, 1, ae + 1, 2, be + 1)) {
 				ae++;
 				be++;
 				if (1 < rc)
@@ -232,60 +186,56 @@ static int fall_back_to_classic_diff(xpparam_t const *xpp, xdfenv_t *env,
 				  line1, count1, line2, count2);
 }
 
-static inline void free_index(struct histindex *index)
-{
-	xdl_free(index->records);
-	xdl_free(index->line_map);
-	xdl_free(index->next_ptrs);
-	xdl_cha_free(&index->rcha);
+static inline void free_index(struct histindex *index) {
+	rust_ivec_free(&index->record_storage);
+	rust_ivec_free(&index->record_chain);
+	rust_ivec_free(&index->line_map);
+	rust_ivec_free(&index->next_ptrs);
 }
 
-static int find_lcs(xpparam_t const *xpp, xdfenv_t *env,
+static int find_lcs(xdfenv_t *env,
 		    struct region *lcs,
 		    int line1, int count1, int line2, int count2)
 {
 	int b_ptr;
 	int ret = -1;
 	struct histindex index;
+	struct record default_rec_value;
+	struct record* default_rec_ptr_value = NULL;
+	usize line_map_size = env->xdf1.record.length + env->xdf2.record.length;
+	usize default_ptr = 0;
+
+	default_rec_value.ptr = 0;
+	default_rec_value.cnt = 0;
+	default_rec_value.next = NULL;
 
 	memset(&index, 0, sizeof(index));
 
-	index.env = env;
-	index.xpp = xpp;
+	IVEC_INIT(index.record_storage);
+	IVEC_INIT(index.record_chain);
+	IVEC_INIT(index.line_map);
+	IVEC_INIT(index.next_ptrs);
 
-	index.records = NULL;
-	index.line_map = NULL;
-	/* in case of early xdl_cha_free() */
-	index.rcha.head = NULL;
 
 	index.table_bits = xdl_hashbits(count1);
-	index.records_size = 1 << index.table_bits;
-	if (!XDL_CALLOC_ARRAY(index.records, index.records_size))
-		goto cleanup;
 
-	index.line_map_size = count1;
-	if (!XDL_CALLOC_ARRAY(index.line_map, index.line_map_size))
-		goto cleanup;
+	rust_ivec_resize_exact(&index.record_storage, env->xdf1.record.length*10, &default_rec_value);
+	rust_ivec_resize_exact(&index.record_chain, env->xdf1.record.length*10, &default_rec_ptr_value);
 
-	if (!XDL_CALLOC_ARRAY(index.next_ptrs, index.line_map_size))
-		goto cleanup;
-
-	/* lines / 4 + 1 comes from xprepare.c:xdl_prepare_ctx() */
-	if (xdl_cha_init(&index.rcha, sizeof(struct record), count1 / 4 + 1) < 0)
-		goto cleanup;
+	rust_ivec_resize_exact(&index.line_map, line_map_size*10, &default_rec_ptr_value);
+	rust_ivec_resize_exact(&index.next_ptrs, line_map_size*10, &default_ptr);
 
 	index.ptr_shift = line1;
-	index.max_chain_length = 64;
 
-	if (scanA(&index, line1, count1))
+	if (scanA(&index, env, line1, count1))
 		goto cleanup;
 
-	index.cnt = index.max_chain_length + 1;
+	index.cnt = MAX_CHAIN_LENGTH + 1;
 
 	for (b_ptr = line2; b_ptr <= LINE_END(2); )
-		b_ptr = try_lcs(&index, lcs, b_ptr, line1, count1, line2, count2);
+		b_ptr = try_lcs(&index, env, lcs, b_ptr, line1, count1, line2, count2);
 
-	if (index.has_common && index.max_chain_length < index.cnt)
+	if (index.has_common && MAX_CHAIN_LENGTH < index.cnt)
 		ret = 1;
 	else
 		ret = 0;
@@ -307,9 +257,6 @@ redo:
 	if (count1 <= 0 && count2 <= 0)
 		return 0;
 
-	if (LINE_END(1) >= MAX_PTR)
-		return -1;
-
 	if (!count1) {
 		while(count2--)
 			env->xdf2.rchg[line2++ - 1] = 1;
@@ -321,7 +268,7 @@ redo:
 	}
 
 	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(xpp, env, &lcs, line1, count1, line2, count2);
+	lcs_found = find_lcs(env, &lcs, line1, count1, line2, count2);
 	if (lcs_found < 0)
 		goto out;
 	else if (lcs_found)

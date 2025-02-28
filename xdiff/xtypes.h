@@ -26,19 +26,6 @@
 #include "../rust/header/types.h"
 #include "ivec.h"
 
-typedef struct s_chanode {
-	struct s_chanode *next;
-	long icurr;
-} chanode_t;
-
-typedef struct s_chastore {
-	chanode_t *head, *tail;
-	long isize, nsize;
-	chanode_t *ancur;
-	chanode_t *sncur;
-	long scurr;
-} chastore_t;
-
 typedef struct {
 	u8 const* ptr;
 	usize size_no_eol;

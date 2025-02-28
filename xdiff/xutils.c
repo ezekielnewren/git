@@ -70,54 +70,6 @@ long xdl_mmfile_size(mmfile_t *mmf)
 	return mmf->size;
 }
 
-
-int xdl_cha_init(chastore_t *cha, long isize, long icount) {
-
-	cha->head = cha->tail = NULL;
-	cha->isize = isize;
-	cha->nsize = icount * isize;
-	cha->ancur = cha->sncur = NULL;
-	cha->scurr = 0;
-
-	return 0;
-}
-
-
-void xdl_cha_free(chastore_t *cha) {
-	chanode_t *cur, *tmp;
-
-	for (cur = cha->head; (tmp = cur) != NULL;) {
-		cur = cur->next;
-		xdl_free(tmp);
-	}
-}
-
-
-void *xdl_cha_alloc(chastore_t *cha) {
-	chanode_t *ancur;
-	void *data;
-
-	if (!(ancur = cha->ancur) || ancur->icurr == cha->nsize) {
-		if (!(ancur = (chanode_t *) xdl_malloc(sizeof(chanode_t) + cha->nsize))) {
-
-			return NULL;
-		}
-		ancur->icurr = 0;
-		ancur->next = NULL;
-		if (cha->tail)
-			cha->tail->next = ancur;
-		if (!cha->head)
-			cha->head = ancur;
-		cha->tail = ancur;
-		cha->ancur = ancur;
-	}
-
-	data = (char *) ancur + sizeof(chanode_t) + ancur->icurr;
-	ancur->icurr += cha->isize;
-
-	return data;
-}
-
 int xdl_blankline(const char *line, long size, long flags)
 {
 	long i;
