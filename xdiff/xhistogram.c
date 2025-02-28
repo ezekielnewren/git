@@ -2,7 +2,6 @@
 #include "xinclude.h"
 
 #define LINE_END(n) (line##n + count##n - 1)
-#define LINE_END_PTR(n) (*line##n + *count##n - 1)
 
 #define MAX_CHAIN_LENGTH 64
 
