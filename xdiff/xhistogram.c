@@ -1,8 +1,6 @@
 
 #include "xinclude.h"
 
-#define LINE_END(n) (line##n + count##n - 1)
-
 #define MAX_CHAIN_LENGTH 64
 
 struct record {
@@ -35,13 +33,14 @@ static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
 	return mph1 == mph2;
 }
 
-static i32 scanA(struct histindex *index, xdfenv_t *env, usize line1, usize count1) {
-	usize ptr, tbl_idx;
+static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end1) {
+	usize tbl_idx;
 	usize chain_len;
 	struct record **rec_chain, *rec;
 	struct record new_rec;
 
-	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
+	for (usize i = end1; i > start1; i -= 1) {
+		usize ptr = i - 1;
 		tbl_idx = env->xdf1.minimal_perfect_hash.ptr[ptr - LINE_SHIFT];
 		rec_chain = &index->record_chain.ptr[tbl_idx];
 		rec = *rec_chain;
@@ -90,7 +89,7 @@ continue_scan:
 }
 
 static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, usize b_ptr,
-	usize line1, usize count1, usize line2, usize count2)
+	usize start1, usize end1, usize start2, usize end2)
 {
 	usize b_next = b_ptr + 1;
 	usize tbl_idx = env->xdf2.minimal_perfect_hash.ptr[b_ptr - LINE_SHIFT];
@@ -118,7 +117,7 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 			be = bs;
 			rc = rec->cnt;
 
-			while (line1 < as && line2 < bs
+			while (start1 < as && start2 < bs
 				&& mph_equal_by_line_number(env, as - 1, bs - 1)) {
 				as--;
 				bs--;
@@ -127,7 +126,7 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
-			while (ae < LINE_END(1) && be < LINE_END(2)
+			while (ae + 1 < end1 && be + 1 < end2
 				&& mph_equal_by_line_number(env, ae + 1, be + 1)) {
 				ae++;
 				be++;
@@ -188,9 +187,8 @@ static inline void free_index(struct histindex *index) {
 
 static i32 find_lcs(xdfenv_t *env,
 		    struct region *lcs,
-		    usize line1, usize count1, usize line2, usize count2)
+		    usize start1, usize end1, usize start2, usize end2)
 {
-	usize b_ptr;
 	i32 ret = -1;
 	struct histindex index;
 	struct record default_rec_value;
@@ -210,23 +208,21 @@ static i32 find_lcs(xdfenv_t *env,
 	IVEC_INIT(index.next_ptrs);
 
 
-	index.table_bits = xdl_hashbits(count1);
-
 	rust_ivec_resize_exact(&index.record_storage, env->xdf1.record.length * some_fudge, &default_rec_value);
 	rust_ivec_resize_exact(&index.record_chain, env->minimal_perfect_hash_size + some_fudge, &default_rec_ptr_value);
 
 	rust_ivec_resize_exact(&index.line_map, env->minimal_perfect_hash_size + some_fudge, &default_rec_ptr_value);
 	rust_ivec_resize_exact(&index.next_ptrs, env->minimal_perfect_hash_size + some_fudge, &default_ptr);
 
-	index.ptr_shift = line1;
+	index.ptr_shift = start1;
 
-	if (scanA(&index, env, line1, count1))
+	if (scanA(&index, env, start1, end1))
 		goto cleanup;
 
 	index.cnt = MAX_CHAIN_LENGTH + 1;
 
-	for (b_ptr = line2; b_ptr <= LINE_END(2); )
-		b_ptr = try_lcs(&index, env, lcs, b_ptr, line1, count1, line2, count2);
+	for (usize b_ptr = start2; b_ptr + 1 <= end2; )
+		b_ptr = try_lcs(&index, env, lcs, b_ptr, start1, end1, start2, end2);
 
 	if (index.has_common && MAX_CHAIN_LENGTH < index.cnt)
 		ret = 1;
@@ -239,7 +235,7 @@ cleanup:
 }
 
 static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
-	usize line1, usize count1, usize line2, usize count2)
+	usize start1, usize end1, usize start2, usize end2)
 {
 	struct region lcs;
 	i32 lcs_found;
@@ -247,48 +243,52 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 redo:
 	result = -1;
 
-	if (count1 <= 0 && count2 <= 0)
+	if (start1 >= end1 && start2 >= end2)
 		return 0;
 
-	if (!count1) {
-		while(count2--)
-			env->xdf2.rchg[line2++ - 1] = 1;
+	if (start1 == end1) {
+		for (; start2 < end2; start2 += 1) {
+			env->xdf2.rchg[start2 - 1] = 1;
+		}
 		return 0;
-	} else if (!count2) {
-		while(count1--)
-			env->xdf1.rchg[line1++ - 1] = 1;
+	}
+	if (start2 == end2) {
+		for (; start1 < end1; start1 += 1) {
+			env->xdf1.rchg[start1 - 1] = 1;
+		}
 		return 0;
 	}
 
 	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(env, &lcs, line1, count1, line2, count2);
+	lcs_found = find_lcs(env, &lcs, start1, end1, start2, end2);
 	if (lcs_found < 0)
 		goto out;
 	else if (lcs_found)
-		result = fall_back_to_classic_diff(xpp, env, line1, count1, line2, count2);
+		result = fall_back_to_classic_diff(xpp, env, start1, end1 - start1, start2, end2 - start1);
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
-			while (count1--)
-				env->xdf1.rchg[line1++ - 1] = 1;
-			while (count2--)
-				env->xdf2.rchg[line2++ - 1] = 1;
+			for (; start1 < end1; start1 += 1) {
+				env->xdf1.rchg[start1 - 1] = 1;
+			}
+			for (; start2 < end2; start2 += 1) {
+				env->xdf2.rchg[start2 - 1] = 1;
+			}
 			result = 0;
 		} else {
 			result = histogram_diff(xpp, env,
-						line1, lcs.begin1 - line1,
-						line2, lcs.begin2 - line2);
+						start1, lcs.begin1,
+						start2, lcs.begin2);
 			if (result)
 				goto out;
 			/*
 			 * result = histogram_diff(xpp, env,
-			 *            lcs.end1 + 1, LINE_END(1) - lcs.end1,
-			 *            lcs.end2 + 1, LINE_END(2) - lcs.end2);
+			 *            lcs.end1 + 1, end1,
+			 *            lcs.end2 + 1, end2);
 			 * but let's optimize tail recursion ourself:
 			*/
-			count1 = LINE_END(1) - lcs.end1;
-			line1 = lcs.end1 + 1;
-			count2 = LINE_END(2) - lcs.end2;
-			line2 = lcs.end2 + 1;
+			start1 = lcs.end1 + 1;
+			start2 = lcs.end2 + 1;
+
 			goto redo;
 		}
 	}
@@ -301,6 +301,6 @@ int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
 	isize end2 = env->xdf2.record.length - 1;
 
 	return histogram_diff(xpp, env,
-		env->delta_start + 1, end1 - env->delta_start + 1,
-		env->delta_start + 1, end2 - env->delta_start + 1);
+		env->delta_start + 1, end1 + 2*LINE_SHIFT,
+		env->delta_start + 1, end2 + 2*LINE_SHIFT);
 }
