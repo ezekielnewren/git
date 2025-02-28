@@ -44,9 +44,6 @@ struct region {
 #define CMP(env, s1, l1, s2, l2) \
 	(MPH(env, s1, l1) == MPH(env, s2, l2))
 
-#define TABLE_HASH(index, env, side, line) \
-	XDL_HASHLONG((MPH(env, side, line)), index->table_bits)
-
 static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 {
 	unsigned int ptr, tbl_idx;
@@ -55,7 +52,7 @@ static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 	struct record new_rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(index, env, 1, ptr);
+		tbl_idx = MPH(env, 1, ptr);
 		rec_chain = &index->record_chain.ptr[tbl_idx];
 		rec = *rec_chain;
 
@@ -105,7 +102,7 @@ static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, i
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
-	struct record *rec = index->record_chain.ptr[TABLE_HASH(index, env, 2, b_ptr)];
+	struct record *rec = index->record_chain.ptr[MPH(env, 2, b_ptr)];
 	unsigned int as, ae, bs, be, np, rc;
 	int should_break;
 
@@ -202,7 +199,7 @@ static int find_lcs(xdfenv_t *env,
 	struct histindex index;
 	struct record default_rec_value;
 	struct record* default_rec_ptr_value = NULL;
-	usize line_map_size = env->xdf1.record.length + env->xdf2.record.length;
+	usize some_fudge = 10;
 	usize default_ptr = 0;
 
 	default_rec_value.ptr = 0;
@@ -219,11 +216,11 @@ static int find_lcs(xdfenv_t *env,
 
 	index.table_bits = xdl_hashbits(count1);
 
-	rust_ivec_resize_exact(&index.record_storage, env->xdf1.record.length*10, &default_rec_value);
-	rust_ivec_resize_exact(&index.record_chain, env->xdf1.record.length*10, &default_rec_ptr_value);
+	rust_ivec_resize_exact(&index.record_storage, env->xdf1.record.length * some_fudge, &default_rec_value);
+	rust_ivec_resize_exact(&index.record_chain, env->minimal_perfect_hash_size + some_fudge, &default_rec_ptr_value);
 
-	rust_ivec_resize_exact(&index.line_map, line_map_size*10, &default_rec_ptr_value);
-	rust_ivec_resize_exact(&index.next_ptrs, line_map_size*10, &default_ptr);
+	rust_ivec_resize_exact(&index.line_map, env->minimal_perfect_hash_size + some_fudge, &default_rec_ptr_value);
+	rust_ivec_resize_exact(&index.next_ptrs, env->minimal_perfect_hash_size + some_fudge, &default_ptr);
 
 	index.ptr_shift = line1;
 
