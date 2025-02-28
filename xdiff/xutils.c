@@ -273,6 +273,58 @@ void* xdl_alloc_grow_helper(void *p, long nr, long *alloc, size_t size)
 	return tmp;
 }
 
+void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size) {
+	usize default_value = INVALID_INDEX;
+
+	IVEC_INIT(mphb->head);
+	IVEC_INIT(mphb->kv);
+
+	mphb->hbits = xdl_hashbits(size);
+	mphb->hsize = 1 << mphb->hbits;
+
+	rust_ivec_resize_exact(&mphb->head, mphb->hsize, &default_value);
+	rust_ivec_reserve(&mphb->kv, size);
+
+	mphb->count = 0;
+}
+
+u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key) {
+	struct xdl_mphb_node_t *node;
+	usize index;
+
+	usize hi = (long) XDL_HASHLONG(key->line_hash, mph->hbits);
+	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
+		node = &mph->kv.ptr[index];
+		if (xdl_record_equal(&node->key, key))
+			break;
+		index = node->next;
+	}
+
+	if (index == INVALID_INDEX) {
+		struct xdl_mphb_node_t node_new;
+		index = mph->count;
+		node_new.key = *key;
+		node_new.value = mph->count++;
+		node_new.next = mph->head.ptr[hi];
+		mph->head.ptr[hi] = index;
+		rust_ivec_push(&mph->kv, &node_new);
+	}
+
+	node = &mph->kv.ptr[index];
+
+	return node->value;
+}
+
+usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder_t *mphb) {
+	usize minimal_perfect_hash_size = (usize) mphb->count;
+	rust_ivec_free(&mphb->head);
+	rust_ivec_free(&mphb->kv);
+	mphb->hbits = 0;
+	mphb->hsize = 0;
+	mphb->count = 0;
+	return minimal_perfect_hash_size;
+}
+
 void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol) {
 	usize size = end - start;
 	*no_eol = size;

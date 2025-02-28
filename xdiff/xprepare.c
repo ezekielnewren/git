@@ -41,79 +41,14 @@ void xdl_free_env(xdfenv_t *xe) {
 }
 
 #ifndef WITH_RUST
-typedef struct {
-	xrecord_t key;
-	u64 value;
-	usize next;
-} xdlmphnode_t;
-
-DEFINE_IVEC_TYPE(xdlmphnode_t, xdlmphnode_t);
-
-typedef struct {
-	ivec_usize head;
-	ivec_xdlmphnode_t kv;
-	u32 hbits;
-	usize hsize;
-	u64 count;
-} xdlmph_t;
-
-
-static void xdl_mph_init(xdlmph_t *mph, usize size) {
-	usize default_value = INVALID_INDEX;
-
-	IVEC_INIT(mph->head);
-	IVEC_INIT(mph->kv);
-
-	mph->hbits = xdl_hashbits(size);
-	mph->hsize = 1 << mph->hbits;
-
-	rust_ivec_resize_exact(&mph->head, mph->hsize, &default_value);
-	rust_ivec_reserve(&mph->kv, size);
-
-	mph->count = 0;
-}
-
-
-static void xdl_mph_free(xdlmph_t *mph) {
-	rust_ivec_free(&mph->head);
-	rust_ivec_free(&mph->kv);
-}
-
-static u64 xdl_mph_hash(xdlmph_t *mph, xrecord_t *key) {
-	xdlmphnode_t *node;
-	usize index;
-
-	usize hi = (long) XDL_HASHLONG(key->line_hash, mph->hbits);
-	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
-		node = &mph->kv.ptr[index];
-		if (xdl_record_equal(&node->key, key))
-			break;
-		index = node->next;
-	}
-
-	if (index == INVALID_INDEX) {
-		xdlmphnode_t node_new;
-		index = mph->count;
-		node_new.key = *key;
-		node_new.value = mph->count++;
-		node_new.next = mph->head.ptr[hi];
-		mph->head.ptr[hi] = index;
-		rust_ivec_push(&mph->kv, &node_new);
-	}
-
-	node = &mph->kv.ptr[index];
-
-	return node->value;
-}
-
 static void xdl_count_occurrences(xdfenv_t *xe) {
-	xdlmph_t mph;
-	xdl_mph_init(&mph, xe->xdf1.record.length + xe->xdf2.record.length);
+	struct xdl_minimal_perfect_hash_builder_t mphb;
+	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length);
 
 	for (usize i = 0; i < xe->xdf1.record.length; i++) {
 		u64 minimal_perfect_hash;
 		xrecord_t *rec = &xe->xdf1.record.ptr[i];
-		minimal_perfect_hash = xdl_mph_hash(&mph, rec);
+		minimal_perfect_hash = xdl_mphb_hash(&mphb, rec);
 		if (minimal_perfect_hash == xe->occurrence.length) {
 			xdloccurrence_t occ;
 			occ.file1 = 0;
@@ -127,7 +62,7 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 	for (usize i = 0; i < xe->xdf2.record.length; i++) {
 		u64 minimal_perfect_hash;
 		xrecord_t *rec = &xe->xdf2.record.ptr[i];
-		minimal_perfect_hash = xdl_mph_hash(&mph, rec);
+		minimal_perfect_hash = xdl_mphb_hash(&mphb, rec);
 		if (minimal_perfect_hash == xe->occurrence.length) {
 			xdloccurrence_t occ;
 			occ.file1 = 0;
@@ -138,7 +73,7 @@ static void xdl_count_occurrences(xdfenv_t *xe) {
 		rust_ivec_push(&xe->xdf2.minimal_perfect_hash, &minimal_perfect_hash);
 	}
 
-	xdl_mph_free(&mph);
+	xdl_mphb_finish(&mphb);
 }
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {

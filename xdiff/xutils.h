@@ -23,6 +23,22 @@
 #if !defined(XUTILS_H)
 #define XUTILS_H
 
+struct xdl_mphb_node_t {
+	xrecord_t key;
+	u64 value;
+	usize next;
+};
+
+DEFINE_IVEC_TYPE(struct xdl_mphb_node_t, xdl_mphb_node_t);
+
+struct xdl_minimal_perfect_hash_builder_t {
+	ivec_usize head;
+	ivec_xdl_mphb_node_t kv;
+	u32 hbits;
+	usize hsize;
+	u64 count;
+};
+
 struct xwhitespaceiter_t {
 	u8 const* ptr;
 	usize size;
@@ -55,6 +71,9 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 
 /* Do not call this function, use XDL_ALLOC_GROW instead */
 void* xdl_alloc_grow_helper(void* p, long nr, long* alloc, size_t size);
+void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size);
+u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key);
+usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder_t *mphb);
 void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol);
 void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size, bool ignore_cr_at_eol);
 bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol);
