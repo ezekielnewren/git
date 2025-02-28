@@ -38,11 +38,11 @@ struct region {
 #define CNT(index, ptr) \
 	((LINE_MAP(index, ptr))->cnt)
 
-#define MPH(env, s, l) \
-	(env->xdf##s.minimal_perfect_hash.ptr[l - 1])
-
-#define CMP(env, s1, l1, s2, l2) \
-	(MPH(env, s1, l1) == MPH(env, s2, l2))
+static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
+	u64 mph1 = env->xdf1.minimal_perfect_hash.ptr[lhs - LINE_SHIFT];
+	u64 mph2 = env->xdf2.minimal_perfect_hash.ptr[rhs - LINE_SHIFT];
+	return mph1 == mph2;
+}
 
 static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 {
@@ -52,13 +52,15 @@ static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 	struct record new_rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
-		tbl_idx = MPH(env, 1, ptr);
+		tbl_idx = env->xdf1.minimal_perfect_hash.ptr[ptr - LINE_SHIFT];
 		rec_chain = &index->record_chain.ptr[tbl_idx];
 		rec = *rec_chain;
 
 		chain_len = 0;
 		while (rec) {
-			if (CMP(env, 1, rec->ptr, 1, ptr)) {
+			u64 mph1 = env->xdf1.minimal_perfect_hash.ptr[rec->ptr - LINE_SHIFT];
+			u64 mph2 = env->xdf1.minimal_perfect_hash.ptr[ptr - LINE_SHIFT];
+			if (mph1 == mph2) {
 				/*
 				 * ptr is identical to another element. Insert
 				 * it onto the front of the existing element
@@ -102,19 +104,20 @@ static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, i
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
-	struct record *rec = index->record_chain.ptr[MPH(env, 2, b_ptr)];
+	usize tbl_idx = env->xdf2.minimal_perfect_hash.ptr[b_ptr - LINE_SHIFT];
+	struct record *rec = index->record_chain.ptr[tbl_idx];
 	unsigned int as, ae, bs, be, np, rc;
 	int should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
 			if (!index->has_common)
-				index->has_common = CMP(env, 1, rec->ptr, 2, b_ptr);
+				index->has_common = mph_equal_by_line_number(env, rec->ptr, b_ptr);
 			continue;
 		}
 
 		as = rec->ptr;
-		if (!CMP(env, 1, as, 2, b_ptr))
+		if (!mph_equal_by_line_number(env, as, b_ptr))
 			continue;
 
 		index->has_common = 1;
@@ -127,14 +130,14 @@ static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, i
 			rc = rec->cnt;
 
 			while (line1 < as && line2 < bs
-				&& CMP(env, 1, as - 1, 2, bs - 1)) {
+				&& mph_equal_by_line_number(env, as - 1, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc)
 					rc = XDL_MIN(rc, CNT(index, as));
 			}
 			while (ae < LINE_END(1) && be < LINE_END(2)
-				&& CMP(env, 1, ae + 1, 2, be + 1)) {
+				&& mph_equal_by_line_number(env, ae + 1, be + 1)) {
 				ae++;
 				be++;
 				if (1 < rc)
