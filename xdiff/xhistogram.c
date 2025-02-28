@@ -30,11 +30,6 @@ struct region {
 	unsigned int begin2, end2;
 };
 
-#define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
-
-#define CNT(index, ptr) \
-	((LINE_MAP(index, ptr))->cnt)
-
 static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
 	u64 mph1 = env->xdf1.minimal_perfect_hash.ptr[lhs - LINE_SHIFT];
 	u64 mph2 = env->xdf2.minimal_perfect_hash.ptr[rhs - LINE_SHIFT];
@@ -65,9 +60,8 @@ static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 				 */
 				index->next_ptrs.ptr[ptr - index->ptr_shift] = rec->ptr;
 				rec->ptr = ptr;
-				/* cap rec->cnt at MAX_CNT */
 				rec->cnt = rec->cnt + 1;
-				LINE_MAP(index, ptr) = rec;
+				index->line_map.ptr[ptr - index->ptr_shift] = rec;
 				goto continue_scan;
 			}
 
@@ -88,7 +82,7 @@ static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 		rust_ivec_push(&index->record_storage, &new_rec);
 		rec = &index->record_storage.ptr[index->record_storage.length - 1];
 		*rec_chain = rec;
-		LINE_MAP(index, ptr) = rec;
+		index->line_map.ptr[ptr - index->ptr_shift] = rec;
 
 continue_scan:
 		; /* no op */
@@ -130,15 +124,19 @@ static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, i
 				&& mph_equal_by_line_number(env, as - 1, bs - 1)) {
 				as--;
 				bs--;
-				if (1 < rc)
-					rc = XDL_MIN(rc, CNT(index, as));
+				if (1 < rc) {
+					usize cnt = index->line_map.ptr[as - index->ptr_shift]->cnt;
+					rc = XDL_MIN(rc, cnt);
+				}
 			}
 			while (ae < LINE_END(1) && be < LINE_END(2)
 				&& mph_equal_by_line_number(env, ae + 1, be + 1)) {
 				ae++;
 				be++;
-				if (1 < rc)
-					rc = XDL_MIN(rc, CNT(index, ae));
+				if (1 < rc) {
+					usize cnt = index->line_map.ptr[ae - index->ptr_shift]->cnt;
+					rc = XDL_MIN(rc, cnt);
+				}
 			}
 
 			if (b_next <= be)
