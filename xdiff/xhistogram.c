@@ -32,9 +32,6 @@ struct region {
 
 #define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
 
-#define NEXT_PTR(index, ptr_off) \
-	(index->next_ptrs.ptr[(ptr_off) - index->ptr_shift])
-
 #define CNT(index, ptr) \
 	((LINE_MAP(index, ptr))->cnt)
 
@@ -66,7 +63,7 @@ static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
 				 * it onto the front of the existing element
 				 * chain.
 				 */
-				NEXT_PTR(index, ptr) = rec->ptr;
+				index->next_ptrs.ptr[ptr - index->ptr_shift] = rec->ptr;
 				rec->ptr = ptr;
 				/* cap rec->cnt at MAX_CNT */
 				rec->cnt = rec->cnt + 1;
@@ -123,7 +120,7 @@ static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, i
 		index->has_common = 1;
 		for (;;) {
 			should_break = 0;
-			np = NEXT_PTR(index, as);
+			np = index->next_ptrs.ptr[as - index->ptr_shift];
 			bs = b_ptr;
 			ae = as;
 			be = bs;
@@ -158,7 +155,7 @@ static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, i
 				break;
 
 			while (np <= ae) {
-				np = NEXT_PTR(index, np);
+				np = index->next_ptrs.ptr[np - index->ptr_shift];
 				if (np == 0) {
 					should_break = 1;
 					break;
