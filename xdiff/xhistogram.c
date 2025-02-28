@@ -25,8 +25,8 @@ struct histindex {
 };
 
 struct region {
-	unsigned int begin1, end1;
-	unsigned int begin2, end2;
+	usize begin1, end1;
+	usize begin2, end2;
 };
 
 static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
@@ -35,10 +35,9 @@ static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
 	return mph1 == mph2;
 }
 
-static int scanA(struct histindex *index, xdfenv_t *env, int line1, int count1)
-{
-	unsigned int ptr, tbl_idx;
-	unsigned int chain_len;
+static i32 scanA(struct histindex *index, xdfenv_t *env, usize line1, usize count1) {
+	usize ptr, tbl_idx;
+	usize chain_len;
 	struct record **rec_chain, *rec;
 	struct record new_rec;
 
@@ -90,14 +89,14 @@ continue_scan:
 	return 0;
 }
 
-static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, int b_ptr,
-	int line1, int count1, int line2, int count2)
+static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, usize b_ptr,
+	usize line1, usize count1, usize line2, usize count2)
 {
-	unsigned int b_next = b_ptr + 1;
+	usize b_next = b_ptr + 1;
 	usize tbl_idx = env->xdf2.minimal_perfect_hash.ptr[b_ptr - LINE_SHIFT];
 	struct record *rec = index->record_chain.ptr[tbl_idx];
-	unsigned int as, ae, bs, be, np, rc;
-	int should_break;
+	usize as, ae, bs, be, np, rc;
+	bool should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
@@ -168,8 +167,8 @@ static int try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, i
 	return b_next;
 }
 
-static int fall_back_to_classic_diff(xpparam_t const *xpp, xdfenv_t *env,
-		int line1, int count1, int line2, int count2)
+static i32 fall_back_to_classic_diff(xpparam_t const *xpp, xdfenv_t *env,
+		usize line1, usize count1, usize line2, usize count2)
 {
 	xpparam_t xpparam;
 
@@ -187,12 +186,12 @@ static inline void free_index(struct histindex *index) {
 	rust_ivec_free(&index->next_ptrs);
 }
 
-static int find_lcs(xdfenv_t *env,
+static i32 find_lcs(xdfenv_t *env,
 		    struct region *lcs,
-		    int line1, int count1, int line2, int count2)
+		    usize line1, usize count1, usize line2, usize count2)
 {
-	int b_ptr;
-	int ret = -1;
+	usize b_ptr;
+	i32 ret = -1;
 	struct histindex index;
 	struct record default_rec_value;
 	struct record* default_rec_ptr_value = NULL;
@@ -240,11 +239,11 @@ cleanup:
 }
 
 static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
-	int line1, int count1, int line2, int count2)
+	usize line1, usize count1, usize line2, usize count2)
 {
 	struct region lcs;
-	int lcs_found;
-	int result;
+	i32 lcs_found;
+	i32 result;
 redo:
 	result = -1;
 
