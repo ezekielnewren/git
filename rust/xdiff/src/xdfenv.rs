@@ -127,9 +127,9 @@ extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: isize, mut s: isize, mut e
 	let mut r = 1;
 	// for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
 	while i - r >= s {
-		if dis[(i - r) as usize] == 0 {
+		if dis[(i - r) as usize] == NO {
 			rdis0 += 1;
-		} else if dis[(i - r) as usize] == 2 {
+		} else if dis[(i - r) as usize] == TOO_MANY {
 			rpdis0 += 1;
 		} else {
 			break;
@@ -150,9 +150,9 @@ extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: isize, mut s: isize, mut e
 	let mut rpdis1 = 1;
 	r = 1;
 	while i + r <= e {
-		if dis[(i + r) as usize] == 0 {
+		if dis[(i + r) as usize] == NO {
 			rdis1 += 1;
-		} else if dis[(i + r) as usize] == 2 {
+		} else if dis[(i + r) as usize] == TOO_MANY {
 			rpdis1 += 1;
 		} else {
 			break;

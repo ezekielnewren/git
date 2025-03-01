@@ -154,9 +154,9 @@ static bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
 	 * current line (i) is already a multimatch line.
 	 */
 	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
-		if (!dis->ptr[i - r])
+		if (dis->ptr[i - r] == NO)
 			rdis0++;
-		else if (dis->ptr[i - r] == 2)
+		else if (dis->ptr[i - r] == TOO_MANY)
 			rpdis0++;
 		else
 			break;
@@ -170,9 +170,9 @@ static bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
 	if (rdis0 == 0)
 		return 0;
 	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
-		if (!dis->ptr[i + r])
+		if (dis->ptr[i + r] == NO)
 			rdis1++;
-		else if (dis->ptr[i + r] == 2)
+		else if (dis->ptr[i + r] == TOO_MANY)
 			rpdis1++;
 		else
 			break;
@@ -216,14 +216,14 @@ static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) 
 	for (i = xe->delta_start; i <= end1; i++) {
 		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
 		nm = occurrence->ptr[mph].file1;
-		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim1) ? 2: 1;
+		dis1.ptr[i] = (nm == 0) ? NO: (nm >= mlim1) ? TOO_MANY: YES;
 	}
 
 	mlim2 = XDL_MIN(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe->xdf2.record.length));
 	for (i = xe->delta_start; i <= end2; i++) {
 		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
 		nm = occurrence->ptr[mph].file1;
-		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim2) ? 2: 1;
+		dis2.ptr[i] = (nm == 0) ? NO: (nm >= mlim2) ? TOO_MANY: YES;
 	}
 
 	for (i = xe->delta_start; i <= end1; i++) {
@@ -231,7 +231,7 @@ static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) 
 		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch(&dis1, i, xe->delta_start, end1))) {
 			rust_ivec_push(&xe->xdf1.rindex, &i);
 		} else
-			xe->xdf1.rchg[i] = 1;
+			xe->xdf1.rchg[i] = YES;
 	}
 
 	for (i = xe->delta_start; i <= end2; i++) {
@@ -239,7 +239,7 @@ static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) 
 		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch(&dis2, i, xe->delta_start, end2))) {
 			rust_ivec_push(&xe->xdf2.rindex, &i);
 		} else
-			xe->xdf2.rchg[i] = 1;
+			xe->xdf2.rchg[i] = YES;
 	}
 
 	rust_ivec_free(&dis1);

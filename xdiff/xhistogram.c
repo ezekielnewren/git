@@ -248,13 +248,13 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 
 		if (start1 == end1) {
 			for (; start2 < end2; start2 += 1) {
-				env->xdf2.rchg[start2 - 1] = 1;
+				env->xdf2.rchg[start2 - 1] = YES;
 			}
 			return 0;
 		}
 		if (start2 == end2) {
 			for (; start1 < end1; start1 += 1) {
-				env->xdf1.rchg[start1 - 1] = 1;
+				env->xdf1.rchg[start1 - 1] = YES;
 			}
 			return 0;
 		}
@@ -268,10 +268,10 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 		else {
 			if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 				for (; start1 < end1; start1 += 1) {
-					env->xdf1.rchg[start1 - 1] = 1;
+					env->xdf1.rchg[start1 - 1] = YES;
 				}
 				for (; start2 < end2; start2 += 1) {
-					env->xdf2.rchg[start2 - 1] = 1;
+					env->xdf2.rchg[start2 - 1] = YES;
 				}
 				result = 0;
 			} else {
