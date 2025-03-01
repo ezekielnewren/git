@@ -105,7 +105,7 @@ impl xdfenv_t {
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		xe.count_occurrences(occurrence);
+		xe.construct_mph_and_occurrences(occurrence);
 
 		xe
 	}
@@ -145,7 +145,7 @@ impl xdfenv_t {
 	}
 
 
-	pub(crate) fn count_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>) {
+	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>) {
 		let mut mphb = MinimalPerfectHashBuilder::<xrecord_t>::default();
 
 		for rec in self.xdf1.record.as_slice() {

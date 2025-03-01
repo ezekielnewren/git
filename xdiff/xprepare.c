@@ -47,7 +47,7 @@ typedef struct {
 DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
 
 #ifndef WITH_RUST
-static void xdl_count_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
+static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
 	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length);
 
@@ -304,7 +304,7 @@ i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	xdl_prepare_ctx(mf1, &xe->xdf1, flags);
 	xdl_prepare_ctx(mf2, &xe->xdf2, flags);
 
-	xdl_count_occurrences(xe, occ_ptr);
+	xdl_construct_mph_and_occurrences(xe, occ_ptr);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		xdl_optimize_ctxs(xe, &occurrence);
