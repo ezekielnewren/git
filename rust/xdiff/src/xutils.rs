@@ -56,6 +56,19 @@ impl<'a> Iterator for LineReader<'a> {
 	}
 }
 
+pub(crate) fn xdl_bogosqrt(mut n: u64) -> u64 {
+	/*
+	 * Classical integer square root approximation using shifts.
+	 */
+	let mut i = 1;
+	while n > 0 {
+		i <<= 1;
+		n >>= 2;
+	}
+
+	i
+}
+
 pub(crate) fn XDL_ISSPACE(v: u8) -> bool {
 	match v {
 		b'\t' | b'\n' | b'\r' | b' ' => true,

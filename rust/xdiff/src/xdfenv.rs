@@ -2,11 +2,11 @@
 
 use std::collections::HashMap;
 use interop::ivec::IVec;
-use crate::xdiff::XDF_IGNORE_CR_AT_EOL;
+use crate::xdiff::{LINE_SHIFT, XDF_IGNORE_CR_AT_EOL};
 use crate::xrecord::xrecord_t;
 use crate::xtypes::ConsiderLine::*;
 use crate::xtypes::{MinimalPerfectHashBuilder, Occurrence};
-use crate::xutils::LineReader;
+use crate::xutils::{xdl_bogosqrt, LineReader};
 
 const XDL_KPDIS_RUN: u64 = 4;
 const XDL_MAX_EQLIMIT: u64 = 1024;
@@ -172,6 +172,72 @@ extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: isize, mut s: isize, mut e
 
 	rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1)
 }
+
+
+#[no_mangle]
+extern "C" fn xdl_cleanup_records(xe: *mut xdfenv_t, occurrence: *mut IVec<Occurrence>) {
+	let xe = unsafe { xdfenv_t::from_raw(xe, false) };
+	let occurrence = unsafe { IVec::from_raw_mut(occurrence) };
+
+	let mut dis1 = IVec::<u8>::new();
+	let mut dis2 = IVec::<u8>::new();
+
+	let end1 = xe.xdf1.record.len() - xe.delta_end as usize;
+	let end2 = xe.xdf2.record.len() - xe.delta_end as usize;
+
+	dis1.resize_exact(xe.xdf1.rchg_vec.len(), NO.into());
+	dis2.resize_exact(xe.xdf2.rchg_vec.len(), NO.into());
+
+	let mlim1 = std::cmp::min(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe.xdf1.record.len() as u64)) as usize;
+	for i in xe.delta_start as usize..end1 {
+		let mph = xe.xdf1.minimal_perfect_hash[i];
+		let nm = occurrence[mph as usize].file1;
+		dis1[i] = if nm == 0 {
+			NO
+		} else if nm >= mlim1 {
+			TOO_MANY
+		} else {
+			YES
+		}.into();
+	}
+
+	let mlim2 = std::cmp::min(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe.xdf2.record.len() as u64)) as usize;
+	// for (i = xe->delta_start; i <= end2; i++) {
+	for i in xe.delta_start as usize..end2 {
+		let mph = xe.xdf2.minimal_perfect_hash[i];
+		let nm = occurrence[mph as usize].file1;
+		// dis2[i] = (nm == 0) ? NO: (nm >= mlim2) ? TOO_MANY: YES;
+		dis2[i] = if nm == 0 {
+			NO
+		} else if nm >= mlim2 {
+			TOO_MANY
+		} else {
+			YES
+		}.into();
+	}
+
+	for i in xe.delta_start as usize..end1 {
+		if dis1[i] == YES ||
+		    (dis1[i] == TOO_MANY && !xdl_clean_mmatch(&mut dis1, i as isize, xe.delta_start, end1 as isize - 1)) {
+			xe.xdf1.rindex.push(i as isize);
+		} else {
+			xe.xdf1.rchg_vec[i + LINE_SHIFT] = YES.into();
+		}
+	}
+
+	// for (i = xe->delta_start; i <= end2; i++) {
+	for i in xe.delta_start as usize..end2 {
+		if dis2[i] == YES ||
+		    (dis2[i] == TOO_MANY && !xdl_clean_mmatch(&mut dis2, i as isize, xe.delta_start, end2 as isize - 1)) {
+			xe.xdf2.rindex.push(i as isize);
+			// rust_ivec_push(&xe->xdf2.rindex, &i);
+		} else {
+			xe.xdf2.rchg_vec[i + LINE_SHIFT] = YES.into();
+		}
+	}
+}
+
+
 
 
 impl xdfenv_t {

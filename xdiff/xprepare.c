@@ -195,6 +195,9 @@ static bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
+#ifdef WITH_RUST
+extern void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence);
+#else
 static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	isize i, nm, mlim1, mlim2;
 
@@ -202,8 +205,8 @@ static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) 
 	ivec_u8 dis2;
 
 	u8 default_value = NO;
-	isize end1 = xe->xdf1.record.length - 1 - xe->delta_end;
-	isize end2 = xe->xdf2.record.length - 1 - xe->delta_end;
+	isize end1 = xe->xdf1.record.length - xe->delta_end;
+	isize end2 = xe->xdf2.record.length - xe->delta_end;
 
 	IVEC_INIT(dis1);
 	rust_ivec_resize_exact(&dis1, xe->xdf1.rchg_vec.length, &default_value);
@@ -213,30 +216,30 @@ static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) 
 
 
 	mlim1 = XDL_MIN(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe->xdf1.record.length));
-	for (i = xe->delta_start; i <= end1; i++) {
+	for (i = xe->delta_start; i < end1; i++) {
 		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
 		nm = occurrence->ptr[mph].file1;
 		dis1.ptr[i] = (nm == 0) ? NO: (nm >= mlim1) ? TOO_MANY: YES;
 	}
 
 	mlim2 = XDL_MIN(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe->xdf2.record.length));
-	for (i = xe->delta_start; i <= end2; i++) {
+	for (i = xe->delta_start; i < end2; i++) {
 		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
-		nm = occurrence->ptr[mph].file1;
+		nm = occurrence->ptr[mph].file2;
 		dis2.ptr[i] = (nm == 0) ? NO: (nm >= mlim2) ? TOO_MANY: YES;
 	}
 
-	for (i = xe->delta_start; i <= end1; i++) {
-		if (dis1.ptr[i] == 1 ||
-		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch(&dis1, i, xe->delta_start, end1))) {
+	for (i = xe->delta_start; i < end1; i++) {
+		if (dis1.ptr[i] == YES ||
+		    (dis1.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis1, i, xe->delta_start, end1 - 1))) {
 			rust_ivec_push(&xe->xdf1.rindex, &i);
 		} else
 			xe->xdf1.rchg[i] = YES;
 	}
 
-	for (i = xe->delta_start; i <= end2; i++) {
-		if (dis2.ptr[i] == 1 ||
-		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch(&dis2, i, xe->delta_start, end2))) {
+	for (i = xe->delta_start; i < end2; i++) {
+		if (dis2.ptr[i] == YES ||
+		    (dis2.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis2, i, xe->delta_start, end2 - 1))) {
 			rust_ivec_push(&xe->xdf2.rindex, &i);
 		} else
 			xe->xdf2.rchg[i] = YES;
@@ -245,7 +248,7 @@ static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) 
 	rust_ivec_free(&dis1);
 	rust_ivec_free(&dis2);
 }
-
+#endif
 
 /*
  * Early trim initial and terminal matching records.
