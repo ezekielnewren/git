@@ -100,12 +100,12 @@ pub struct xdfenv_t {
 
 impl xdfenv_t {
 
-	pub(crate) fn new(mf1: &[u8], mf2: &[u8], flags: u64, occurrence: &mut IVec<Occurrence>) -> Self {
+	pub(crate) fn new(mf1: &[u8], mf2: &[u8], flags: u64, occurrence: Option<&mut IVec<Occurrence>>) -> Self {
 		let mut xe = xdfenv_t::default();
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		xe.minimal_perfect_hash_size = xe.count_occurrences(occurrence);
+		xe.count_occurrences(occurrence);
 
 		xe
 	}
@@ -145,28 +145,39 @@ impl xdfenv_t {
 	}
 
 
-	pub(crate) fn count_occurrences(&mut self, occurrence: &mut IVec<Occurrence>) -> usize {
+	pub(crate) fn count_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>) {
 		let mut mphb = MinimalPerfectHashBuilder::<xrecord_t>::default();
 
 		for rec in self.xdf1.record.as_slice() {
-			let minimal_perfect_hash = mphb.hash(rec);
-			if minimal_perfect_hash == occurrence.len() as u64 {
-				occurrence.push(Occurrence::default());
-			}
-			occurrence[minimal_perfect_hash as usize].file1 += 1;
-			self.xdf1.minimal_perfect_hash.push(minimal_perfect_hash);
+			self.xdf1.minimal_perfect_hash.push(mphb.hash(rec));
 		}
 
 		for rec in self.xdf2.record.as_slice() {
-			let minimal_perfect_hash = mphb.hash(rec);
-			if minimal_perfect_hash == occurrence.len() as u64 {
-				occurrence.push(Occurrence::default());
-			}
-			occurrence[minimal_perfect_hash as usize].file2 += 1;
-			self.xdf2.minimal_perfect_hash.push(minimal_perfect_hash);
+			self.xdf2.minimal_perfect_hash.push(mphb.hash(rec));
 		}
 
-		mphb.finish()
+		self.minimal_perfect_hash_size = mphb.finish();
+
+		/*
+		 * ORDER MATTERS!!!, counting occurrences will only work properly if
+		 * the records are iterated over in the same way that the mph set
+		 * was constructed
+		 */
+		if let Some(occ) = occurrence {
+			for minimal_perfect_hash in self.xdf1.minimal_perfect_hash.as_slice() {
+				if *minimal_perfect_hash == occ.len() as u64 {
+					occ.push(Occurrence::default());
+				}
+				occ[*minimal_perfect_hash as usize].file1 += 1;
+			}
+
+			for minimal_perfect_hash in self.xdf2.minimal_perfect_hash.as_slice() {
+				if *minimal_perfect_hash == occ.len() as u64 {
+					occ.push(Occurrence::default());
+				}
+				occ[*minimal_perfect_hash as usize].file1 += 1;
+			}
+		}
 	}
 }
 

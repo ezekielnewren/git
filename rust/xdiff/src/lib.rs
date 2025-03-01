@@ -32,7 +32,7 @@ unsafe extern "C" fn rust_xdl_prepare_env(mf1: *const mmfile_t, mf2: *const mmfi
     let xe = xdfenv_t::from_raw(xe, true);
     let occurrence = IVec::from_raw_mut(occurrence);
 
-    *xe = xdfenv_t::new(mf1, mf2, flags, occurrence);
+    *xe = xdfenv_t::new(mf1, mf2, flags, Some(occurrence));
 
     0
 }
@@ -44,7 +44,7 @@ unsafe extern "C" fn rust_xdl_do_histogram_diff(env: *mut xdfenv_t, flags: u64) 
     let mf1 = env.xdf1.as_ref();
     let mf2 = env.xdf2.as_ref();
 
-    let mut copy = xdfenv_t::new(mf1, mf2, flags, &mut Default::default());
+    let mut copy = xdfenv_t::new(mf1, mf2, flags, None);
 
 
     let result = xdl_do_histogram_diff(&mut copy);

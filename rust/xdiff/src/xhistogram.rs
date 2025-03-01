@@ -341,7 +341,7 @@ mod tests {
 			let _expect = read_test_file(&path).unwrap();
 
 			let mut occurrrence = IVec::<Occurrence>::new();
-			let mut xe = xdfenv_t::new(before.as_slice(), after.as_slice(), _flags, &mut occurrrence);
+			let mut xe = xdfenv_t::new(before.as_slice(), after.as_slice(), _flags, Some(&mut occurrrence));
 
 			xdl_do_histogram_diff(&mut xe);
 		}

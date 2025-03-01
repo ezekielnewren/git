@@ -297,20 +297,7 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 	return result;
 }
 
-#ifdef WITH_RUST
-extern int rust_xdl_do_histogram_diff(xdfenv_t *env, u64 flags);
-int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
-	isize end1 = env->xdf1.record.length;
-	isize end2 = env->xdf2.record.length;
 
-	i32 r0 = histogram_diff(xpp, env,
-		env->delta_start + 1, end1 + LINE_SHIFT,
-		env->delta_start + 1, end2 + LINE_SHIFT);
-	rust_xdl_do_histogram_diff(env, xpp->flags);
-
-	return r0;
-}
-#else
 int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
 	isize end1 = env->xdf1.record.length;
 	isize end2 = env->xdf2.record.length;
@@ -319,4 +306,3 @@ int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
 		env->delta_start + 1, end1 + LINE_SHIFT,
 		env->delta_start + 1, end2 + LINE_SHIFT);
 }
-#endif
