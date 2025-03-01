@@ -1,26 +1,9 @@
-/*
- *  LibXDiff by Davide Libenzi ( File Differential Library )
- *  Copyright (C) 2003  Davide Libenzi
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, see
- *  <http://www.gnu.org/licenses/>.
- *
- *  Davide Libenzi <davidel@xmailserver.org>
- *
- */
-
 #include "xinclude.h"
+
+#ifdef WITH_RUST
+extern i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe);
+extern void xdl_free_env(xdfenv_t *xe);
+#else
 #include "ivec.h"
 
 #define XDL_KPDIS_RUN 4
@@ -46,7 +29,6 @@ typedef struct {
 
 DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
 
-#ifndef WITH_RUST
 static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
 	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length);
@@ -126,12 +108,8 @@ static void xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	xdf->rchg = xdf->rchg_vec.ptr + 1;
 }
-#endif
 
 
-#ifdef WITH_RUST
-extern bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e);
-#else
 static bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
 	isize r, rdis0, rpdis0, rdis1, rpdis1;
 
@@ -188,16 +166,12 @@ static bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
 
 	return rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1);
 }
-#endif
 
 /*
  * Try to reduce the problem complexity, discard records that have no
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-#ifdef WITH_RUST
-extern void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence);
-#else
 static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	isize i, nm, mlim1, mlim2;
 
@@ -248,7 +222,6 @@ static void xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) 
 	rust_ivec_free(&dis1);
 	rust_ivec_free(&dis2);
 }
-#endif
 
 /*
  * Early trim initial and terminal matching records.
@@ -274,27 +247,11 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 }
 
 
-
 static void xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	xdl_trim_ends(xe);
 	xdl_cleanup_records(xe, occurrence);
 }
 
-#ifdef WITH_RUST
-extern i32 rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe, ivec_xdloccurrence_t *occurrence);
-i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
-	ivec_xdloccurrence_t occurrence;
-	IVEC_INIT(occurrence);
-
-	rust_xdl_prepare_env(mf1, mf2, flags, xe, &occurrence);
-
-	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		xdl_optimize_ctxs(xe, &occurrence);
-	}
-
-	return 0;
-}
-#else
 i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	ivec_xdloccurrence_t occurrence;
 	ivec_xdloccurrence_t *occ_ptr;
@@ -320,5 +277,3 @@ i32 xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	return 0;
 }
 #endif
-
-

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use interop::ivec::IVec;
-use crate::xdiff::{LINE_SHIFT, XDF_IGNORE_CR_AT_EOL};
+use crate::xdiff::{LINE_SHIFT, XDF_HISTOGRAM_DIFF, XDF_IGNORE_CR_AT_EOL, XDF_PATIENCE_DIFF};
 use crate::xrecord::xrecord_t;
 use crate::xtypes::ConsiderLine::*;
 use crate::xtypes::{MinimalPerfectHashBuilder, Occurrence};
@@ -98,10 +98,7 @@ pub struct xdfenv_t {
 }
 
 
-#[no_mangle]
-extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: isize, mut s: isize, mut e: isize) -> bool {
-	let dis = unsafe { IVec::from_raw_mut(dis) };
-
+fn clean_mmatch(dis: &mut Vec<u8>, i: isize, mut s: isize, mut e: isize) -> bool {
 	/*
 	 * Limits the window the is examined during the similar-lines
 	 * scan. The loops below stops when dis[i - r] == 1 (line that
@@ -174,97 +171,62 @@ extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: isize, mut s: isize, mut e
 }
 
 
-#[no_mangle]
-extern "C" fn xdl_cleanup_records(xe: *mut xdfenv_t, occurrence: *mut IVec<Occurrence>) {
-	let xe = unsafe { xdfenv_t::from_raw(xe, false) };
-	let occurrence = unsafe { IVec::from_raw_mut(occurrence) };
-
-	let mut dis1 = IVec::<u8>::new();
-	let mut dis2 = IVec::<u8>::new();
-
-	let end1 = xe.xdf1.record.len() - xe.delta_end as usize;
-	let end2 = xe.xdf2.record.len() - xe.delta_end as usize;
-
-	dis1.resize_exact(xe.xdf1.rchg_vec.len(), NO.into());
-	dis2.resize_exact(xe.xdf2.rchg_vec.len(), NO.into());
-
-	let mlim1 = std::cmp::min(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe.xdf1.record.len() as u64)) as usize;
-	for i in xe.delta_start as usize..end1 {
-		let mph = xe.xdf1.minimal_perfect_hash[i];
-		let nm = occurrence[mph as usize].file1;
-		dis1[i] = if nm == 0 {
-			NO
-		} else if nm >= mlim1 {
-			TOO_MANY
-		} else {
-			YES
-		}.into();
-	}
-
-	let mlim2 = std::cmp::min(XDL_MAX_EQLIMIT, xdl_bogosqrt(xe.xdf2.record.len() as u64)) as usize;
-	// for (i = xe->delta_start; i <= end2; i++) {
-	for i in xe.delta_start as usize..end2 {
-		let mph = xe.xdf2.minimal_perfect_hash[i];
-		let nm = occurrence[mph as usize].file1;
-		// dis2[i] = (nm == 0) ? NO: (nm >= mlim2) ? TOO_MANY: YES;
-		dis2[i] = if nm == 0 {
-			NO
-		} else if nm >= mlim2 {
-			TOO_MANY
-		} else {
-			YES
-		}.into();
-	}
-
-	for i in xe.delta_start as usize..end1 {
-		if dis1[i] == YES ||
-		    (dis1[i] == TOO_MANY && !xdl_clean_mmatch(&mut dis1, i as isize, xe.delta_start, end1 as isize - 1)) {
-			xe.xdf1.rindex.push(i as isize);
-		} else {
-			xe.xdf1.rchg_vec[i + LINE_SHIFT] = YES.into();
-		}
-	}
-
-	// for (i = xe->delta_start; i <= end2; i++) {
-	for i in xe.delta_start as usize..end2 {
-		if dis2[i] == YES ||
-		    (dis2[i] == TOO_MANY && !xdl_clean_mmatch(&mut dis2, i as isize, xe.delta_start, end2 as isize - 1)) {
-			xe.xdf2.rindex.push(i as isize);
-			// rust_ivec_push(&xe->xdf2.rindex, &i);
-		} else {
-			xe.xdf2.rchg_vec[i + LINE_SHIFT] = YES.into();
-		}
-	}
-}
-
-
-
-
 impl xdfenv_t {
 
-	pub(crate) fn new(mf1: &[u8], mf2: &[u8], flags: u64, occurrence: Option<&mut IVec<Occurrence>>) -> Self {
-		let mut xe = xdfenv_t::default();
-		xe.xdf1 = xdfile_t::new(mf1, flags);
-		xe.xdf2 = xdfile_t::new(mf2, flags);
+	fn cleanup_records(&mut self, occurrence: &mut Vec<Occurrence>) {
+		let mut dis1 = Vec::<u8>::new();
+		let mut dis2 = Vec::<u8>::new();
 
-		xe.construct_mph_and_occurrences(occurrence);
+		let end1 = self.xdf1.record.len() - self.delta_end as usize;
+		let end2 = self.xdf2.record.len() - self.delta_end as usize;
 
-		xe
-	}
+		dis1.resize(self.xdf1.rchg_vec.len(), NO.into());
+		dis2.resize(self.xdf2.rchg_vec.len(), NO.into());
 
-	pub(crate) unsafe fn from_raw<'a>(xe: *mut xdfenv_t, do_init: bool) -> &'a mut xdfenv_t {
-		if xe.is_null() {
-			panic!("xdfenv_t is null");
+		let mlim1 = std::cmp::min(XDL_MAX_EQLIMIT, xdl_bogosqrt(self.xdf1.record.len() as u64)) as usize;
+		for i in self.delta_start as usize..end1 {
+			let mph = self.xdf1.minimal_perfect_hash[i];
+			let nm = occurrence[mph as usize].file1;
+			dis1[i] = if nm == 0 {
+				NO
+			} else if nm >= mlim1 {
+				TOO_MANY
+			} else {
+				YES
+			}.into();
 		}
-		if do_init {
-			std::ptr::write(xe, xdfenv_t::default());
+
+		let mlim2 = std::cmp::min(XDL_MAX_EQLIMIT, xdl_bogosqrt(self.xdf2.record.len() as u64)) as usize;
+		for i in self.delta_start as usize..end2 {
+			let mph = self.xdf2.minimal_perfect_hash[i];
+			let nm = occurrence[mph as usize].file1;
+			dis2[i] = if nm == 0 {
+				NO
+			} else if nm >= mlim2 {
+				TOO_MANY
+			} else {
+				YES
+			}.into();
 		}
-		&mut *xe
+
+		for i in self.delta_start as usize..end1 {
+			if dis1[i] == YES ||
+				(dis1[i] == TOO_MANY && !clean_mmatch(&mut dis1, i as isize, self.delta_start, end1 as isize - 1)) {
+				self.xdf1.rindex.push(i as isize);
+			} else {
+				self.xdf1.rchg_vec[i + LINE_SHIFT] = YES.into();
+			}
+		}
+
+		for i in self.delta_start as usize..end2 {
+			if dis2[i] == YES ||
+				(dis2[i] == TOO_MANY && !clean_mmatch(&mut dis2, i as isize, self.delta_start, end2 as isize - 1)) {
+				self.xdf2.rindex.push(i as isize);
+			} else {
+				self.xdf2.rchg_vec[i + LINE_SHIFT] = YES.into();
+			}
+		}
 	}
-}
-
-
-impl xdfenv_t {
 
 	pub(crate) fn trim_ends(&mut self) {
 		let mph1 = &self.xdf1.minimal_perfect_hash.as_slice();
@@ -287,7 +249,7 @@ impl xdfenv_t {
 	}
 
 
-	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>) {
+	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: &mut Vec<Occurrence>, count_occurrences: bool) {
 		let mut mphb = MinimalPerfectHashBuilder::<xrecord_t>::default();
 
 		for rec in self.xdf1.record.as_slice() {
@@ -300,26 +262,59 @@ impl xdfenv_t {
 
 		self.minimal_perfect_hash_size = mphb.finish();
 
+		if !count_occurrences {
+			return;
+		}
+
 		/*
 		 * ORDER MATTERS!!!, counting occurrences will only work properly if
 		 * the records are iterated over in the same way that the mph set
 		 * was constructed
 		 */
-		if let Some(occ) = occurrence {
-			for minimal_perfect_hash in self.xdf1.minimal_perfect_hash.as_slice() {
-				if *minimal_perfect_hash == occ.len() as u64 {
-					occ.push(Occurrence::default());
-				}
-				occ[*minimal_perfect_hash as usize].file1 += 1;
+		for minimal_perfect_hash in self.xdf1.minimal_perfect_hash.as_slice() {
+			if *minimal_perfect_hash == occurrence.len() as u64 {
+				occurrence.push(Occurrence::default());
 			}
-
-			for minimal_perfect_hash in self.xdf2.minimal_perfect_hash.as_slice() {
-				if *minimal_perfect_hash == occ.len() as u64 {
-					occ.push(Occurrence::default());
-				}
-				occ[*minimal_perfect_hash as usize].file1 += 1;
-			}
+			occurrence[*minimal_perfect_hash as usize].file1 += 1;
 		}
+
+		for minimal_perfect_hash in self.xdf2.minimal_perfect_hash.as_slice() {
+			if *minimal_perfect_hash == occurrence.len() as u64 {
+				occurrence.push(Occurrence::default());
+			}
+			occurrence[*minimal_perfect_hash as usize].file1 += 1;
+		}
+	}
+}
+
+
+impl xdfenv_t {
+
+	pub(crate) fn new(mf1: &[u8], mf2: &[u8], flags: u64) -> Self {
+		let mut xe = xdfenv_t::default();
+		xe.xdf1 = xdfile_t::new(mf1, flags);
+		xe.xdf2 = xdfile_t::new(mf2, flags);
+
+		let mut occurrence: Vec<Occurrence> = Vec::new();
+		let count_occurrences = (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0;
+		xe.construct_mph_and_occurrences(&mut occurrence, count_occurrences);
+
+		if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
+			xe.trim_ends();
+			xe.cleanup_records(&mut occurrence);
+		}
+
+		xe
+	}
+
+	pub(crate) unsafe fn from_raw<'a>(xe: *mut xdfenv_t, do_init: bool) -> &'a mut xdfenv_t {
+		if xe.is_null() {
+			panic!("xdfenv_t is null");
+		}
+		if do_init {
+			std::ptr::write(xe, xdfenv_t::default());
+		}
+		&mut *xe
 	}
 }
 

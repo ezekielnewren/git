@@ -26,17 +26,19 @@ unsafe extern "C" fn rust_xdl_prepare_ctx(_mf: *const mmfile_t, _xdf: *mut xdfil
 }
 
 #[no_mangle]
-unsafe extern "C" fn rust_xdl_prepare_env(mf1: *const mmfile_t, mf2: *const mmfile_t, flags: u64, xe: *mut xdfenv_t, occurrence: *mut IVec<Occurrence>) -> i32 {
+unsafe extern "C" fn xdl_prepare_env(mf1: *const mmfile_t, mf2: *const mmfile_t, flags: u64, xe: *mut xdfenv_t) -> i32 {
     let mf1 = mmfile_t::from_raw(mf1);
     let mf2 = mmfile_t::from_raw(mf2);
-    let xe = xdfenv_t::from_raw(xe, true);
-    let occurrence = IVec::from_raw_mut(occurrence);
 
-    *xe = xdfenv_t::new(mf1, mf2, flags, Some(occurrence));
+    std::ptr::write(xe, xdfenv_t::new(mf1, mf2, flags));
 
     0
 }
 
+#[no_mangle]
+unsafe extern "C" fn xdl_free_env(xe: *mut xdfenv_t) {
+    std::ptr::drop_in_place(xe);
+}
 
 
 
@@ -53,7 +55,7 @@ unsafe extern "C" fn rust_xdl_do_histogram_diff(env: *mut xdfenv_t, flags: u64) 
     let mf1 = env.xdf1.as_ref();
     let mf2 = env.xdf2.as_ref();
 
-    let mut copy = xdfenv_t::new(mf1, mf2, flags, None);
+    let mut copy = xdfenv_t::new(mf1, mf2, flags);
 
 
     let result = xdl_do_histogram_diff(&mut copy);
