@@ -128,7 +128,11 @@ static void xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 }
 #endif
 
-static int xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
+
+#ifdef WITH_RUST
+extern bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e);
+#else
+static bool xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
 	isize r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
@@ -178,13 +182,13 @@ static int xdl_clean_mmatch(ivec_u8 *dis, isize i, isize s, isize e) {
 	 * return 0 and hence we don't make the current line (i) discarded.
 	 */
 	if (rdis1 == 0)
-		return 0;
+		return false;
 	rdis1 += rdis0;
 	rpdis1 += rpdis0;
 
 	return rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1);
 }
-
+#endif
 
 /*
  * Try to reduce the problem complexity, discard records that have no

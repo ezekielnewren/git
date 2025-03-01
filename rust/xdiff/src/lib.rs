@@ -37,6 +37,15 @@ unsafe extern "C" fn rust_xdl_prepare_env(mf1: *const mmfile_t, mf2: *const mmfi
     0
 }
 
+
+
+
+
+
+
+
+
+
 #[no_mangle]
 unsafe extern "C" fn rust_xdl_do_histogram_diff(env: *mut xdfenv_t, flags: u64) -> i32 {
     let env = xdfenv_t::from_raw(env, false);

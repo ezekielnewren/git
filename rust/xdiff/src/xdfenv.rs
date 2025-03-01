@@ -98,6 +98,82 @@ pub struct xdfenv_t {
 }
 
 
+#[no_mangle]
+extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: isize, mut s: isize, mut e: isize) -> bool {
+	let dis = unsafe { IVec::from_raw_mut(dis) };
+
+	/*
+	 * Limits the window the is examined during the similar-lines
+	 * scan. The loops below stops when dis[i - r] == 1 (line that
+	 * has no match), but there are corner cases where the loop
+	 * proceed all the way to the extremities by causing huge
+	 * performance penalties in case of big files.
+	 */
+	if i - s > XDL_SIMSCAN_WINDOW as isize {
+		s = i - XDL_SIMSCAN_WINDOW as isize;
+	}
+	if e - i > XDL_SIMSCAN_WINDOW as isize {
+		e = i + XDL_SIMSCAN_WINDOW as isize;
+	}
+
+	/*
+	 * Scans the lines before 'i' to find a run of lines that either
+	 * have no match (dis[j] == 0) or have multiple matches (dis[j] > 1).
+	 * Note that we always call this function with dis[i] > 1, so the
+	 * current line (i) is already a multimatch line.
+	 */
+	let mut rdis0 = 0;
+	let mut rpdis0 = 1;
+	let mut r = 1;
+	// for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
+	while i - r >= s {
+		if dis[(i - r) as usize] == 0 {
+			rdis0 += 1;
+		} else if dis[(i - r) as usize] == 2 {
+			rpdis0 += 1;
+		} else {
+			break;
+		}
+		r += 1;
+	}
+	/*
+	 * If the run before the line 'i' found only multimatch lines, we
+	 * return 0 and hence we don't make the current line (i) discarded.
+	 * We want to discard multimatch lines only when they appear in the
+	 * middle of runs with nomatch lines (dis[j] == 0).
+	 */
+	if rdis0 == 0 {
+		return false;
+	}
+	// for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
+	let mut rdis1 = 0;
+	let mut rpdis1 = 1;
+	r = 1;
+	while i + r <= e {
+		if dis[(i + r) as usize] == 0 {
+			rdis1 += 1;
+		} else if dis[(i + r) as usize] == 2 {
+			rpdis1 += 1;
+		} else {
+			break;
+		}
+
+		r += 1;
+	}
+	/*
+	 * If the run after the line 'i' found only multimatch lines, we
+	 * return 0 and hence we don't make the current line (i) discarded.
+	 */
+	if rdis1 == 0 {
+		return false;
+	}
+	rdis1 += rdis0;
+	rpdis1 += rpdis0;
+
+	rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1)
+}
+
+
 impl xdfenv_t {
 
 	pub(crate) fn new(mf1: &[u8], mf2: &[u8], flags: u64, occurrence: Option<&mut IVec<Occurrence>>) -> Self {
