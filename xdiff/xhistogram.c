@@ -15,7 +15,6 @@ struct histindex {
 	ivec_usize record_chain;
 	ivec_usize line_map;
 	ivec_usize next_ptrs;
-	u32 table_bits;
 	usize ptr_shift;
 	usize cnt;
 	bool has_common;
@@ -40,6 +39,7 @@ static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end
 	struct record rec_new;
 
 	for (usize i = end1; i > start1; i -= 1) {
+		bool continue_scan = false;
 		usize ptr = i - 1;
 		tbl_idx = env->xdf1.minimal_perfect_hash.ptr[ptr - LINE_SHIFT];
 		rec_cur_idx = index->record_chain.ptr[tbl_idx];
@@ -60,12 +60,16 @@ static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end
 				rec_cur->ptr = ptr;
 				rec_cur->cnt = rec_cur->cnt + 1;
 				index->line_map.ptr[ptr - index->ptr_shift] = rec_cur_idx;
-				goto continue_scan;
+				continue_scan = true;
+				break;
 			}
 
 			rec_cur_idx = rec_cur->next;
 			chain_len++;
 		}
+
+		if (continue_scan)
+			continue;
 
 		if (chain_len == MAX_CHAIN_LENGTH)
 			return -1;
@@ -81,9 +85,6 @@ static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end
 		rust_ivec_push(&index->record_storage, &rec_new);
 		index->record_chain.ptr[tbl_idx] = rec_new_idx;
 		index->line_map.ptr[ptr - index->ptr_shift] = rec_new_idx;
-
-continue_scan:
-		; /* no op */
 	}
 
 	return 0;
@@ -198,7 +199,7 @@ static i32 find_lcs(xdfenv_t *env,
 {
 	i32 ret = -1;
 	struct histindex index;
-	usize some_fudge = 4;  /* this breaks if it's less than 4, I don't know why */
+	usize table_size = env->xdf1.record.length;
 	usize default_value = INVALID_INDEX;
 	memset(&index, 0, sizeof(index));
 
@@ -207,14 +208,16 @@ static i32 find_lcs(xdfenv_t *env,
 	IVEC_INIT(index.line_map);
 	IVEC_INIT(index.next_ptrs);
 
-	rust_ivec_resize_exact(&index.record_chain, env->minimal_perfect_hash_size + some_fudge, &default_value);
-	rust_ivec_resize_exact(&index.line_map, env->minimal_perfect_hash_size     + some_fudge, &default_value);
-	rust_ivec_resize_exact(&index.next_ptrs, env->minimal_perfect_hash_size    + some_fudge, &default_value);
+	rust_ivec_resize_exact(&index.record_chain, env->minimal_perfect_hash_size, &default_value);
+	rust_ivec_resize_exact(&index.line_map, table_size, &default_value);
+	rust_ivec_resize_exact(&index.next_ptrs, table_size, &default_value);
 
 	index.ptr_shift = start1;
 
-	if (scanA(&index, env, start1, end1))
-		goto cleanup;
+	if (scanA(&index, env, start1, end1)) {
+		free_index(&index);
+		return ret;
+	}
 
 	index.cnt = MAX_CHAIN_LENGTH + 1;
 
@@ -226,7 +229,6 @@ static i32 find_lcs(xdfenv_t *env,
 	else
 		ret = 0;
 
-cleanup:
 	free_index(&index);
 	return ret;
 }
@@ -237,67 +239,84 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 	struct region lcs;
 	i32 lcs_found;
 	i32 result;
-redo:
-	result = -1;
 
-	if (start1 >= end1 && start2 >= end2)
-		return 0;
+	while (true) {
+		result = -1;
 
-	if (start1 == end1) {
-		for (; start2 < end2; start2 += 1) {
-			env->xdf2.rchg[start2 - 1] = 1;
-		}
-		return 0;
-	}
-	if (start2 == end2) {
-		for (; start1 < end1; start1 += 1) {
-			env->xdf1.rchg[start1 - 1] = 1;
-		}
-		return 0;
-	}
+		if (start1 >= end1 && start2 >= end2)
+			return 0;
 
-	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(env, &lcs, start1, end1, start2, end2);
-	if (lcs_found < 0)
-		goto out;
-	else if (lcs_found)
-		result = fall_back_to_classic_diff(xpp, env, start1, end1 - start1, start2, end2 - start1);
-	else {
-		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
-			for (; start1 < end1; start1 += 1) {
-				env->xdf1.rchg[start1 - 1] = 1;
-			}
+		if (start1 == end1) {
 			for (; start2 < end2; start2 += 1) {
 				env->xdf2.rchg[start2 - 1] = 1;
 			}
-			result = 0;
-		} else {
-			result = histogram_diff(xpp, env,
-						start1, lcs.begin1,
-						start2, lcs.begin2);
-			if (result)
-				goto out;
-			/*
-			 * result = histogram_diff(xpp, env,
-			 *            lcs.end1 + 1, end1,
-			 *            lcs.end2 + 1, end2);
-			 * but let's optimize tail recursion ourself:
-			*/
-			start1 = lcs.end1 + 1;
-			start2 = lcs.end2 + 1;
-
-			goto redo;
+			return 0;
 		}
+		if (start2 == end2) {
+			for (; start1 < end1; start1 += 1) {
+				env->xdf1.rchg[start1 - 1] = 1;
+			}
+			return 0;
+		}
+
+		memset(&lcs, 0, sizeof(lcs));
+		lcs_found = find_lcs(env, &lcs, start1, end1, start2, end2);
+		if (lcs_found < 0)
+			return result;
+		else if (lcs_found)
+			result = fall_back_to_classic_diff(xpp, env, start1, end1 - start1, start2, end2 - start1);
+		else {
+			if (lcs.begin1 == 0 && lcs.begin2 == 0) {
+				for (; start1 < end1; start1 += 1) {
+					env->xdf1.rchg[start1 - 1] = 1;
+				}
+				for (; start2 < end2; start2 += 1) {
+					env->xdf2.rchg[start2 - 1] = 1;
+				}
+				result = 0;
+			} else {
+				result = histogram_diff(xpp, env,
+							start1, lcs.begin1,
+							start2, lcs.begin2);
+				if (result)
+					return result;
+				/*
+				 * result = histogram_diff(xpp, env,
+				 *            lcs.end1 + 1, end1,
+				 *            lcs.end2 + 1, end2);
+				 * but let's optimize tail recursion ourself:
+				*/
+				start1 = lcs.end1 + 1;
+				start2 = lcs.end2 + 1;
+
+				continue;
+			}
+		}
+		break;
 	}
-out:
 	return result;
 }
 
+#ifdef WITH_RUST
+extern int rust_xdl_do_histogram_diff(xdfenv_t *env, u64 flags);
 int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
-	isize end1 = env->xdf1.record.length - 1;
-	isize end2 = env->xdf2.record.length - 1;
+	isize end1 = env->xdf1.record.length;
+	isize end2 = env->xdf2.record.length;
+
+	i32 r0 = histogram_diff(xpp, env,
+		env->delta_start + 1, end1 + LINE_SHIFT,
+		env->delta_start + 1, end2 + LINE_SHIFT);
+	rust_xdl_do_histogram_diff(env, xpp->flags);
+
+	return r0;
+}
+#else
+int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
+	isize end1 = env->xdf1.record.length;
+	isize end2 = env->xdf2.record.length;
 
 	return histogram_diff(xpp, env,
-		env->delta_start + 1, end1 + 2*LINE_SHIFT,
-		env->delta_start + 1, end2 + 2*LINE_SHIFT);
+		env->delta_start + 1, end1 + LINE_SHIFT,
+		env->delta_start + 1, end2 + LINE_SHIFT);
 }
+#endif

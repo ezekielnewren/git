@@ -13,6 +13,7 @@ const XDL_MAX_EQLIMIT: u64 = 1024;
 const XDL_SIMSCAN_WINDOW: u64 = 100;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct xdfile_t {
 	pub record: IVec<xrecord_t>,
 	pub minimal_perfect_hash: IVec<u64>,
@@ -71,6 +72,18 @@ impl xdfile_t {
 		xdf
 	}
 
+	pub(crate) fn as_ref(&self) -> &[u8] {
+		if self.record.len() == 0 {
+			&[]
+		} else {
+			let start = self.record[0].ptr;
+			let last = &self.record[self.record.len() - 1];
+			unsafe {
+				let end = last.ptr.add(last.size_with_eol);
+				std::slice::from_raw_parts(start, end.sub(start as usize) as usize)
+			}
+		}
+	}
 
 }
 

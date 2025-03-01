@@ -11,6 +11,13 @@ pub struct IVec<T> {
 }
 
 
+impl<T> Default for IVec<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 impl<T> Drop for IVec<T> {
     fn drop(&mut self) {
         unsafe {
@@ -19,11 +26,39 @@ impl<T> Drop for IVec<T> {
     }
 }
 
-impl<T> Default for IVec<T> {
-    fn default() -> Self {
-        Self::new()
+
+impl<T: Clone> Clone for IVec<T> {
+    fn clone(&self) -> Self {
+        let mut copy = Self::new();
+        copy.reserve_exact(self.len());
+        for i in 0..self.len() {
+            copy.push(self[i].clone());
+        }
+
+        copy
     }
 }
+
+
+impl<T: PartialEq> PartialEq for IVec<T> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        let lhs = self.as_slice();
+        let rhs = &other.as_slice()[..lhs.len()];
+        for i in 0..lhs.len() {
+            if lhs[i] != rhs[i] {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl<T: PartialEq> Eq for IVec<T> {}
 
 
 /*
@@ -263,10 +298,10 @@ impl<T> IndexMut<usize> for IVec<T> {
 }
 
 
-impl<T> Debug for IVec<T> {
+impl<T: Debug> Debug for IVec<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "ptr: {}, capacity: {}, len: {}, element_size: {}",
-                 self.ptr as usize, self.capacity, self.length, self.element_size)
+        writeln!(f, "ptr: {}, capacity: {}, len: {}, element_size: {}, content: {:?}",
+                 self.ptr as usize, self.capacity, self.length, self.element_size, self.as_slice())
     }
 }
 

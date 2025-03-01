@@ -3,6 +3,7 @@
 
 
 pub const INVALID_INDEX: usize = usize::MAX;
+pub const LINE_SHIFT: usize = 1;
 pub const XDF_NEED_MINIMAL: u64 = 1 << 0;
 
 pub const XDF_IGNORE_WHITESPACE: u64 = 1 << 1;
