@@ -33,10 +33,12 @@ DEFINE_IVEC_TYPE(struct xdl_mphb_node_t, xdl_mphb_node_t);
 DEFINE_IVEC_TYPE(struct xdl_mphb_node_t*, xdl_mphb_node_ptr_t);
 
 struct xdl_minimal_perfect_hash_builder_t {
-	ivec_xdl_mphb_node_ptr_t head;
-	ivec_xdl_mphb_node_t kv;
+	struct xdl_mphb_node_t **head;
+	usize head_capacity;
+	struct xdl_mphb_node_t *kv;
+	usize kv_capacity;
+	usize kv_length;
 	u32 hbits;
-	usize hsize;
 	u64 count;
 };
 
