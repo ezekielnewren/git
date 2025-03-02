@@ -35,7 +35,6 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	struct xlinereader_t reader;
-	u8 default_value = 0;
 
 	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->minimal_perfect_hash);
@@ -54,7 +53,9 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	}
 
 
-	rust_ivec_resize_exact(&xdf->rchg_vec, xdf->record.length + 2, &default_value);
+	rust_ivec_reserve_exact(&xdf->rchg_vec, xdf->record.length + 2);
+	xdf->rchg_vec.length = xdf->rchg_vec.capacity;
+	rust_ivec_memset(&xdf->rchg_vec, 0);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length + 1);

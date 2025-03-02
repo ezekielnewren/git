@@ -414,15 +414,16 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 
 
 void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size) {
-	usize default_value = INVALID_INDEX;
-
 	IVEC_INIT(mphb->head);
 	IVEC_INIT(mphb->kv);
 
 	mphb->hbits = xdl_hashbits(size);
 	mphb->hsize = 1 << mphb->hbits;
 
-	rust_ivec_resize_exact(&mphb->head, mphb->hsize, &default_value);
+	rust_ivec_reserve_exact(&mphb->head, mphb->hsize);
+	mphb->head.length = mphb->head.capacity;
+	rust_ivec_memset(&mphb->head, 0xff);
+
 	rust_ivec_reserve(&mphb->kv, size);
 
 	mphb->count = 0;
