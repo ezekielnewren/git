@@ -26,13 +26,14 @@
 struct xdl_mphb_node_t {
 	xrecord_t key;
 	u64 value;
-	usize next;
+	struct xdl_mphb_node_t *next;
 };
 
 DEFINE_IVEC_TYPE(struct xdl_mphb_node_t, xdl_mphb_node_t);
+DEFINE_IVEC_TYPE(struct xdl_mphb_node_t*, xdl_mphb_node_ptr_t);
 
 struct xdl_minimal_perfect_hash_builder_t {
-	ivec_usize head;
+	ivec_xdl_mphb_node_ptr_t head;
 	ivec_xdl_mphb_node_t kv;
 	u32 hbits;
 	usize hsize;

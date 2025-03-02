@@ -422,36 +422,29 @@ void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size) 
 
 	rust_ivec_reserve_exact(&mphb->head, mphb->hsize);
 	mphb->head.length = mphb->head.capacity;
-	rust_ivec_memset(&mphb->head, 0xff);
+	rust_ivec_memset(&mphb->head, 0);
 
-	rust_ivec_reserve(&mphb->kv, size);
+	rust_ivec_reserve_exact(&mphb->kv, size);
 
 	mphb->count = 0;
 }
 
 u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key) {
 	struct xdl_mphb_node_t *node;
-	usize index;
 
 	usize hi = (long) XDL_HASHLONG(key->line_hash, mph->hbits);
-	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
-		node = &mph->kv.ptr[index];
+	for (node = mph->head.ptr[hi]; node; node = node->next) {
 		if (xdl_record_equal(&node->key, key))
 			break;
-		index = node->next;
 	}
 
-	if (index == INVALID_INDEX) {
-		struct xdl_mphb_node_t node_new;
-		index = mph->count;
-		node_new.key = *key;
-		node_new.value = mph->count++;
-		node_new.next = mph->head.ptr[hi];
-		mph->head.ptr[hi] = index;
-		rust_ivec_push(&mph->kv, &node_new);
+	if (node == NULL) {
+		node = &mph->kv.ptr[mph->kv.length++];
+		node->key = *key;
+		node->value = mph->count++;
+		node->next = mph->head.ptr[hi];
+		mph->head.ptr[hi] = node;
 	}
-
-	node = &mph->kv.ptr[index];
 
 	return node->value;
 }
