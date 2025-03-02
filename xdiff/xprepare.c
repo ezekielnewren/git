@@ -36,8 +36,8 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	struct xlinereader_t reader;
 
-	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->minimal_perfect_hash);
+	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->rchg_vec);
 
