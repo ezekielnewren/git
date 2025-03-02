@@ -43,7 +43,6 @@ typedef struct {
 	u8 const* ptr;
 	usize size_no_eol;
 	usize size_with_eol;
-	u64 line_hash;
 } xrecord_t;
 
 DEFINE_IVEC_TYPE(xrecord_t, xrecord_t);

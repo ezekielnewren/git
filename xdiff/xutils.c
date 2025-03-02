@@ -425,14 +425,16 @@ void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size, 
 
 u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mphb, xrecord_t *key) {
 	struct xdl_mphb_node_t *node;
+	u64 line_hash;
 	usize hi;
 
 	if ((mphb->flags & XDF_IGNORE_CR_AT_EOL) != 0 && key->size_no_eol > 0 && key->ptr[key->size_no_eol - 1] == '\r')
 		key->size_no_eol--;
 
-	hi = (long) XDL_HASHLONG(key->line_hash, mphb->hbits);
+	line_hash = xdl_line_hash(key->ptr, key->size_no_eol, mphb->flags);
+	hi = (long) XDL_HASHLONG(line_hash, mphb->hbits);
 	for (node = mphb->head[hi]; node; node = node->next) {
-		if (node->line_hash == key->line_hash &&
+		if (node->line_hash == line_hash &&
 			xdl_line_equal(node->ptr, node->size_no_eol, key->ptr, key->size_no_eol, mphb->flags))
 			break;
 	}
@@ -441,7 +443,7 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mphb, xrecord_t *ke
 		node = &mphb->kv[mphb->kv_length];
 		node->ptr = key->ptr;
 		node->size_no_eol = key->size_no_eol;
-		node->line_hash = key->line_hash;
+		node->line_hash = line_hash;
 		node->value = mphb->kv_length++;
 		node->next = mphb->head[hi];
 		mphb->head[hi] = node;
@@ -495,7 +497,7 @@ bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol
 }
 
 void xdl_whitespace_iter_init(struct xwhitespaceiter_t* it,
-	u8 const* ptr, usize line_size_with_eol, u64 flags
+	u8 const* ptr, usize line_size_no_eol, u64 flags
 ) {
 #ifdef DEBUG
 	if (it == NULL) {
@@ -506,7 +508,7 @@ void xdl_whitespace_iter_init(struct xwhitespaceiter_t* it,
 	}
 #endif
 	it->ptr = ptr;
-	it->size = xdl_strip_eol(it->ptr, line_size_with_eol, flags);
+	it->size = line_size_no_eol;
 	it->index = 0;
 	it->flags = flags;
 }
@@ -603,11 +605,10 @@ void xdl_whitespace_iter_assert_done(struct xwhitespaceiter_t* it) {
 	it->flags = 0;
 }
 
-u64 xdl_line_hash(u8 const* ptr, usize line_size_with_eol, u64 flags) {
-	if ((flags & XDF_WHITESPACE_FLAGS) == 0) {
-		usize no_eol = xdl_strip_eol(ptr, line_size_with_eol, flags);
+u64 xdl_line_hash(u8 const* ptr, usize line_size_no_eol, u64 flags) {
+	if ((flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
 		u64 hash = 5381;
-		for (usize i = 0; i < no_eol; i++) {
+		for (usize i = 0; i < line_size_no_eol; i++) {
 			hash = hash * 33 ^ (u64) ptr[i];
 		}
 		return hash;
@@ -618,7 +619,7 @@ u64 xdl_line_hash(u8 const* ptr, usize line_size_with_eol, u64 flags) {
 
 		u64 hash = 5381;
 
-		xdl_whitespace_iter_init(&it, ptr, line_size_with_eol, flags);
+		xdl_whitespace_iter_init(&it, ptr, line_size_no_eol, flags);
 		while (xdl_whitespace_iter_next(&it, &run_start, &run_size)) {
 			for (usize i = 0; i < run_size; i++) {
 				hash = hash * 33 ^ (u64) run_start[i];
@@ -631,10 +632,7 @@ u64 xdl_line_hash(u8 const* ptr, usize line_size_with_eol, u64 flags) {
 }
 
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags) {
-	if ((flags & XDF_WHITESPACE_FLAGS) == 0) {
-		size1 = xdl_strip_eol(line1, size1, flags);
-		size2 = xdl_strip_eol(line2, size2, flags);
-
+	if ((flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
 		if (size1 != size2)
 			return false;
 		return memcmp(line1, line2, size1) == 0;
@@ -691,10 +689,6 @@ bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, 
 }
 
 bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs, u64 flags) {
-	if (lhs->line_hash != rhs->line_hash) {
-		return false;
-	}
-
 	return xdl_line_equal(lhs->ptr, lhs->size_no_eol,
 		rhs->ptr, rhs->size_no_eol, flags);
 }

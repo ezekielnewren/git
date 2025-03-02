@@ -33,7 +33,7 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e);
 static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
 
 
-static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
+static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf) {
 	struct xlinereader_t reader;
 
 	IVEC_INIT(xdf->minimal_perfect_hash);
@@ -53,7 +53,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 			xdf->record.length--;
 			break;
 		}
-		rec->line_hash = xdl_line_hash(rec->ptr, rec->size_no_eol, flags);
 	}
 
 
@@ -215,21 +214,21 @@ static int xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
  */
 static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
 	long i, lim;
-	xrecord_t *recs1, *recs2;
+	u64 *mph1, *mph2;
 
-	recs1 = xdf1->record.ptr;
-	recs2 = xdf2->record.ptr;
+	mph1 = xdf1->minimal_perfect_hash.ptr;
+	mph2 = xdf2->minimal_perfect_hash.ptr;
 	for (i = 0, lim = XDL_MIN(xdf1->record.length, xdf2->record.length); i < lim;
-	     i++, recs1++, recs2++)
-		if (recs1->line_hash != recs2->line_hash)
+	     i++, mph1++, mph2++)
+		if (*mph1 != *mph2)
 			break;
 
 	xdf1->dstart = xdf2->dstart = i;
 
-	recs1 = xdf1->record.ptr + xdf1->record.length - 1;
-	recs2 = xdf2->record.ptr + xdf2->record.length - 1;
-	for (lim -= i, i = 0; i < lim; i++, recs1--, recs2--)
-		if (recs1->line_hash != recs2->line_hash)
+	mph1 = xdf1->minimal_perfect_hash.ptr + xdf1->minimal_perfect_hash.length - 1;
+	mph2 = xdf2->minimal_perfect_hash.ptr + xdf2->minimal_perfect_hash.length - 1;
+	for (lim -= i, i = 0; i < lim; i++, mph1--, mph2--)
+		if (*mph1 != *mph2)
 			break;
 
 	xdf1->dend = xdf1->record.length - i - 1;
@@ -312,8 +311,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		occ_ptr = NULL;
 	}
 
-	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
-	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
+	xdl_prepare_ctx(mf1, &xe->xdf1);
+	xdl_prepare_ctx(mf2, &xe->xdf2);
 
 	xdl_construct_mph_and_occurrences(xe, xpp->flags, occ_ptr);
 
