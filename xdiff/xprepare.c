@@ -56,10 +56,10 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	rust_ivec_reserve_exact(&xdf->rchg_vec, xdf->record.length + 2);
 	xdf->rchg_vec.length = xdf->rchg_vec.capacity;
 	rust_ivec_memset(&xdf->rchg_vec, 0);
+	rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length + 1);
-		rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length + 1);
+		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length);
 	}
 
 	xdf->rchg = xdf->rchg_vec.ptr + 1;
@@ -253,12 +253,12 @@ static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t
 
 	for (usize i = 0; i < xe->xdf1.record.length; i++) {
 		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf1.record.ptr[i]);
-		rust_ivec_push(&xe->xdf1.minimal_perfect_hash, &mph);
+		xe->xdf1.minimal_perfect_hash.ptr[xe->xdf1.minimal_perfect_hash.length++] = mph;
 	}
 
 	for (usize i = 0; i < xe->xdf2.record.length; i++) {
 		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf2.record.ptr[i]);
-		rust_ivec_push(&xe->xdf2.minimal_perfect_hash, &mph);
+		xe->xdf2.minimal_perfect_hash.ptr[xe->xdf2.minimal_perfect_hash.length++] = mph;
 	}
 
 	xe->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
