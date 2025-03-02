@@ -53,14 +53,11 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	}
 
 
-	rust_ivec_reserve_exact(&xdf->rchg_vec, xdf->record.length + 2);
+	xdf->rchg_vec.capacity = xdf->record.length + 2;
+	XDL_CALLOC_ARRAY(xdf->rchg_vec.ptr, xdf->rchg_vec.capacity);
 	xdf->rchg_vec.length = xdf->rchg_vec.capacity;
-	rust_ivec_memset(&xdf->rchg_vec, 0);
-	rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
 
-	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		rust_ivec_reserve_exact(&xdf->rindex, xdf->record.length);
-	}
+	rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
 
 	xdf->rchg = xdf->rchg_vec.ptr + 1;
 	xdf->dstart = 0;
@@ -166,6 +163,9 @@ static int xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 
 	rust_ivec_resize_exact(&dis1, xe->xdf1.rchg_vec.length, &default_value);
 	rust_ivec_resize_exact(&dis2, xe->xdf2.rchg_vec.length, &default_value);
+
+	rust_ivec_reserve_exact(&xe->xdf1.rindex, xe->xdf1.record.length);
+	rust_ivec_reserve_exact(&xe->xdf2.rindex, xe->xdf2.record.length);
 
 	if ((mlim = xdl_bogosqrt(xe->xdf1.record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
@@ -314,8 +314,9 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xdl_construct_mph_and_occurrences(xe, occ_ptr);
 
 
-	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0)
-	    xdl_optimize_ctxs(xe, &occurrences);
+	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(xe, &occurrences);
+	}
 
 	return 0;
 }
