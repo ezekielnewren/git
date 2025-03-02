@@ -44,7 +44,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->rchg_vec);
 
-	xdl_linereader_init(&reader, (u8 const *) mf->ptr, mf->size, (flags & XDF_IGNORE_CR_AT_EOL) != 0);
+	xdl_linereader_init(&reader, (u8 const *) mf->ptr, mf->size);
 	while (xdl_linereader_next(&reader, &cur, &no_eol, &with_eol)) {
 		xrecord_t rec;
 		rec.ptr = cur;

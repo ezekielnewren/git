@@ -465,10 +465,9 @@ usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder_t *mphb) {
 	return minimal_perfect_hash_size;
 }
 
-void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size, bool ignore_cr_at_eol) {
+void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size) {
 	it->cur = ptr;
 	it->size = size;
-	it->ignore_cr_at_eol = ignore_cr_at_eol;
 }
 
 bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol) {
@@ -477,8 +476,6 @@ bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol
 	}
 
 	*cur = it->cur;
-	*no_eol = it->size;
-	*with_eol = it->size;
 	it->cur = memchr(it->cur, '\n', it->size);
 	if (it->cur) {
 		*no_eol = it->cur - *cur;
@@ -486,11 +483,9 @@ bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol
 		it->size -= *with_eol;
 		it->cur++;
 	} else {
+		*no_eol = it->size;
+		*with_eol = it->size;
 		it->size = 0;
-	}
-
-	if (it->ignore_cr_at_eol && *no_eol > 0 && it->cur[*no_eol - 1] == '\r') {
-		*no_eol -= 1;
 	}
 
 	return true;
