@@ -301,23 +301,24 @@ static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    xdfenv_t *xe) {
 	ivec_xdloccurrence_t occurrences;
+	ivec_xdloccurrence_t *occ_ptr;
 
 	IVEC_INIT(occurrences);
+
+	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		occ_ptr = &occurrences;
+	} else {
+		occ_ptr = NULL;
+	}
 
 	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
 	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
 
-	xdl_construct_mph_and_occurrences(xe, &occurrences);
+	xdl_construct_mph_and_occurrences(xe, occ_ptr);
 
 
-	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
-	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
-	    xdl_optimize_ctxs(xe, &occurrences) < 0) {
-		xdl_free_ctx(&xe->xdf2);
-		xdl_free_ctx(&xe->xdf1);
-		return -1;
-	    }
-
+	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0)
+	    xdl_optimize_ctxs(xe, &occurrences);
 
 	return 0;
 }
