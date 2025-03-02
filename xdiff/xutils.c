@@ -419,7 +419,7 @@ void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size) 
 	mphb->kv_length = 0;
 
 	XDL_CALLOC_ARRAY(mphb->head, 1 << mphb->hbits);
-	XDL_CALLOC_ARRAY(mphb->kv, mphb->kv_capacity);
+	XDL_ALLOC_ARRAY(mphb->kv, mphb->kv_capacity);
 }
 
 u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key) {
@@ -427,13 +427,16 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key
 
 	usize hi = (long) XDL_HASHLONG(key->line_hash, mph->hbits);
 	for (node = mph->head[hi]; node; node = node->next) {
-		if (xdl_record_equal(&node->key, key))
+		if (node->line_hash == key->line_hash &&
+			xdl_line_equal(node->ptr, node->size_no_eol, key->ptr, key->size_no_eol, key->flags))
 			break;
 	}
 
 	if (node == NULL) {
 		node = &mph->kv[mph->kv_length];
-		node->key = *key;
+		node->ptr = key->ptr;
+		node->size_no_eol = key->size_no_eol;
+		node->line_hash = key->line_hash;
 		node->value = mph->kv_length++;
 		node->next = mph->head[hi];
 		mph->head[hi] = node;

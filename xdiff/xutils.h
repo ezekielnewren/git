@@ -24,7 +24,9 @@
 #define XUTILS_H
 
 struct xdl_mphb_node_t {
-	xrecord_t key;
+	u8 const* ptr;
+	usize size_no_eol;
+	u64 line_hash;
 	u64 value;
 	struct xdl_mphb_node_t *next;
 };
