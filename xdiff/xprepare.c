@@ -28,109 +28,9 @@
 #define XDL_SIMSCAN_WINDOW 100
 
 
-typedef struct s_xdlclass {
-	struct s_xdlclass *next;
-	xrecord_t rec;
-	long idx;
-	long len1, len2;
-} xdlclass_t;
-
-typedef struct s_xdlclassifier {
-	unsigned int hbits;
-	long hsize;
-	xdlclass_t **rchash;
-	chastore_t ncha;
-	xdlclass_t **rcrecs;
-	long alloc;
-	long count;
-	long flags;
-} xdlclassifier_t;
-
-
-
-
-static int xdl_init_classifier(xdlclassifier_t *cf, long size, long flags);
-static void xdl_free_classifier(xdlclassifier_t *cf);
-static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, xrecord_t *rec);
 static void xdl_free_ctx(xdfile_t *xdf);
 static int xdl_clean_mmatch(char const *dis, long i, long s, long e);
-static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2);
 static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
-static int xdl_optimize_ctxs(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2);
-
-
-
-
-static int xdl_init_classifier(xdlclassifier_t *cf, long size, long flags) {
-	cf->flags = flags;
-
-	cf->hbits = xdl_hashbits((unsigned int) size);
-	cf->hsize = 1 << cf->hbits;
-
-	if (xdl_cha_init(&cf->ncha, sizeof(xdlclass_t), size / 4 + 1) < 0) {
-
-		return -1;
-	}
-	if (!XDL_CALLOC_ARRAY(cf->rchash, cf->hsize)) {
-
-		xdl_cha_free(&cf->ncha);
-		return -1;
-	}
-
-	cf->alloc = size;
-	if (!XDL_ALLOC_ARRAY(cf->rcrecs, cf->alloc)) {
-
-		xdl_free(cf->rchash);
-		xdl_cha_free(&cf->ncha);
-		return -1;
-	}
-
-	cf->count = 0;
-
-	return 0;
-}
-
-
-static void xdl_free_classifier(xdlclassifier_t *cf) {
-
-	xdl_free(cf->rcrecs);
-	xdl_free(cf->rchash);
-	xdl_cha_free(&cf->ncha);
-}
-
-
-static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, xrecord_t *rec) {
-	long hi;
-	xdlclass_t *rcrec;
-
-	hi = (long) XDL_HASHLONG(rec->hash, cf->hbits);
-	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
-		if (rcrec->rec.hash == rec->hash &&
-				xdl_recmatch((const char *) rcrec->rec.ptr, rcrec->rec.size,
-					(const char *) rec->ptr, rec->size, cf->flags))
-			break;
-
-	if (!rcrec) {
-		if (!(rcrec = xdl_cha_alloc(&cf->ncha))) {
-
-			return -1;
-		}
-		rcrec->idx = cf->count++;
-		if (XDL_ALLOC_GROW(cf->rcrecs, cf->count, cf->alloc))
-				return -1;
-		cf->rcrecs[rcrec->idx] = rcrec;
-		rcrec->rec = *rec;
-		rcrec->len1 = rcrec->len2 = 0;
-		rcrec->next = cf->rchash[hi];
-		cf->rchash[hi] = rcrec;
-	}
-
-	(pass == 1) ? rcrec->len1++ : rcrec->len2++;
-
-	rec->hash = (u64) rcrec->idx;
-
-	return 0;
-}
 
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
@@ -151,7 +51,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 			hav = xdl_hash_record(&cur, top, flags);
 			crec.ptr = (u8 *) prev;
 			crec.size = (long) (cur - prev);
-			crec.hash = hav;
+			crec.line_hash = hav;
 			crec.flags = flags;
 			rust_ivec_push(&xdf->record, &crec);
 		}
@@ -246,58 +146,64 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	return rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1);
 }
 
+typedef struct {
+	usize file1;
+	usize file2;
+} xdloccurrence_t;
+
+DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
 
 /*
  * Try to reduce the problem complexity, discard records that have no
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2) {
+static int xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 	long i, nm, mlim;
-	xrecord_t *recs;
-	xdlclass_t *rcrec;
-	char *dis, *dis1, *dis2;
+	ivec_u8 dis1;
+	ivec_u8 dis2;
+	u8 default_value = 0;
 
-	if (!XDL_CALLOC_ARRAY(dis, xdf1->record.length + xdf2->record.length + 2))
-		return -1;
-	dis1 = dis;
-	dis2 = dis1 + xdf1->record.length + 1;
+	IVEC_INIT(dis1);
+	IVEC_INIT(dis2);
 
-	if ((mlim = xdl_bogosqrt(xdf1->record.length)) > XDL_MAX_EQLIMIT)
+	rust_ivec_resize_exact(&dis1, xe->xdf1.rchg_vec.length, &default_value);
+	rust_ivec_resize_exact(&dis2, xe->xdf2.rchg_vec.length, &default_value);
+
+	if ((mlim = xdl_bogosqrt(xe->xdf1.record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xdf1->dstart, recs = &xdf1->record.ptr[xdf1->dstart]; i <= xdf1->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->hash];
-		nm = rcrec ? rcrec->len2 : 0;
-		dis1[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
+	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
+		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
+		nm = occ->ptr[mph].file2;
+		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	if ((mlim = xdl_bogosqrt(xdf2->record.length)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(xe->xdf2.record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xdf2->dstart, recs = &xdf2->record.ptr[xdf2->dstart]; i <= xdf2->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->hash];
-		nm = rcrec ? rcrec->len1 : 0;
-		dis2[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
+	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
+		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
+		nm = occ->ptr[mph].file1;
+		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	for (i = xdf1->dstart, recs = &xdf1->record.ptr[xdf1->dstart];
-	     i <= xdf1->dend; i++, recs++) {
-		if (dis1[i] == 1 ||
-		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, xdf1->dstart, xdf1->dend))) {
-			rust_ivec_push(&xdf1->rindex, &i);
+	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
+		if (dis1.ptr[i] == 1 ||
+		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xe->xdf1.dstart, xe->xdf1.dend))) {
+			rust_ivec_push(&xe->xdf1.rindex, &i);
 		} else
-			xdf1->rchg[i] = 1;
+			xe->xdf1.rchg[i] = 1;
 	}
 
-	for (i = xdf2->dstart, recs = &xdf2->record.ptr[xdf2->dstart];
-	     i <= xdf2->dend; i++, recs++) {
-		if (dis2[i] == 1 ||
-		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, xdf2->dstart, xdf2->dend))) {
-			rust_ivec_push(&xdf2->rindex, &i);
+	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
+		if (dis2.ptr[i] == 1 ||
+		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xe->xdf2.dstart, xe->xdf2.dend))) {
+			rust_ivec_push(&xe->xdf2.rindex, &i);
 		} else
-			xdf2->rchg[i] = 1;
+			xe->xdf2.rchg[i] = 1;
 	}
 
-	xdl_free(dis);
+	rust_ivec_free(&dis1);
+	rust_ivec_free(&dis2);
 
 	return 0;
 }
@@ -314,7 +220,7 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
 	recs2 = xdf2->record.ptr;
 	for (i = 0, lim = XDL_MIN(xdf1->record.length, xdf2->record.length); i < lim;
 	     i++, recs1++, recs2++)
-		if (recs1->hash != recs2->hash)
+		if (recs1->line_hash != recs2->line_hash)
 			break;
 
 	xdf1->dstart = xdf2->dstart = i;
@@ -322,7 +228,7 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
 	recs1 = xdf1->record.ptr + xdf1->record.length - 1;
 	recs2 = xdf2->record.ptr + xdf2->record.length - 1;
 	for (lim -= i, i = 0; i < lim; i++, recs1--, recs2--)
-		if (recs1->hash != recs2->hash)
+		if (recs1->line_hash != recs2->line_hash)
 			break;
 
 	xdf1->dend = xdf1->record.length - i - 1;
@@ -332,23 +238,16 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
 }
 
 
-static int xdl_optimize_ctxs(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2) {
+static int xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 
-	if (xdl_trim_ends(xdf1, xdf2) < 0 ||
-	    xdl_cleanup_records(cf, xdf1, xdf2) < 0) {
+	if (xdl_trim_ends(&xe->xdf1, &xe->xdf2) < 0 ||
+	    xdl_cleanup_records(xe, occ) < 0) {
 
 		return -1;
 	}
 
 	return 0;
 }
-
-typedef struct {
-	usize file1;
-	usize file2;
-} xdloccurrence_t;
-
-DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
 
 static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
@@ -402,39 +301,23 @@ static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    xdfenv_t *xe) {
 	ivec_xdloccurrence_t occurrences;
-	xdlclassifier_t cf;
 
 	IVEC_INIT(occurrences);
-	memset(&cf, 0, sizeof(cf));
 
 	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
 	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
 
 	xdl_construct_mph_and_occurrences(xe, &occurrences);
 
-	if (xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length + 1, xpp->flags) < 0)
-		return -1;
-
-	for (usize i = 0; i < xe->xdf1.record.length; i++) {
-		xrecord_t *rec = &xe->xdf1.record.ptr[i];
-		xdl_classify_record(1, &cf, rec);
-	}
-	for (usize i = 0; i < xe->xdf2.record.length; i++) {
-		xrecord_t *rec = &xe->xdf2.record.ptr[i];
-		xdl_classify_record(2, &cf, rec);
-	}
 
 	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
-	    xdl_optimize_ctxs(&cf, &xe->xdf1, &xe->xdf2) < 0) {
-
+	    xdl_optimize_ctxs(xe, &occurrences) < 0) {
 		xdl_free_ctx(&xe->xdf2);
 		xdl_free_ctx(&xe->xdf1);
-		xdl_free_classifier(&cf);
 		return -1;
 	    }
 
-	xdl_free_classifier(&cf);
 
 	return 0;
 }

@@ -42,7 +42,7 @@ typedef struct s_chastore {
 typedef struct {
 	u8 const* ptr;
 	usize size;
-	u64 hash;
+	u64 line_hash;
 	u64 flags;
 } xrecord_t;
 

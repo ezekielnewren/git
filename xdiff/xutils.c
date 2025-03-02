@@ -432,7 +432,7 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key
 	struct xdl_mphb_node_t *node;
 	usize index;
 
-	usize hi = (long) XDL_HASHLONG(key->hash, mph->hbits);
+	usize hi = (long) XDL_HASHLONG(key->line_hash, mph->hbits);
 	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
 		node = &mph->kv.ptr[index];
 		if (xdl_record_equal(&node->key, key))
@@ -732,7 +732,7 @@ bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs) {
 		BUG("xdl_record_equal flags do not match");
 	}
 
-	if (lhs->hash != rhs->hash) {
+	if (lhs->line_hash != rhs->line_hash) {
 		return false;
 	}
 
