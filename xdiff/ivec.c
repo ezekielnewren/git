@@ -65,6 +65,17 @@ void rust_ivec_resize_exact(void* self, usize new_length, void* default_value) {
 	_rust_ivec_resize(self, new_length, default_value, true);
 }
 
+usize rust_ivec_new(void* self) {
+	rawivec_t *this = self;
+	usize index = this->length;
+
+	if (this->length + 1 > this->capacity) {
+		rust_ivec_reserve(self, 1);
+	}
+	this->length += 1;
+	return index;
+}
+
 void rust_ivec_push(void* self, void* value) {
 	rawivec_t *this = self;
 	u8* dst;
