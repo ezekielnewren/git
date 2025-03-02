@@ -415,14 +415,11 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 
 void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size) {
 	mphb->hbits = xdl_hashbits(size);
-	mphb->head_capacity = 1 << mphb->hbits;
 	mphb->kv_capacity = size;
 	mphb->kv_length = 0;
 
-	XDL_CALLOC_ARRAY(mphb->head, mphb->head_capacity);
+	XDL_CALLOC_ARRAY(mphb->head, 1 << mphb->hbits);
 	XDL_CALLOC_ARRAY(mphb->kv, mphb->kv_capacity);
-
-	mphb->count = 0;
 }
 
 u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key) {
@@ -435,9 +432,9 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key
 	}
 
 	if (node == NULL) {
-		node = &mph->kv[mph->kv_length++];
+		node = &mph->kv[mph->kv_length];
 		node->key = *key;
-		node->value = mph->count++;
+		node->value = mph->kv_length++;
 		node->next = mph->head[hi];
 		mph->head[hi] = node;
 	}
@@ -446,7 +443,7 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key
 }
 
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder_t *mphb) {
-	usize minimal_perfect_hash_size = (usize) mphb->count;
+	usize minimal_perfect_hash_size = mphb->kv_length;
 	free(mphb->head);
 	free(mphb->kv);
 	return minimal_perfect_hash_size;

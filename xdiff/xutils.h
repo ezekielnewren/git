@@ -34,12 +34,10 @@ DEFINE_IVEC_TYPE(struct xdl_mphb_node_t*, xdl_mphb_node_ptr_t);
 
 struct xdl_minimal_perfect_hash_builder_t {
 	struct xdl_mphb_node_t **head;
-	usize head_capacity;
 	struct xdl_mphb_node_t *kv;
 	usize kv_capacity;
 	usize kv_length;
 	u32 hbits;
-	u64 count;
 };
 
 struct xwhitespaceiter_t {
