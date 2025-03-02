@@ -45,7 +45,10 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	xdl_linereader_init(&reader, (u8 const *) mf->ptr, mf->size);
 	while (true) {
-		xrecord_t *rec = rust_ivec_new(&xdf->record);
+		xrecord_t *rec;
+		if (xdf->record.length >= xdf->record.capacity)
+			rust_ivec_reserve(&xdf->record, 1);
+		rec = &xdf->record.ptr[xdf->record.length++];
 		if (!xdl_linereader_next(&reader, &rec->ptr, &rec->size_no_eol, &rec->size_with_eol)) {
 			xdf->record.length--;
 			break;
