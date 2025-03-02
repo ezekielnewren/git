@@ -48,9 +48,8 @@ struct xwhitespaceiter_t {
 
 
 struct xlinereader_t {
-	u8 const* start;
-	u8 const* end;
-	usize off;
+	u8 const* cur;
+	usize size;
 	bool ignore_cr_at_eol;
 };
 
@@ -73,7 +72,6 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size);
 u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key);
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder_t *mphb);
-void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol);
 void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size, bool ignore_cr_at_eol);
 bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol);
 void xdl_linereader_assert_done(struct xlinereader_t *it);
