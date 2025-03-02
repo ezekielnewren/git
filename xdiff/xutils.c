@@ -412,6 +412,335 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	return 0;
 }
 
+
+void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size) {
+	usize default_value = INVALID_INDEX;
+
+	IVEC_INIT(mphb->head);
+	IVEC_INIT(mphb->kv);
+
+	mphb->hbits = xdl_hashbits(size);
+	mphb->hsize = 1 << mphb->hbits;
+
+	rust_ivec_resize_exact(&mphb->head, mphb->hsize, &default_value);
+	rust_ivec_reserve(&mphb->kv, size);
+
+	mphb->count = 0;
+}
+
+u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key) {
+	struct xdl_mphb_node_t *node;
+	usize index;
+
+	usize hi = (long) XDL_HASHLONG(key->hash, mph->hbits);
+	for (index = mph->head.ptr[hi]; index != INVALID_INDEX;) {
+		node = &mph->kv.ptr[index];
+		if (xdl_record_equal(&node->key, key))
+			break;
+		index = node->next;
+	}
+
+	if (index == INVALID_INDEX) {
+		struct xdl_mphb_node_t node_new;
+		index = mph->count;
+		node_new.key = *key;
+		node_new.value = mph->count++;
+		node_new.next = mph->head.ptr[hi];
+		mph->head.ptr[hi] = index;
+		rust_ivec_push(&mph->kv, &node_new);
+	}
+
+	node = &mph->kv.ptr[index];
+
+	return node->value;
+}
+
+usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder_t *mphb) {
+	usize minimal_perfect_hash_size = (usize) mphb->count;
+	rust_ivec_free(&mphb->head);
+	rust_ivec_free(&mphb->kv);
+	mphb->hbits = 0;
+	mphb->hsize = 0;
+	mphb->count = 0;
+	return minimal_perfect_hash_size;
+}
+
+void xdl_line_length(u8 const* start, u8 const* end, bool ignore_cr_at_eol, usize *no_eol, usize *with_eol) {
+	usize size = end - start;
+	*no_eol = size;
+	*with_eol = size;
+	for (usize i = 0; i < size; i++) {
+		if (start[i] == '\n') {
+			*no_eol = i;
+			*with_eol = i+1;
+			break;
+		}
+	}
+
+	if (ignore_cr_at_eol && *no_eol > 0 && start[*no_eol - 1] == '\r') {
+		*no_eol -= 1;
+	}
+}
+
+void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size, bool ignore_cr_at_eol) {
+	it->start = ptr;
+	it->end = ptr + size;
+	it->off = 0;
+	it->ignore_cr_at_eol = ignore_cr_at_eol;
+}
+
+bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol) {
+	*cur = it->start + it->off;
+	if (*cur == it->end) {
+		*cur = NULL;
+		*no_eol = 0;
+		*with_eol = 0;
+		return false;
+	}
+
+	xdl_line_length(*cur, it->end, it->ignore_cr_at_eol, no_eol, with_eol);
+	it->off += *with_eol;
+
+	return true;
+}
+
+void xdl_linereader_assert_done(struct xlinereader_t *it) {
+	u8 const* cur = it->start + it->off;
+	if (cur < it->end) {
+		BUG("not all lines were read");
+	}
+
+	if (cur > it->end) {
+		BUG("xlinereader_t::off was over incremented");
+	}
+}
+
+#ifdef DEBUG
+static void validate_line_arguments(
+	u8 const* ptr, usize line_size_without_eol, u64 flags
+) {
+	if (ptr == NULL) {
+		BUG("xdl_line_iter_init() ptr is null");
+	}
+	if (line_size_without_eol >= 1) {
+		/* this test is a bit excessive, even in DEBUG builds */
+		// for (usize i = 0; i < line_size_without_eol - 1; i++) {
+		// 	if (ptr[i] == '\n') {
+		// 		BUG("line_size_without_eol incorrect: found lf in the middle of the line");
+		// 	}
+		// }
+		if (ptr[line_size_without_eol - 1] == '\n') {
+			if ((flags & XDF_IGNORE_CR_AT_EOL) != 0 && line_size_without_eol >= 2 && ptr[line_size_without_eol - 2] == '\r')
+				BUG("line_size_without_eol incorrect: found trailing crlf with flag XDF_IGNORE_CR_AT_EOL set");
+			else
+				BUG("line_size_without_eol incorrect: found trailing lf");
+		}
+	}
+}
+#endif
+
+/*
+ * line_size_without_eol means that for the line "ab\r\n" the size is 3
+ * if XDF_IGNORE_CR_AT_EOL is set then the size is 2
+ */
+void xdl_whitespace_iter_init(struct xwhitespaceiter_t* it,
+	u8 const* ptr, usize line_size_without_eol, u64 flags
+) {
+#ifdef DEBUG
+	if (it == NULL) {
+		BUG("xlineiter_t is null");
+	}
+	validate_line_arguments(ptr, line_size_without_eol, flags);
+#endif
+	it->ptr = ptr;
+	it->size = line_size_without_eol;
+	it->index = 0;
+	it->flags = flags;
+}
+
+bool xdl_whitespace_iter_next(struct xwhitespaceiter_t* it, u8 const** ptr, usize *run_size) {
+	if (it->index >= it->size) {
+		*ptr = NULL;
+		*run_size = 0;
+		return false;
+	}
+
+	if ((it->flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
+		it->index = it->size;
+		*ptr = it->ptr;
+		*run_size = it->size;
+		return true;
+	}
+
+	while (true) {
+		usize start = it->index;
+		if (it->index == it->size) {
+			*ptr = NULL;
+			*run_size = 0;
+			return false;
+		}
+
+		/* return contiguous run of not space bytes */
+		while (it->index < it->size) {
+			if XDL_ISSPACE(it->ptr[it->index]) {
+				break;
+			}
+			it->index += 1;
+		}
+		if (it->index > start) {
+			*ptr = it->ptr + start;
+			*run_size = it->index - start;
+			return true;
+		}
+		/* the current byte had better be a space */
+#ifdef DEBUG
+		if (!XDL_ISSPACE(it->ptr[it->index])) {
+			BUG("xdl_line_iter_next XDL_ISSPACE() is false")
+		}
+#endif
+
+		for (; it->index < it->size; it->index++) {
+			if (!XDL_ISSPACE(it->ptr[it->index])) {
+				break;
+			}
+		}
+
+#ifdef DEBUG
+		if (it->index <= start) {
+			BUG("XDL_ISSPACE() cannot simultaneously be true and false");
+		}
+#endif
+		if ((it->flags & XDF_IGNORE_WHITESPACE_AT_EOL) != 0
+		    && it->index == it->size)
+		{
+			*ptr = NULL;
+			*run_size = 0;
+			return false;
+		}
+		if ((it->flags & XDF_IGNORE_WHITESPACE) != 0) {
+			continue;
+		}
+		if ((it->flags & XDF_IGNORE_WHITESPACE_CHANGE) != 0) {
+			const u8 *SINGLE_SPACE = (const u8 *) " ";
+			if (it->index == it->size) {
+				continue;
+			}
+			*ptr = SINGLE_SPACE;
+			*run_size = 1;
+			return true;
+		}
+		*ptr = it->ptr + start;
+		*run_size = it->index - start;
+		return true;
+	}
+}
+
+void xdl_whitespace_iter_assert_done(struct xwhitespaceiter_t* it) {
+#ifdef DEBUG
+	if (it->index < it->size) {
+		BUG("xlineiter_t: didn't consume the whole iterator");
+	}
+	if (it->index > it->size) {
+		BUG("xlineiter_t: index was incremented too much");
+	}
+#endif
+	it->ptr = NULL;
+	it->size = 0;
+	it->index = 0;
+	it->flags = 0;
+}
+
+u64 xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags) {
+	struct xwhitespaceiter_t it;
+	u8 const* run_start;
+	usize run_size;
+
+#ifdef DEBUG
+	validate_line_arguments(ptr, line_size_without_eol, flags);
+#endif
+
+	u64 hash = 5381;
+
+	xdl_whitespace_iter_init(&it, ptr, line_size_without_eol, flags);
+	while (xdl_whitespace_iter_next(&it, &run_start, &run_size)) {
+		for (usize i = 0; i < run_size; i++) {
+			hash = hash * 33 ^ (u64) run_start[i];
+		}
+	}
+	xdl_whitespace_iter_assert_done(&it);
+
+	return hash;
+}
+
+bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags) {
+	struct xwhitespaceiter_t it1, it2;
+	u8 const *run_start1, *run_start2;
+	usize run_size1, run_size2;
+	usize i1, i2;
+	bool has_next1, has_next2;
+
+#ifdef DEBUG
+	validate_line_arguments(line1, size1, flags);
+	validate_line_arguments(line2, size2, flags);
+#endif
+
+	if ((flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
+		return memcmp(line1, line2, size1) == 0;
+	}
+
+	xdl_whitespace_iter_init(&it1, line1, size1, flags);
+	xdl_whitespace_iter_init(&it2, line2, size2, flags);
+
+	has_next1 = xdl_whitespace_iter_next(&it1, &run_start1, &run_size1);
+	has_next2 = xdl_whitespace_iter_next(&it2, &run_start2, &run_size2);
+
+	i1 = 0, i2 = 0;
+	while (has_next1 && has_next2) {
+		while (i1 < run_size1 && i2 < run_size2) {
+			if (run_start1[i1] != run_start2[i2])
+				return false;
+			i1++, i2++;
+		}
+
+		if (i1 == run_size1) {
+			i1 = 0;
+			has_next1 = xdl_whitespace_iter_next(&it1, &run_start1, &run_size1);
+		}
+
+		if (i2 == run_size2) {
+			i2 = 0;
+			has_next2 = xdl_whitespace_iter_next(&it2, &run_start2, &run_size2);
+		}
+	}
+
+	/*
+	 * check for emtpy runs
+	 */
+	while (has_next1 && run_size1 == 0) {
+		has_next1 = xdl_whitespace_iter_next(&it1, &run_start1, &run_size1);
+	}
+
+	while (has_next2 && run_size2 == 0) {
+		has_next2 = xdl_whitespace_iter_next(&it2, &run_start2, &run_size2);
+	}
+
+	return !has_next1 && !has_next2;
+}
+
+bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs) {
+	if (lhs->flags != rhs->flags) {
+		BUG("xdl_record_equal flags do not match");
+	}
+
+	if (lhs->hash != rhs->hash) {
+		return false;
+	}
+
+	return xdl_line_equal(lhs->ptr, lhs->size,
+		rhs->ptr, rhs->size, rhs->flags);
+}
+
+
 void* xdl_alloc_grow_helper(void *p, long nr, long *alloc, size_t size)
 {
 	void *tmp = NULL;
@@ -428,17 +757,3 @@ void* xdl_alloc_grow_helper(void *p, long nr, long *alloc, size_t size)
 	}
 	return tmp;
 }
-
-void line_length(u8 const* start, u8 const* end, usize *no_eol, usize *with_eol) {
-	usize size = end - start;
-	*no_eol = size;
-	*with_eol = size;
-	for (usize i = 0; i < size; i++) {
-		if (start[i] == '\n') {
-			*no_eol = i;
-			*with_eol = i+1;
-			break;
-		}
-	}
-}
-

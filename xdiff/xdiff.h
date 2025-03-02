@@ -27,6 +27,13 @@
 extern "C" {
 #endif /* #ifdef __cplusplus */
 
+#define INVALID_INDEX SIZE_MAX
+#define LINE_SHIFT 1
+
+#define NO 0
+#define YES 1
+#define TOO_MANY 2
+
 /* xpparm_t.flags */
 #define XDF_NEED_MINIMAL (1 << 0)
 
@@ -34,10 +41,13 @@ extern "C" {
 #define XDF_IGNORE_WHITESPACE_CHANGE (1 << 2)
 #define XDF_IGNORE_WHITESPACE_AT_EOL (1 << 3)
 #define XDF_IGNORE_CR_AT_EOL (1 << 4)
-#define XDF_WHITESPACE_FLAGS (XDF_IGNORE_WHITESPACE | \
-			      XDF_IGNORE_WHITESPACE_CHANGE | \
-			      XDF_IGNORE_WHITESPACE_AT_EOL | \
-			      XDF_IGNORE_CR_AT_EOL)
+#define XDF_IGNORE_WHITESPACE_WITHIN ( \
+	XDF_IGNORE_WHITESPACE | \
+	XDF_IGNORE_WHITESPACE_CHANGE | \
+	XDF_IGNORE_WHITESPACE_AT_EOL)
+#define XDF_WHITESPACE_FLAGS ( \
+	XDF_IGNORE_WHITESPACE_WITHIN | \
+	XDF_IGNORE_CR_AT_EOL)
 
 #define XDF_IGNORE_BLANK_LINES (1 << 7)
 
