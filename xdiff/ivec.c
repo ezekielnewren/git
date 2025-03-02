@@ -32,7 +32,8 @@ void rust_ivec_init(void* self, usize element_size) {
 
 void rust_ivec_reserve(void* self, usize additional) {
 	rawivec_t *this = self;
-	rust_ivec_reserve_exact(self, XDL_MAX(additional, this->capacity));
+	usize growby = XDL_MIN(128, this->capacity);
+	rust_ivec_reserve_exact(self, XDL_MAX(additional, growby));
 }
 
 void rust_ivec_reserve_exact(void* self, usize additional) {
