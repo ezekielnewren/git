@@ -425,13 +425,9 @@ void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size, 
 
 u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mphb, xrecord_t *key) {
 	struct xdl_mphb_node_t *node;
-	u64 line_hash;
 	usize hi;
 
-	if ((mphb->flags & XDF_IGNORE_CR_AT_EOL) != 0 && key->size_no_eol > 0 && key->ptr[key->size_no_eol - 1] == '\r')
-		key->size_no_eol--;
-
-	line_hash = xdl_line_hash(key->ptr, key->size_no_eol, mphb->flags);
+	u64 line_hash = xdl_line_hash(key->ptr, key->size_no_eol, mphb->flags);
 	hi = (long) XDL_HASHLONG(line_hash, mphb->hbits);
 	for (node = mphb->head[hi]; node; node = node->next) {
 		if (node->line_hash == line_hash &&

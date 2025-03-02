@@ -33,7 +33,7 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e);
 static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
 
 
-static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf) {
+static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, bool ignore_cr_at_eol) {
 	struct xlinereader_t reader;
 
 	IVEC_INIT(xdf->minimal_perfect_hash);
@@ -55,6 +55,13 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf) {
 		}
 	}
 
+	if (ignore_cr_at_eol) {
+		for (usize i = 0; i < xdf->record.length; i++) {
+			xrecord_t *rec = &xdf->record.ptr[i];
+			if (rec->size_no_eol > 0 && rec->ptr[rec->size_no_eol - 1] == '\r')
+				rec->size_no_eol--;
+		}
+	}
 
 	xdf->rchg_vec.capacity = xdf->record.length + 2;
 	XDL_CALLOC_ARRAY(xdf->rchg_vec.ptr, xdf->rchg_vec.capacity);
@@ -302,6 +309,7 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    xdfenv_t *xe) {
 	ivec_xdloccurrence_t occurrences;
 	ivec_xdloccurrence_t *occ_ptr;
+	bool ignore_cr_at_eol = (xpp->flags & XDF_IGNORE_CR_AT_EOL) != 0;
 
 	IVEC_INIT(occurrences);
 
@@ -311,8 +319,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		occ_ptr = NULL;
 	}
 
-	xdl_prepare_ctx(mf1, &xe->xdf1);
-	xdl_prepare_ctx(mf2, &xe->xdf2);
+	xdl_prepare_ctx(mf1, &xe->xdf1, ignore_cr_at_eol);
+	xdl_prepare_ctx(mf2, &xe->xdf2, ignore_cr_at_eol);
 
 	xdl_construct_mph_and_occurrences(xe, xpp->flags, occ_ptr);
 
