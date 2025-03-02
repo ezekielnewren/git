@@ -89,6 +89,12 @@ void rust_ivec_push(void* self, void* value) {
 	this->length += 1;
 }
 
+void rust_ivec_memset(void* self, int value) {
+	rawivec_t *this = self;
+
+	memset(this->ptr, value, this->capacity * this->element_size);
+}
+
 void* rust_ivec_steal_memory(void* self) {
 	rawivec_t *this = self;
 	void* t = this->ptr;

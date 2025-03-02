@@ -44,6 +44,7 @@ void  rust_ivec_resize_exact(void* self, usize new_length, void* default_value);
 void  rust_ivec_shrink_to_fit(void* self);
 void* rust_ivec_new(void* self);
 void  rust_ivec_push(void* self, void* value);
+void  rust_ivec_memset(void* self, int value);
 void* rust_ivec_steal_memory(void* self);
 bool  rust_ivec_equal(void* self, void* other);
 void  rust_ivec_free(void* self);
