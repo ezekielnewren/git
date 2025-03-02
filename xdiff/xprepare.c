@@ -140,6 +140,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	u8 default_value = 0;
 
 	IVEC_INIT(xdf->record);
+	IVEC_INIT(xdf->minimal_perfect_hash);
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->hash);
 	IVEC_INIT(xdf->rchg_vec);
@@ -179,52 +180,6 @@ static void xdl_free_ctx(xdfile_t *xdf) {
 	rust_ivec_free(&xdf->rindex);
 	rust_ivec_free(&xdf->hash);
 	rust_ivec_free(&xdf->record);
-}
-
-
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		    xdfenv_t *xe) {
-	xdlclassifier_t cf;
-
-	memset(&cf, 0, sizeof(cf));
-
-	if (xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags) < 0) {
-
-		xdl_free_classifier(&cf);
-		return -1;
-	}
-	if (xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags) < 0) {
-
-		xdl_free_ctx(&xe->xdf1);
-		xdl_free_classifier(&cf);
-		return -1;
-	}
-
-	if (xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length + 1, xpp->flags) < 0)
-		return -1;
-
-	for (usize i = 0; i < xe->xdf1.record.length; i++) {
-		xrecord_t *rec = &xe->xdf1.record.ptr[i];
-		xdl_classify_record(1, &cf, rec);
-	}
-	for (usize i = 0; i < xe->xdf2.record.length; i++) {
-		xrecord_t *rec = &xe->xdf2.record.ptr[i];
-		xdl_classify_record(2, &cf, rec);
-	}
-
-	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
-	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
-	    xdl_optimize_ctxs(&cf, &xe->xdf1, &xe->xdf2) < 0) {
-
-		xdl_free_ctx(&xe->xdf2);
-		xdl_free_ctx(&xe->xdf1);
-		xdl_free_classifier(&cf);
-		return -1;
-	}
-
-	xdl_free_classifier(&cf);
-
-	return 0;
 }
 
 
@@ -387,6 +342,102 @@ static int xdl_optimize_ctxs(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2
 
 		return -1;
 	}
+
+	return 0;
+}
+
+typedef struct {
+	usize file1;
+	usize file2;
+} xdloccurrence_t;
+
+DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
+
+static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
+	struct xdl_minimal_perfect_hash_builder_t mphb;
+	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length);
+
+
+	for (usize i = 0; i < xe->xdf1.record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf1.record.ptr[i]);
+		rust_ivec_push(&xe->xdf1.minimal_perfect_hash, &mph);
+	}
+
+	for (usize i = 0; i < xe->xdf2.record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf2.record.ptr[i]);
+		rust_ivec_push(&xe->xdf2.minimal_perfect_hash, &mph);
+	}
+
+	xe->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
+
+	if (occurrence == NULL)
+		return;
+
+	/*
+	 * ORDER MATTERS!!!, counting occurrences will only work properly if
+	 * the records are iterated over in the same way that the mph set
+	 * was constructed
+	 */
+	for (usize i = 0; i < xe->xdf1.minimal_perfect_hash.length; i++) {
+		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
+		if (mph == occurrence->length) {
+			xdloccurrence_t occ;
+			occ.file1 = 0;
+			occ.file2 = 0;
+			rust_ivec_push(occurrence, &occ);
+		}
+		occurrence->ptr[mph].file1 += 1;
+	}
+
+	for (usize i = 0; i < xe->xdf2.minimal_perfect_hash.length; i++) {
+		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
+		if (mph == occurrence->length) {
+			xdloccurrence_t occ;
+			occ.file1 = 0;
+			occ.file2 = 0;
+			rust_ivec_push(occurrence, &occ);
+		}
+		occurrence->ptr[mph].file2 += 1;
+	}
+}
+
+
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
+		    xdfenv_t *xe) {
+	ivec_xdloccurrence_t occurrences;
+	xdlclassifier_t cf;
+
+	IVEC_INIT(occurrences);
+	memset(&cf, 0, sizeof(cf));
+
+	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
+	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
+
+	xdl_construct_mph_and_occurrences(xe, &occurrences);
+
+	if (xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length + 1, xpp->flags) < 0)
+		return -1;
+
+	for (usize i = 0; i < xe->xdf1.record.length; i++) {
+		xrecord_t *rec = &xe->xdf1.record.ptr[i];
+		xdl_classify_record(1, &cf, rec);
+	}
+	for (usize i = 0; i < xe->xdf2.record.length; i++) {
+		xrecord_t *rec = &xe->xdf2.record.ptr[i];
+		xdl_classify_record(2, &cf, rec);
+	}
+
+	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
+	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
+	    xdl_optimize_ctxs(&cf, &xe->xdf1, &xe->xdf2) < 0) {
+
+		xdl_free_ctx(&xe->xdf2);
+		xdl_free_ctx(&xe->xdf1);
+		xdl_free_classifier(&cf);
+		return -1;
+	    }
+
+	xdl_free_classifier(&cf);
 
 	return 0;
 }
