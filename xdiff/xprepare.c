@@ -34,8 +34,6 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
 
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
-	u8 const* cur;
-	usize no_eol, with_eol;
 	struct xlinereader_t reader;
 	u8 default_value = 0;
 
@@ -45,12 +43,13 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	IVEC_INIT(xdf->rchg_vec);
 
 	xdl_linereader_init(&reader, (u8 const *) mf->ptr, mf->size);
-	while (xdl_linereader_next(&reader, &cur, &no_eol, &with_eol)) {
+	while (true) {
 		xrecord_t *rec = rust_ivec_new(&xdf->record);
-		rec->ptr = cur;
-		rec->size_no_eol = no_eol;
-		rec->size_with_eol = with_eol;
-		rec->line_hash = xdl_line_hash(cur, no_eol, flags);
+		if (!xdl_linereader_next(&reader, &rec->ptr, &rec->size_no_eol, &rec->size_with_eol)) {
+			xdf->record.length--;
+			break;
+		}
+		rec->line_hash = xdl_line_hash(rec->ptr, rec->size_no_eol, flags);
 		rec->flags = flags;
 	}
 
