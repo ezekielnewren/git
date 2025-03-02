@@ -54,7 +54,6 @@ typedef struct s_xdfile {
 	ivec_u64 minimal_perfect_hash;
 	ivec_u8 rchg_vec;
 	ivec_isize rindex;
-	ivec_u64 hash;
 	isize dstart, dend;
 	u8 *rchg;
 } xdfile_t;

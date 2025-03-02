@@ -34,6 +34,10 @@ typedef struct s_xdpsplit {
 	int min_lo, min_hi;
 } xdpsplit_t;
 
+static u64 get_mph(xdfile_t *xdf, isize index) {
+	return xdf->minimal_perfect_hash.ptr[xdf->rindex.ptr[(usize) index]];
+}
+
 /*
  * See "An O(ND) Difference Algorithm and its Variations", by Eugene Myers.
  * Basically considers a "box" (off1, off2, lim1, lim2) and scan from both
@@ -43,8 +47,8 @@ typedef struct s_xdpsplit {
  * using this algorithm, so a little bit of heuristic is needed to cut the
  * search and to return a suboptimal point.
  */
-static long xdl_split(unsigned long const *ha1, long off1, long lim1,
-		      unsigned long const *ha2, long off2, long lim2,
+static long xdl_split(xdfile_t *xdf1, long off1, long lim1,
+		      xdfile_t *xdf2, long off2, long lim2,
 		      long *kvdf, long *kvdb, int need_min, xdpsplit_t *spl,
 		      xdalgoenv_t *xenv) {
 	long dmin = off1 - lim2, dmax = lim1 - off2;
@@ -88,7 +92,7 @@ static long xdl_split(unsigned long const *ha1, long off1, long lim1,
 				i1 = kvdf[d + 1];
 			prev1 = i1;
 			i2 = i1 - d;
-			for (; i1 < lim1 && i2 < lim2 && ha1[i1] == ha2[i2]; i1++, i2++);
+			for (; i1 < lim1 && i2 < lim2 && get_mph(xdf1, i1) == get_mph(xdf2, i2); i1++, i2++);
 			if (i1 - prev1 > xenv->snake_cnt)
 				got_snake = 1;
 			kvdf[d] = i1;
@@ -125,7 +129,7 @@ static long xdl_split(unsigned long const *ha1, long off1, long lim1,
 				i1 = kvdb[d + 1] - 1;
 			prev1 = i1;
 			i2 = i1 - d;
-			for (; i1 > off1 && i2 > off2 && ha1[i1 - 1] == ha2[i2 - 1]; i1--, i2--);
+			for (; i1 > off1 && i2 > off2 && get_mph(xdf1, i1 - 1) == get_mph(xdf2, i2 - 1); i1--, i2--);
 			if (prev1 - i1 > xenv->snake_cnt)
 				got_snake = 1;
 			kvdb[d] = i1;
@@ -160,7 +164,7 @@ static long xdl_split(unsigned long const *ha1, long off1, long lim1,
 				if (v > XDL_K_HEUR * ec && v > best &&
 				    off1 + xenv->snake_cnt <= i1 && i1 < lim1 &&
 				    off2 + xenv->snake_cnt <= i2 && i2 < lim2) {
-					for (k = 1; ha1[i1 - k] == ha2[i2 - k]; k++)
+					for (k = 1; get_mph(xdf1, i1 - k) == get_mph(xdf2, i2 - k); k++)
 						if (k == xenv->snake_cnt) {
 							best = v;
 							spl->i1 = i1;
@@ -184,7 +188,7 @@ static long xdl_split(unsigned long const *ha1, long off1, long lim1,
 				if (v > XDL_K_HEUR * ec && v > best &&
 				    off1 < i1 && i1 <= lim1 - xenv->snake_cnt &&
 				    off2 < i2 && i2 <= lim2 - xenv->snake_cnt) {
-					for (k = 0; ha1[i1 + k] == ha2[i2 + k]; k++)
+					for (k = 0; get_mph(xdf1, i1 + k) == get_mph(xdf2, i2 + k); k++)
 						if (k == xenv->snake_cnt - 1) {
 							best = v;
 							spl->i1 = i1;
@@ -254,33 +258,27 @@ static long xdl_split(unsigned long const *ha1, long off1, long lim1,
  * sub-boxes by calling the box splitting function. Note that the real job
  * (marking changed lines) is done in the two boundary reaching checks.
  */
-int xdl_recs_cmp(diffdata_t *dd1, long off1, long lim1,
-		 diffdata_t *dd2, long off2, long lim2,
+int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
+		 xdfile_t *xdf2, long off2, long lim2,
 		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv) {
-	u64 const *ha1 = dd1->hash, *ha2 = dd2->hash;
+	// u64 const *ha1 = dd1->hash, *ha2 = dd2->hash;
 
 	/*
 	 * Shrink the box by walking through each diagonal snake (SW and NE).
 	 */
-	for (; off1 < lim1 && off2 < lim2 && ha1[off1] == ha2[off2]; off1++, off2++);
-	for (; off1 < lim1 && off2 < lim2 && ha1[lim1 - 1] == ha2[lim2 - 1]; lim1--, lim2--);
+	for (; off1 < lim1 && off2 < lim2 && get_mph(xdf1, off1) == get_mph(xdf2, off2); off1++, off2++);
+	for (; off1 < lim1 && off2 < lim2 && get_mph(xdf1, lim1 - 1) == get_mph(xdf2, lim2 - 1); lim1--, lim2--);
 
 	/*
 	 * If one dimension is empty, then all records on the other one must
 	 * be obviously changed.
 	 */
 	if (off1 == lim1) {
-		char *rchg2 = dd2->rchg;
-		long *rindex2 = dd2->rindex;
-
 		for (; off2 < lim2; off2++)
-			rchg2[rindex2[off2]] = 1;
+			xdf2->rchg[xdf2->rindex.ptr[off2]] = YES;
 	} else if (off2 == lim2) {
-		char *rchg1 = dd1->rchg;
-		long *rindex1 = dd1->rindex;
-
 		for (; off1 < lim1; off1++)
-			rchg1[rindex1[off1]] = 1;
+			xdf1->rchg[xdf1->rindex.ptr[off1]] = YES;
 	} else {
 		xdpsplit_t spl;
 		spl.i1 = spl.i2 = 0;
@@ -288,7 +286,7 @@ int xdl_recs_cmp(diffdata_t *dd1, long off1, long lim1,
 		/*
 		 * Divide ...
 		 */
-		if (xdl_split(ha1, off1, lim1, ha2, off2, lim2, kvdf, kvdb,
+		if (xdl_split(xdf1, off1, lim1, xdf2, off2, lim2, kvdf, kvdb,
 			      need_min, &spl, xenv) < 0) {
 
 			return -1;
@@ -297,9 +295,9 @@ int xdl_recs_cmp(diffdata_t *dd1, long off1, long lim1,
 		/*
 		 * ... et Impera.
 		 */
-		if (xdl_recs_cmp(dd1, off1, spl.i1, dd2, off2, spl.i2,
+		if (xdl_recs_cmp(xdf1, off1, spl.i1, xdf2, off2, spl.i2,
 				 kvdf, kvdb, spl.min_lo, xenv) < 0 ||
-		    xdl_recs_cmp(dd1, spl.i1, lim1, dd2, spl.i2, lim2,
+		    xdl_recs_cmp(xdf1, spl.i1, lim1, xdf2, spl.i2, lim2,
 				 kvdf, kvdb, spl.min_hi, xenv) < 0) {
 
 			return -1;
@@ -315,7 +313,6 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
 	xdalgoenv_t xenv;
-	diffdata_t dd1, dd2;
 	int res;
 
 	if (xdl_prepare_env(mf1, mf2, xpp, xe) < 0)
@@ -354,16 +351,8 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.snake_cnt = XDL_SNAKE_CNT;
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
-	dd1.nrec = xe->xdf1.rindex.length;
-	dd1.hash = xe->xdf1.hash.ptr;
-	dd1.rchg = (char *) xe->xdf1.rchg;
-	dd1.rindex = xe->xdf1.rindex.ptr;
-	dd2.nrec = xe->xdf2.rindex.length;
-	dd2.hash = xe->xdf2.hash.ptr;
-	dd2.rchg = (char *) xe->xdf2.rchg;
-	dd2.rindex = xe->xdf2.rindex.ptr;
 
-	res = xdl_recs_cmp(&dd1, 0, dd1.nrec, &dd2, 0, dd2.nrec,
+	res = xdl_recs_cmp(&xe->xdf1, 0, xe->xdf1.rindex.length, &xe->xdf2, 0, xe->xdf2.rindex.length,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 	xdl_free(kvd);
@@ -391,11 +380,6 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 	return xch;
 }
 
-
-static int recs_match(xrecord_t *rec1, xrecord_t *rec2)
-{
-	return rec1->hash == rec2->hash;
-}
 
 /*
  * If a line is indented more than this, get_indent() just returns this value.
@@ -717,7 +701,7 @@ struct xdlgroup {
 static void group_init(xdfile_t *xdf, struct xdlgroup *g)
 {
 	g->start = g->end = 0;
-	while (xdf->rchg[g->end])
+	while (xdf->rchg[g->end] != NO)
 		g->end++;
 }
 
@@ -731,7 +715,7 @@ static inline int group_next(xdfile_t *xdf, struct xdlgroup *g)
 		return -1;
 
 	g->start = g->end + 1;
-	for (g->end = g->start; xdf->rchg[g->end]; g->end++)
+	for (g->end = g->start; xdf->rchg[g->end] != NO; g->end++)
 		;
 
 	return 0;
@@ -747,7 +731,7 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
 		return -1;
 
 	g->end = g->start - 1;
-	for (g->start = g->end; xdf->rchg[g->start - 1]; g->start--)
+	for (g->start = g->end; xdf->rchg[g->start - 1] != NO; g->start--)
 		;
 
 	return 0;
@@ -758,14 +742,15 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
  * following group, expand this group to include it. Return 0 on success or -1
  * if g cannot be slid down.
  */
-static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
-{
-	if (g->end < xdf->record.length &&
-	    recs_match(&xdf->record.ptr[g->start], &xdf->record.ptr[g->end])) {
-		xdf->rchg[g->start++] = 0;
-		xdf->rchg[g->end++] = 1;
+static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g) {
+	u64 mph1 = xdf->minimal_perfect_hash.ptr[g->start];
+	u64 mph2 = xdf->minimal_perfect_hash.ptr[g->end];
 
-		while (xdf->rchg[g->end])
+	if (g->end < xdf->record.length && mph1 == mph2) {
+		xdf->rchg[g->start++] = NO;
+		xdf->rchg[g->end++] = YES;
+
+		while (xdf->rchg[g->end] != NO)
 			g->end++;
 
 		return 0;
@@ -779,14 +764,15 @@ static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
  * into a previous group, expand this group to include it. Return 0 on success
  * or -1 if g cannot be slid up.
  */
-static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g)
-{
-	if (g->start > 0 &&
-	    recs_match(&xdf->record.ptr[g->start - 1], &xdf->record.ptr[g->end - 1])) {
-		xdf->rchg[--g->start] = 1;
-		xdf->rchg[--g->end] = 0;
+static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g) {
+	u64 mph1 = xdf->minimal_perfect_hash.ptr[g->start - 1];
+	u64 mph2 = xdf->minimal_perfect_hash.ptr[g->end - 1];
 
-		while (xdf->rchg[g->start - 1])
+	if (g->start > 0 && mph1 == mph2) {
+		xdf->rchg[--g->start] = YES;
+		xdf->rchg[--g->end] = NO;
+
+		while (xdf->rchg[g->start - 1] != NO)
 			g->start--;
 
 		return 0;
@@ -948,9 +934,9 @@ int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
 	for (i1 = xe->xdf1.record.length, i2 = xe->xdf2.record.length; i1 >= 0 || i2 >= 0; i1--, i2--)
-		if (rchg1[i1 - 1] || rchg2[i2 - 1]) {
-			for (l1 = i1; rchg1[i1 - 1]; i1--);
-			for (l2 = i2; rchg2[i2 - 1]; i2--);
+		if (rchg1[i1 - 1] != NO || rchg2[i2 - 1] != NO) {
+			for (l1 = i1; rchg1[i1 - 1] != NO; i1--);
+			for (l2 = i2; rchg2[i2 - 1] != NO; i2--);
 
 			if (!(xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2))) {
 				xdl_free_script(cscr);
