@@ -413,33 +413,34 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 }
 
 
-void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size) {
+void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size, u64 flags) {
 	mphb->hbits = xdl_hashbits(size);
 	mphb->kv_capacity = size;
 	mphb->kv_length = 0;
+	mphb->flags = flags;
 
 	XDL_CALLOC_ARRAY(mphb->head, 1 << mphb->hbits);
 	XDL_ALLOC_ARRAY(mphb->kv, mphb->kv_capacity);
 }
 
-u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key) {
+u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mphb, xrecord_t *key) {
 	struct xdl_mphb_node_t *node;
 
-	usize hi = (long) XDL_HASHLONG(key->line_hash, mph->hbits);
-	for (node = mph->head[hi]; node; node = node->next) {
+	usize hi = (long) XDL_HASHLONG(key->line_hash, mphb->hbits);
+	for (node = mphb->head[hi]; node; node = node->next) {
 		if (node->line_hash == key->line_hash &&
-			xdl_line_equal(node->ptr, node->size_no_eol, key->ptr, key->size_no_eol, key->flags))
+			xdl_line_equal(node->ptr, node->size_no_eol, key->ptr, key->size_no_eol, mphb->flags))
 			break;
 	}
 
 	if (node == NULL) {
-		node = &mph->kv[mph->kv_length];
+		node = &mphb->kv[mphb->kv_length];
 		node->ptr = key->ptr;
 		node->size_no_eol = key->size_no_eol;
 		node->line_hash = key->line_hash;
-		node->value = mph->kv_length++;
-		node->next = mph->head[hi];
-		mph->head[hi] = node;
+		node->value = mphb->kv_length++;
+		node->next = mphb->head[hi];
+		mphb->head[hi] = node;
 	}
 
 	return node->value;
@@ -700,17 +701,13 @@ bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, 
 	}
 }
 
-bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs) {
-	if (lhs->flags != rhs->flags) {
-		BUG("xdl_record_equal flags do not match");
-	}
-
+bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs, u64 flags) {
 	if (lhs->line_hash != rhs->line_hash) {
 		return false;
 	}
 
 	return xdl_line_equal(lhs->ptr, lhs->size_no_eol,
-		rhs->ptr, rhs->size_no_eol, rhs->flags);
+		rhs->ptr, rhs->size_no_eol, flags);
 }
 
 

@@ -40,6 +40,7 @@ struct xdl_minimal_perfect_hash_builder_t {
 	usize kv_capacity;
 	usize kv_length;
 	u32 hbits;
+	u64 flags;
 };
 
 struct xwhitespaceiter_t {
@@ -71,8 +72,8 @@ int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 		       int line1, int count1, int line2, int count2);
 
-void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size);
-u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mph, xrecord_t *key);
+void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder_t *mphb, usize size, u64 flags);
+u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder_t *mphb, xrecord_t *key);
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder_t *mphb);
 void xdl_linereader_init(struct xlinereader_t *it, u8 const* ptr, usize size);
 bool xdl_linereader_next(struct xlinereader_t *it, u8 const **cur, usize *no_eol, usize *with_eol);
@@ -82,7 +83,7 @@ bool xdl_whitespace_iter_next(struct xwhitespaceiter_t* it, u8 const** ptr, usiz
 void xdl_whitespace_iter_assert_done(struct xwhitespaceiter_t* it);
 u64  xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags);
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags);
-bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs);
+bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs, u64 flags);
 
 
 /* Do not call this function, use XDL_ALLOC_GROW instead */

@@ -44,7 +44,6 @@ typedef struct {
 	usize size_no_eol;
 	usize size_with_eol;
 	u64 line_hash;
-	u64 flags;
 } xrecord_t;
 
 DEFINE_IVEC_TYPE(xrecord_t, xrecord_t);

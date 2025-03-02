@@ -51,7 +51,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 			break;
 		}
 		rec->line_hash = xdl_line_hash(rec->ptr, rec->size_no_eol, flags);
-		rec->flags = flags;
 	}
 
 
@@ -248,9 +247,9 @@ static int xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 	return 0;
 }
 
-static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, ivec_xdloccurrence_t *occurrence) {
+static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
-	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length);
+	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length, flags);
 
 
 	for (usize i = 0; i < xe->xdf1.record.length; i++) {
@@ -313,7 +312,7 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
 	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
 
-	xdl_construct_mph_and_occurrences(xe, occ_ptr);
+	xdl_construct_mph_and_occurrences(xe, xpp->flags, occ_ptr);
 
 
 	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
