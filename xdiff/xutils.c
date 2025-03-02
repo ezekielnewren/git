@@ -627,25 +627,33 @@ void xdl_whitespace_iter_assert_done(struct xwhitespaceiter_t* it) {
 }
 
 u64 xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags) {
-	struct xwhitespaceiter_t it;
-	u8 const* run_start;
-	usize run_size;
+	if ((flags & XDF_WHITESPACE_FLAGS) == 0) {
+		u64 hash = 5381;
+		for (usize i = 0; i < line_size_without_eol; i++) {
+			hash = hash * 33 ^ (u64) ptr[i];
+		}
+		return hash;
+	} else {
+		struct xwhitespaceiter_t it;
+		u8 const* run_start;
+		usize run_size;
 
 #ifdef DEBUG
-	validate_line_arguments(ptr, line_size_without_eol, flags);
+		validate_line_arguments(ptr, line_size_without_eol, flags);
 #endif
 
-	u64 hash = 5381;
+		u64 hash = 5381;
 
-	xdl_whitespace_iter_init(&it, ptr, line_size_without_eol, flags);
-	while (xdl_whitespace_iter_next(&it, &run_start, &run_size)) {
-		for (usize i = 0; i < run_size; i++) {
-			hash = hash * 33 ^ (u64) run_start[i];
+		xdl_whitespace_iter_init(&it, ptr, line_size_without_eol, flags);
+		while (xdl_whitespace_iter_next(&it, &run_start, &run_size)) {
+			for (usize i = 0; i < run_size; i++) {
+				hash = hash * 33 ^ (u64) run_start[i];
+			}
 		}
-	}
-	xdl_whitespace_iter_assert_done(&it);
+		xdl_whitespace_iter_assert_done(&it);
 
-	return hash;
+		return hash;
+	}
 }
 
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags) {
