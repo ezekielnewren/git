@@ -48,7 +48,8 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	while (xdl_linereader_next(&reader, &cur, &no_eol, &with_eol)) {
 		xrecord_t *rec = rust_ivec_new(&xdf->record);
 		rec->ptr = cur;
-		rec->size = with_eol;
+		rec->size_no_eol = no_eol;
+		rec->size_with_eol = with_eol;
 		rec->line_hash = xdl_line_hash(cur, no_eol, flags);
 		rec->flags = flags;
 	}

@@ -41,7 +41,8 @@ typedef struct s_chastore {
 
 typedef struct {
 	u8 const* ptr;
-	usize size;
+	usize size_no_eol;
+	usize size_with_eol;
 	u64 line_hash;
 	u64 flags;
 } xrecord_t;
