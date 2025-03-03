@@ -10,6 +10,7 @@ pub(crate) mod xtypes;
 pub(crate) mod xdfenv;
 #[cfg(test)]
 pub(crate) mod mock;
+mod mphb;
 
 #[no_mangle]
 unsafe extern "C" fn rust_xdl_prepare_ctx(_mf: *const mmfile_t, _xdf: *mut xdfile_t, flags: u64) -> i32 {

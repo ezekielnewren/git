@@ -15,6 +15,7 @@ crate-type = ["staticlib", "rlib"]
 interop = { path = "../interop" }
 libc = "0.2.169"
 sha2 = "0.10.8"
+typed-arena = "2.0.2"
 xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
 #xxhash = "0.0.8"
 #twox-hash = "2.1.0"

@@ -2,6 +2,7 @@
 
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use crate::mphb::HashAndEq;
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN, XDF_WHITESPACE_FLAGS};
 use crate::xtypes::DJB2a;
 use crate::xutils::{chunked_iter_equal, XDL_ISSPACE};
@@ -49,6 +50,49 @@ impl Hash for xrecord_t {
     fn hash<H: Hasher>(&self, state: &mut H) {
         debug_assert_ne!(0, self.line_hash);
         state.write_u64(self.line_hash);
+    }
+}
+
+
+pub struct xrecord_he {
+    flags: u64
+}
+
+impl xrecord_he {
+    pub(crate) fn new(flags: u64) -> Self {
+        Self {
+            flags,
+        }
+    }
+}
+
+impl HashAndEq<xrecord_t> for xrecord_he {
+    fn hash(&self, key: &xrecord_t) -> u64 {
+        if (self.flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+            #[cfg(debug_assertions)]
+            {
+                let mut state = DJB2a::default();
+                state.write(key.as_ref());
+                state.finish()
+            }
+            #[cfg(not(debug_assertions))]
+            xxhash_rust::xxh3::xxh3_64(slice)
+        } else {
+            #[cfg(debug_assertions)]
+            let mut state = DJB2a::default();
+            #[cfg(not(debug_assertions))]
+            let mut state = xxhash_rust::xxh3::Xxh3::default();
+            for run in IterWhiteSpace::new(key.as_ref(), self.flags) {
+                #[cfg(test)]
+                let _view = unsafe { std::str::from_utf8_unchecked(run) };
+                state.write(run);
+            }
+            state.finish()
+        }
+    }
+
+    fn eq(&self, lhs: &xrecord_t, rhs: &xrecord_t) -> bool {
+        todo!()
     }
 }
 
