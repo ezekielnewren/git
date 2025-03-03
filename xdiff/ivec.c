@@ -4,22 +4,10 @@
 
 #include "xmacros.h"
 
-static void _rust_ivec_resize(void* self, usize new_length, void* default_value, bool exact) {
+static void rust_ivec_set_capacity(void* self, usize new_capacity) {
 	rawivec_t *this = self;
-	isize additional = (isize) (new_length - this->capacity);
-	if (additional > 0) {
-		if (exact) {
-			rust_ivec_reserve_exact(self, additional);
-		} else {
-			rust_ivec_reserve(self, additional);
-		}
-	}
-
-	for (usize i = this->length; i < new_length; i++) {
-		void* dst = (u8*) this->ptr + (this->length + i) * this->element_size;
-		memcpy(dst, default_value, this->element_size);
-	}
-	this->length = new_length;
+	this->ptr = xrealloc(this->ptr, new_capacity * this->element_size);
+	this->capacity = new_capacity;
 }
 
 void rust_ivec_init(void* self, usize element_size) {
@@ -30,81 +18,48 @@ void rust_ivec_init(void* self, usize element_size) {
 	this->element_size = element_size;
 }
 
+void rust_ivec_reserve_exact(void* self, usize additional) {
+	rawivec_t *this = self;
+	usize new_capacity = this->capacity + additional;
+	rust_ivec_set_capacity(self, new_capacity);
+}
+
 void rust_ivec_reserve(void* self, usize additional) {
 	rawivec_t *this = self;
 	usize growby = XDL_MIN(128, this->capacity);
 	rust_ivec_reserve_exact(self, XDL_MAX(additional, growby));
 }
 
-void rust_ivec_reserve_exact(void* self, usize additional) {
-	rawivec_t *this = self;
-	void* t;
-	usize new_capacity = this->capacity + additional;
-
-	t = xrealloc(this->ptr, new_capacity * this->element_size);
-	if (t == NULL) {
-		die("out of memory");
-	}
-	this->ptr = t;
-	this->capacity = new_capacity;
-}
-
 void rust_ivec_shrink_to_fit(void* self) {
 	rawivec_t *this = self;
-	usize alloc = this->length * this->element_size;
-
-	this->ptr = xrealloc(this->ptr, alloc);
-	this->capacity = this->length;
+	rust_ivec_set_capacity(self, this->length);
 }
 
 void rust_ivec_resize(void* self, usize new_length, void* default_value) {
-	_rust_ivec_resize(self, new_length, default_value, false);
-}
-
-void rust_ivec_resize_exact(void* self, usize new_length, void* default_value) {
-	_rust_ivec_resize(self, new_length, default_value, true);
-}
-
-void* rust_ivec_new(void* self) {
 	rawivec_t *this = self;
-	void* out;
-
-	if (this->length >= this->capacity) {
-		rust_ivec_reserve(self, 1);
+	isize additional = (isize) (new_length - this->capacity);
+	if (additional > 0) {
+		rust_ivec_reserve(self, additional);
 	}
-	out = (u8 *) this->ptr + this->length * this->element_size;
-	this->length++;
-	return out;
+
+	for (usize i = this->length; i < new_length; i++) {
+		void* dst = (u8*) this->ptr + (this->length + i) * this->element_size;
+		memcpy(dst, default_value, this->element_size);
+	}
+	this->length = new_length;
 }
 
 void rust_ivec_push(void* self, void* value) {
 	rawivec_t *this = self;
 	u8* dst;
 
-	if (this->length >= this->capacity) {
+	if (this->length == this->capacity) {
 		rust_ivec_reserve(self, 1);
 	}
 	dst = (u8*) this->ptr + this->length * this->element_size;
 	memcpy(dst, value, this->element_size);
-	this->length += 1;
+	this->length++;
 }
-
-void rust_ivec_memset(void* self, int value) {
-	rawivec_t *this = self;
-
-	memset(this->ptr, value, this->capacity * this->element_size);
-}
-
-void* rust_ivec_steal_memory(void* self) {
-	rawivec_t *this = self;
-	void* t = this->ptr;
-	this->ptr = NULL;
-	this->capacity = 0;
-	this->length = 0;
-	this->element_size = 0;
-	return t;
-}
-
 
 bool rust_ivec_equal(void* self, void* other) {
 	rawivec_t *lhs = self;

@@ -37,15 +37,11 @@ DEFINE_IVEC_TYPE(usize, usize);
 DEFINE_IVEC_TYPE(isize, isize);
 
 void  rust_ivec_init(void* self, usize element_size);
-void  rust_ivec_reserve(void* self, usize additional);
 void  rust_ivec_reserve_exact(void* self, usize additional);
-void  rust_ivec_resize(void* self, usize new_length, void* default_value);
-void  rust_ivec_resize_exact(void* self, usize new_length, void* default_value);
+void  rust_ivec_reserve(void* self, usize additional);
 void  rust_ivec_shrink_to_fit(void* self);
-void* rust_ivec_new(void* self);
+void  rust_ivec_resize(void* self, usize new_length, void* default_value);
 void  rust_ivec_push(void* self, void* value);
-void  rust_ivec_memset(void* self, int value);
-void* rust_ivec_steal_memory(void* self);
 bool  rust_ivec_equal(void* self, void* other);
 void  rust_ivec_free(void* self);
 
