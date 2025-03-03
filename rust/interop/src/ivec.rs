@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::{Index, IndexMut};
+use crate::xrealloc;
 
 #[repr(C)]
 pub struct IVec<T> {
@@ -10,13 +11,54 @@ pub struct IVec<T> {
 }
 
 
+impl<T> Default for IVec<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 impl<T> Drop for IVec<T> {
     fn drop(&mut self) {
         unsafe {
-            self.free();
+            self._free();
         }
     }
 }
+
+
+impl<T: Clone> Clone for IVec<T> {
+    fn clone(&self) -> Self {
+        let mut copy = Self::new();
+        copy.reserve_exact(self.len());
+        for i in 0..self.len() {
+            copy.push(self[i].clone());
+        }
+
+        copy
+    }
+}
+
+
+impl<T: PartialEq> PartialEq for IVec<T> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        let lhs = self.as_slice();
+        let rhs = &other.as_slice()[..lhs.len()];
+        for i in 0..lhs.len() {
+            if lhs[i] != rhs[i] {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl<T: PartialEq> Eq for IVec<T> {}
 
 
 /*
@@ -53,8 +95,8 @@ impl<T> IVec<T> {
             panic!("null pointer");
         }
         let vec = &mut *raw;
-        #[cfg(test)]
-        vec._test_invariance();
+        #[cfg(debug_assertions)]
+        vec.test_invariants();
         vec
     }
 
@@ -63,8 +105,8 @@ impl<T> IVec<T> {
             panic!("null pointer");
         }
         let vec = &*raw;
-        #[cfg(test)]
-        vec._test_invariance();
+        #[cfg(debug_assertions)]
+        vec.test_invariants();
         vec
     }
 
@@ -76,7 +118,7 @@ impl<T> IVec<T> {
  */
 impl<T> IVec<T> {
 
-    fn _test_invariance(&self) {
+    pub fn test_invariants(&self) {
         if !self.ptr.is_null() && (self.ptr as usize) % align_of::<T>() != 0 {
             panic!("misaligned pointer: expected {:x}, got {:x}",
                    align_of::<T>(), self.ptr as usize
@@ -99,23 +141,16 @@ impl<T> IVec<T> {
         }
     }
 
-    /*
-     * DO NOT IMPLEMENT THE CLONE TRAIT!!!
-     * we need this copy to be a private function
-     */
-    fn _copy(&self) -> Self {
-        Self {
-            ptr: self.ptr,
-            length: self.length,
-            capacity: self.capacity,
-            element_size: self.element_size,
-        }
-    }
-
     fn _zero(&mut self) {
         self.ptr = std::ptr::null_mut();
         self.length = 0;
         self.capacity = 0;
+        // DO NOT MODIFY element_size!!!
+    }
+
+    unsafe fn _free(&mut self) {
+        libc::free(self.ptr as *mut libc::c_void);
+        self._zero();
     }
 
     fn _set_capacity(&mut self, new_capacity: usize) {
@@ -124,10 +159,9 @@ impl<T> IVec<T> {
                 return;
             }
             if new_capacity == 0 {
-                libc::free(self.ptr as *mut libc::c_void);
-                self.ptr = std::ptr::null_mut();
+                self._free();
             } else {
-                let t = libc::realloc(self.ptr as *mut libc::c_void, new_capacity * size_of::<T>());
+                let t = xrealloc(self.ptr as *mut libc::c_void, new_capacity * size_of::<T>());
                 if t.is_null() {
                     panic!("out of memory");
                 }
@@ -246,11 +280,6 @@ impl<T> IVec<T> {
         let range = 0..self.length;
         &mut self._buffer_mut()[range]
     }
-
-    pub unsafe fn free(&mut self) {
-        libc::free(self.ptr as *mut libc::c_void);
-        self._zero();
-    }
 }
 
 
@@ -269,10 +298,10 @@ impl<T> IndexMut<usize> for IVec<T> {
 }
 
 
-impl<T> Debug for IVec<T> {
+impl<T: Debug> Debug for IVec<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "ptr: {}, capacity: {}, len: {}, element_size: {}",
-                 self.ptr as usize, self.capacity, self.length, self.element_size)
+        writeln!(f, "ptr: {}, capacity: {}, len: {}, element_size: {}, content: {:?}",
+                 self.ptr as usize, self.capacity, self.length, self.element_size, self.as_slice())
     }
 }
 
@@ -306,7 +335,6 @@ mod tests {
 
         // test push
         for _ in 0..10 {
-            let capacity_before = vec.capacity;
             vec.push(monotonic);
             assert_eq!(monotonic as usize, vec.length);
             assert_eq!(monotonic, vec[(monotonic - 1) as usize]);
@@ -344,14 +372,14 @@ mod tests {
 
     #[test]
     fn test_struct_size() {
-        let mut vec = IVec::<i16>::new();
+        let vec = IVec::<i16>::new();
 
         assert_eq!(2, vec.element_size);
         assert_eq!(size_of::<usize>()*4, size_of::<IVec<i16>>());
 
         drop(vec);
 
-        let mut vec = IVec::<u128>::new();
+        let vec = IVec::<u128>::new();
         assert_eq!(16, vec.element_size);
         assert_eq!(size_of::<usize>()*4, size_of::<IVec<u128>>());
     }
@@ -362,7 +390,7 @@ mod tests {
         type TestType = i16;
         let mut vec = IVec::<TestType>::new();
 
-        unsafe { vec.free() };
+        unsafe { vec._free() };
         assert!(vec.ptr.is_null());
         assert_eq!(0, vec.length);
         assert_eq!(0, vec.capacity);
