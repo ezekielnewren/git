@@ -166,13 +166,15 @@ static int xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 	long i, nm, mlim;
 	ivec_u8 dis1;
 	ivec_u8 dis2;
-	u8 default_value = 0;
 
 	IVEC_INIT(dis1);
 	IVEC_INIT(dis2);
 
-	rust_ivec_resize_exact(&dis1, xe->xdf1.rchg_vec.length, &default_value);
-	rust_ivec_resize_exact(&dis2, xe->xdf2.rchg_vec.length, &default_value);
+	dis1.capacity = dis1.length = xe->xdf1.rchg_vec.length;
+	XDL_CALLOC_ARRAY(dis1.ptr, dis1.capacity);
+
+	dis2.capacity = dis2.length = xe->xdf2.rchg_vec.length;
+	XDL_CALLOC_ARRAY(dis2.ptr, dis2.capacity);
 
 	rust_ivec_reserve_exact(&xe->xdf1.rindex, xe->xdf1.record.length);
 	rust_ivec_reserve_exact(&xe->xdf2.rindex, xe->xdf2.record.length);
