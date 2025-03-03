@@ -36,70 +36,63 @@ impl<'a, T> Drop for Array<'a, T> {
 }
 
 
-struct MinimalPerfectHashBuilderNode<K> {
+struct Entry<K> {
     key: K,
-    hash: u64,
     mph: u64,
-    next: *mut MinimalPerfectHashBuilderNode<K>,
 }
 
 
 pub struct MinimalPerfectHashBuilder<'a, HE: HashAndEq<K>, K> {
-    he: HE,
+    meta: Array<'a, u64>,
+    data: Array<'a, Entry<K>>,
     mask: usize,
-    head: Array<'a, *mut MinimalPerfectHashBuilderNode<K>>,
-    entry: Arena<MinimalPerfectHashBuilderNode<K>>,
-    mph: u64,
+    he: HE,
+    monotonic: u64,
 }
 
 impl<'a, HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<'a, HE, K> {
 
     pub fn new(capacity: usize, inst: HE) -> Self {
-        let po2 = capacity.next_power_of_two();
+        let po2 = (capacity << 1).next_power_of_two();
         Self {
-            he: inst,
+            meta: Array::new(po2, true),
+            data: Array::new(po2, false),
             mask: po2 - 1,
-            head: Array::new(po2, true),
-            entry: Arena::with_capacity(capacity),
-            mph: 0,
+            he: inst,
+            monotonic: 0,
         }
     }
 
     pub fn hash(&mut self, key: &K) -> u64
     where K: Clone
     {
-        let hash = self.he.hash(&key);
-        let bucket = hash as usize & self.mask;
-        let mut cur = self.head.slice[bucket];
-        while !cur.is_null() {
-            let node = unsafe { &mut *cur };
-            if node.hash == hash && self.he.eq(&node.key, &key) {
-                break;
-            }
-
-            cur = node.next;
+        /*
+         * or with 1 to ensure valid hashes are never 0
+         */
+        let hash = self.he.hash(&key) | 1;
+        let start = hash as usize & self.mask;
+        let matchit = |v: (usize, &u64)| *v.1 == 0 || (*v.1 == hash && self.he.eq(&self.data.slice[v.0].key, key));
+        let mut position = self.meta.slice[start..].iter().enumerate().position(matchit);
+        if position.is_none() {
+            position = self.meta.slice[..start].iter().enumerate().position(matchit);
         }
+        let index = position.unwrap();
 
-        if cur.is_null() {
-            let out = self.mph;
-            let bucket = hash as usize & self.mask;
-            self.head.slice[bucket] = self.entry.alloc(MinimalPerfectHashBuilderNode {
-                hash,
+        if self.meta.slice[index] == 0 {
+            let mph = self.monotonic;
+            self.data.slice[index] = Entry {
                 key: key.clone(),
-                mph: self.mph,
-                next: self.head.slice[bucket],
-            });
-            self.mph += 1;
-            out
+                mph,
+            };
+            self.monotonic += 1;
+            mph
         } else {
-            unsafe { &mut *cur }.mph
+            self.data.slice[index].mph
         }
     }
 
     pub fn finish(self) -> usize {
-        let out = self.mph;
-        drop(self);
-        out as usize
+        self.monotonic as usize
     }
 }
 
@@ -116,19 +109,35 @@ pub trait HashAndEq<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::mphb::{HashAndEq, MinimalPerfectHashBuilder};
+    use xxhash_rust::xxh3::xxh3_64;
+    use crate::mphb::{Entry, HashAndEq, MinimalPerfectHashBuilder};
     use crate::xrecord::{xrecord_he, xrecord_t};
+
+
+    struct StringHE {}
+
+    impl HashAndEq<String> for StringHE {
+        fn hash(&self, key: &String) -> u64 {
+            xxh3_64(key.as_bytes())
+        }
+
+        fn eq(&self, lhs: &String, rhs: &String) -> bool {
+            lhs == rhs
+        }
+    }
 
     #[test]
     fn test_new() {
         let flags = 0;
 
-        let rec = xrecord_t::new("".as_bytes(), 1);
+        let _view = size_of::<Entry<String>>();
 
-        let he = xrecord_he::new(flags);
-        let mut lu = MinimalPerfectHashBuilder::<xrecord_he, xrecord_t>::new(500, he);
+        let key = String::from("apple");
 
-        lu.hash(&rec);
+        let he = StringHE{};
+        let mut lu = MinimalPerfectHashBuilder::<StringHE, String>::new(1, he);
+
+        lu.hash(&key);
 
         let mph_size = lu.finish();
     }
