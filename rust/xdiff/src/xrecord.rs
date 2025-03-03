@@ -13,43 +13,12 @@ pub struct xrecord_t {
     pub ptr: *const u8,
     pub size_no_eol: usize,
     pub size_with_eol: usize,
-    pub line_hash: u64,
-    pub flags: u64,
 }
 
 
 impl Debug for xrecord_t {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-impl PartialEq<Self> for xrecord_t {
-    fn eq(&self, other: &Self) -> bool {
-        debug_assert_eq!(self.flags, other.flags);
-        debug_assert_ne!(0, self.line_hash);
-        debug_assert_ne!(0, other.line_hash);
-
-        if self.line_hash != other.line_hash {
-            return false;
-        }
-
-        if (self.flags&XDF_WHITESPACE_FLAGS) == 0 {
-            self.as_ref() == other.as_ref()
-        } else {
-            let lhs = IterWhiteSpace::new(self.as_ref(), self.flags);
-            let rhs = IterWhiteSpace::new(other.as_ref(), other.flags);
-            chunked_iter_equal(lhs, rhs)
-        }
-    }
-}
-
-impl Eq for xrecord_t {}
-
-impl Hash for xrecord_t {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        debug_assert_ne!(0, self.line_hash);
-        state.write_u64(self.line_hash);
     }
 }
 
@@ -76,7 +45,7 @@ impl HashAndEq<xrecord_t> for xrecord_he {
                 state.finish()
             }
             #[cfg(not(debug_assertions))]
-            xxhash_rust::xxh3::xxh3_64(slice)
+            xxhash_rust::xxh3::xxh3_64(key.as_ref())
         } else {
             #[cfg(debug_assertions)]
             let mut state = DJB2a::default();
@@ -92,7 +61,13 @@ impl HashAndEq<xrecord_t> for xrecord_he {
     }
 
     fn eq(&self, lhs: &xrecord_t, rhs: &xrecord_t) -> bool {
-        todo!()
+        if (self.flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+            lhs.as_ref() == rhs.as_ref()
+        } else {
+            let lhs = IterWhiteSpace::new(lhs.as_ref(), self.flags);
+            let rhs = IterWhiteSpace::new(rhs.as_ref(), self.flags);
+            chunked_iter_equal(lhs, rhs)
+        }
     }
 }
 
@@ -122,13 +97,11 @@ impl xrecord_t {
         }
     }
 
-    pub fn new(slice: &[u8], eol_len: usize, flags: u64) -> Self {
+    pub fn new(ptr: *const u8, no_eol: usize, with_eol: usize) -> Self {
         Self {
-            ptr: slice.as_ptr(),
-            size_no_eol: slice.len(),
-            size_with_eol: slice.len() + eol_len,
-            line_hash: Self::hash(slice, flags),
-            flags,
+            ptr,
+            size_no_eol: no_eol,
+            size_with_eol: with_eol,
         }
     }
 
@@ -152,20 +125,20 @@ impl xrecord_t {
         }
     }
 
-    pub fn is_blank_line(&self) -> bool {
-        if (self.flags & XDF_WHITESPACE_FLAGS) == 0 {
+    pub fn is_blank_line(&self, flags: u64) -> bool {
+        if (flags & XDF_WHITESPACE_FLAGS) == 0 {
             return self.as_ref().len() == 0;
         } else {
-            for _ in self.iter() {
+            for _ in self.iter(flags) {
                 return false;
             }
         }
         true
     }
 
-    pub fn iter(&self) -> IterWhiteSpace {
+    pub fn iter(&self, flags: u64) -> IterWhiteSpace {
         let line = self.as_ref();
-        IterWhiteSpace::new(line, self.flags)
+        IterWhiteSpace::new(line, flags)
     }
 
 }

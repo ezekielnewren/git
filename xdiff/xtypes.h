@@ -46,7 +46,6 @@ typedef struct {
 } xrecord_t;
 
 DEFINE_IVEC_TYPE(xrecord_t, xrecord_t);
-DEFINE_IVEC_TYPE(xrecord_t*, xrecord_ptr_t);
 
 typedef struct s_xdfile {
 	ivec_u64 minimal_perfect_hash;

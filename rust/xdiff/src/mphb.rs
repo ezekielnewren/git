@@ -123,7 +123,7 @@ mod tests {
     fn test_new() {
         let flags = 0;
 
-        let rec = xrecord_t::new("".as_bytes(), 1, flags);
+        let rec = xrecord_t::new("".as_bytes(), 1);
 
         let he = xrecord_he::new(flags);
         let mut lu = MinimalPerfectHashBuilder::<xrecord_he, xrecord_t>::new(500, he);

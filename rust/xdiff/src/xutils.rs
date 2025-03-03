@@ -5,56 +5,53 @@ use std::hash::{BuildHasher, Hash};
 use std::ops::{Range, RangeBounds};
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
 
-pub fn line_length(data: &[u8], ignore_cr_at_eol: bool) -> (usize, usize) {
-	let (mut no_eol, mut with_eol) = (data.len(), data.len());
-	for i in 0..data.len() {
-		if data[i] == b'\n' {
-			no_eol = i;
-			with_eol = i+1;
-			break;
-		}
-	}
 
-	if ignore_cr_at_eol && 0 < no_eol && data[no_eol - 1] == b'\r' {
-		no_eol -= 1;
-	}
-
-	(no_eol, with_eol)
+pub struct LineReader {
+	cur: *const u8,
+	size: usize,
 }
 
 
-pub struct LineReader<'a> {
-	content: &'a [u8],
-	off: usize,
-	ignore_cr_at_eol: bool,
-}
+impl LineReader {
 
-impl<'a> LineReader<'a> {
-	pub fn new(content: &'a [u8], ignore_cr_at_eol: bool) -> Self {
+	pub fn new(ptr: *const u8, size: usize) -> Self {
 		Self {
-			content,
-			off: 0,
-			ignore_cr_at_eol,
+			cur: ptr,
+			size,
 		}
+	}
+
+	pub fn next(&mut self, cur: &mut *const u8, no_eol: &mut usize, with_eol: &mut usize) -> bool {
+		if self.size == 0 {
+			return false;
+		}
+
+		*cur = self.cur;
+		self.cur = unsafe {
+			libc::memchr(self.cur as *const libc::c_void,
+						 b'\n' as libc::c_int, self.size)
+		} as *const u8;
+
+		if !self.cur.is_null() {
+			*no_eol = unsafe { self.cur.sub(*cur as usize) } as usize;
+			*with_eol = *no_eol + 1;
+			self.size -= *with_eol;
+			self.cur = unsafe { self.cur.add(1) };
+		} else {
+			*no_eol = self.size;
+			*with_eol = self.size;
+			self.size = 0;
+		}
+
+		true
 	}
 }
 
 
-impl<'a> Iterator for LineReader<'a> {
-	type Item = (&'a [u8], usize);
 
-	fn next(&mut self) -> Option<Self::Item> {
-		if self.off == self.content.len() {
-			return None;
-		}
 
-		let (no_eol, with_eol) = line_length(&self.content[self.off..], self.ignore_cr_at_eol);
-		let slice = &self.content[self.off..self.off+no_eol];
-		self.off += with_eol;
-		let eol_len = with_eol-no_eol;
-		Some((slice, eol_len))
-	}
-}
+
+
 
 pub(crate) fn xdl_bogosqrt(mut n: u64) -> u64 {
 	/*
