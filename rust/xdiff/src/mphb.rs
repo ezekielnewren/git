@@ -53,7 +53,7 @@ pub struct MinimalPerfectHashBuilder<HE: HashAndEq<K>, K> {
 impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
 
     pub fn new(capacity: usize, inst: HE) -> Self {
-        let po2 = (capacity << 1).next_power_of_two();
+        let po2 = (capacity*2).next_power_of_two();
         let mut it = Self {
             meta: vec![0u64; po2],
             data: Vec::new(),
@@ -66,10 +66,10 @@ impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
         it
     }
 
-    fn put(&mut self, key: &K, hash: u64, index: &mut usize, range: Range<usize>)
+    fn put(&mut self, key: &K, hash: u64, index: &mut usize, it: Box<dyn Iterator<Item = usize>>)
     where K: Clone
     {
-        for i in range {
+        for i in it {
             if self.meta[i] == 0 {
                 self.meta[i] = hash;
                 let mph = self.monotonic;
@@ -97,9 +97,9 @@ impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
         let hash = self.he.hash(&key) | 1;
         let start = hash as usize & self.mask;
         let mut index = INVALID_INDEX;
-        self.put(key, hash, &mut index, start..self.meta.len());
+        self.put(key, hash, &mut index, Box::new((start..self.meta.len()).into_iter()));
         if index == INVALID_INDEX {
-            self.put(key, hash, &mut index, 0..start);
+            self.put(key, hash, &mut index, Box::new((0..start).rev().into_iter()));
         }
 
         if index == INVALID_INDEX {
