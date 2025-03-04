@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use interop::ivec::IVec;
-use crate::mphb::MinimalPerfectHashBuilder;
+use crate::mphb::MPHB;
 use crate::xdiff::{LINE_SHIFT, XDF_HISTOGRAM_DIFF, XDF_IGNORE_CR_AT_EOL, XDF_PATIENCE_DIFF, XDF_WHITESPACE_FLAGS};
 use crate::xrecord::{xrecord_he, xrecord_t};
 use crate::xtypes::ConsiderLine::*;
@@ -270,7 +270,8 @@ impl xdfenv_t {
 
 	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>, flags: u64) {
 		let capacity = self.xdf1.record.len() + self.xdf2.record.len();
-		let mut mphb = MinimalPerfectHashBuilder::<xrecord_he, xrecord_t>::new(capacity, xrecord_he::new(flags));
+		let he = xrecord_he::new(flags);
+		let mut mphb = MPHB::<xrecord_t, xrecord_he>::new(capacity, &he);
 
 		for rec in self.xdf1.record.as_slice() {
 			self.xdf1.minimal_perfect_hash.push(mphb.hash(rec));
