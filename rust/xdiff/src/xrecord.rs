@@ -73,30 +73,6 @@ impl HashAndEq<xrecord_t> for xrecord_he {
 
 impl xrecord_t {
 
-    pub fn hash(slice: &[u8], flags: u64) -> u64 {
-        if (flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
-            #[cfg(debug_assertions)]
-            {
-                let mut state = DJB2a::default();
-                state.write(slice);
-                state.finish()
-            }
-            #[cfg(not(debug_assertions))]
-            xxhash_rust::xxh3::xxh3_64(slice)
-        } else {
-            #[cfg(debug_assertions)]
-            let mut state = DJB2a::default();
-            #[cfg(not(debug_assertions))]
-            let mut state = xxhash_rust::xxh3::Xxh3::default();
-            for run in IterWhiteSpace::new(slice, flags) {
-                #[cfg(test)]
-                let _view = unsafe { std::str::from_utf8_unchecked(run) };
-                state.write(run);
-            }
-            state.finish()
-        }
-    }
-
     pub fn new(ptr: *const u8, no_eol: usize, with_eol: usize) -> Self {
         Self {
             ptr,

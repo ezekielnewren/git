@@ -311,10 +311,32 @@ static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdlo
 
 
 #ifdef WITH_RUST
+extern int rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, ivec_xdloccurrence_t *occ_ptr, u64 flags, xdfenv_t *xe);
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
+	ivec_xdloccurrence_t occurrences;
+	ivec_xdloccurrence_t *occ_ptr;
+	IVEC_INIT(occurrences);
 
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		occ_ptr = &occurrences;
+	} else {
+		occ_ptr = NULL;
+	}
+
+	xdl_prepare_ctx(mf1, &xe->xdf1, flags);
+	xdl_prepare_ctx(mf2, &xe->xdf2, flags);
+
+	xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
+
+
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(xe, &occurrences);
+	}
+
+	return 0;
+}
 #else
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags,
-		    xdfenv_t *xe) {
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	ivec_xdloccurrence_t occurrences;
 	ivec_xdloccurrence_t *occ_ptr;
 	IVEC_INIT(occurrences);

@@ -268,7 +268,7 @@ impl xdfenv_t {
 	// }
 
 
-	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: Option<&mut Vec<Occurrence>>, flags: u64) {
+	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>, flags: u64) {
 		let capacity = self.xdf1.record.len() + self.xdf2.record.len();
 		let mut mphb = MinimalPerfectHashBuilder::<xrecord_he, xrecord_t>::new(capacity, xrecord_he::new(flags));
 
@@ -313,7 +313,7 @@ impl xdfenv_t {
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		let mut occurrence: Vec<Occurrence> = Vec::new();
+		let mut occurrence: IVec<Occurrence> = IVec::new();
 		let mut occ = None;
 		if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
 			occ = Some(&mut occurrence);
