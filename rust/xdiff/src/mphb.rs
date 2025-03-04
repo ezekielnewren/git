@@ -109,9 +109,21 @@ pub trait HashAndEq<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::hash::Hash;
     use xxhash_rust::xxh3::xxh3_64;
     use crate::mphb::{Entry, HashAndEq, MinimalPerfectHashBuilder};
     use crate::xrecord::{xrecord_he, xrecord_t};
+
+    const FURNITURE: [&str; 40] = [
+        "Chair", "Table", "Sofa", "Couch", "Bench", "Stool", "Recliner", "Armchair",
+        "Ottoman", "Loveseat", "Desk", "Bookshelf", "Cabinet", "Dresser", "Wardrobe",
+        "Nightstand", "Bed", "Headboard", "Bunk bed", "Futon", "Crib", "High chair",
+        "Rocking chair", "Barstool", "Chaise lounge", "Side table", "Coffee table",
+        "End table", "Dining table", "Console table", "Buffet", "Hutch", "TV stand",
+        "Entertainment center", "Vanity", "Workbench", "Filing cabinet",
+        "Chest of drawers", "Curio cabinet", "Hall tree"
+    ];
 
 
     struct StringHE {}
@@ -126,20 +138,48 @@ mod tests {
         }
     }
 
+
+    struct MPHBSimple<K: Hash + Eq> {
+        map: HashMap<K, u64>,
+        monotonic: u64,
+    }
+
+    impl<K: Hash + Eq> MPHBSimple<K> {
+        fn hash(&mut self, key: &K) -> u64
+        where K: Clone
+        {
+            if !self.map.contains_key(key) {
+                let mph = self.monotonic;
+                self.monotonic += 1;
+                self.map.insert(key.clone(), mph);
+                mph
+            } else {
+                self.map[key]
+            }
+        }
+    }
+
+
     #[test]
     fn test_new() {
         let flags = 0;
 
-        let _view = size_of::<Entry<String>>();
-
-        let key = String::from("apple");
+        let mut mphb_simple = MPHBSimple {
+            map: HashMap::new(),
+            monotonic: 0,
+        };
 
         let he = StringHE{};
-        let mut lu = MinimalPerfectHashBuilder::<StringHE, String>::new(1, he);
-
-        lu.hash(&key);
+        let mut lu = MinimalPerfectHashBuilder::<StringHE, String>::new(FURNITURE.len(), he);
+        for v in FURNITURE.iter() {
+            let key = String::from(*v);
+            let expected = (key.clone(), mphb_simple.hash(&key));
+            let actual = (key.clone(), lu.hash(&key));
+            assert_eq!(expected, actual);
+        }
 
         let mph_size = lu.finish();
+        assert_eq!(mphb_simple.map.len(), mph_size);
     }
 
 }
