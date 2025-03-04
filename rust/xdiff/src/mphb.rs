@@ -1,39 +1,39 @@
 use std::alloc::{Layout};
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Range};
 use typed_arena::Arena;
+use crate::xdiff::INVALID_INDEX;
 
-
-pub struct Array<'a, T> {
-    slice: &'a mut [T],
-}
-
-
-impl<'a, T> Array<'a, T> {
-
-    pub fn new(capacity: usize, zero: bool) -> Self {
-        let lay = Layout::array::<T>(capacity).unwrap();
-        unsafe {
-            let ptr = if zero {
-                std::alloc::alloc_zeroed(lay)
-            } else {
-                std::alloc::alloc(lay)
-            };
-            Self {
-                slice: std::slice::from_raw_parts_mut(ptr as *mut T, capacity),
-            }
-        }
-    }
-
-}
-
-impl<'a, T> Drop for Array<'a, T> {
-    fn drop(&mut self) {
-        let lay = Layout::array::<T>(self.slice.len()).unwrap();
-        unsafe {
-            std::alloc::dealloc(self.slice.as_mut_ptr() as *mut u8, lay);
-        }
-    }
-}
+// pub struct Array<'a, T> {
+//     slice: &'a mut [T],
+// }
+//
+//
+// impl<'a, T> Array<'a, T> {
+//
+//     pub fn new(capacity: usize, zero: bool) -> Self {
+//         let lay = Layout::array::<T>(capacity).unwrap();
+//         unsafe {
+//             let ptr = if zero {
+//                 std::alloc::alloc_zeroed(lay)
+//             } else {
+//                 std::alloc::alloc(lay)
+//             };
+//             Self {
+//                 slice: std::slice::from_raw_parts_mut(ptr as *mut T, capacity),
+//             }
+//         }
+//     }
+//
+// }
+//
+// impl<'a, T> Drop for Array<'a, T> {
+//     fn drop(&mut self) {
+//         let lay = Layout::array::<T>(self.slice.len()).unwrap();
+//         unsafe {
+//             std::alloc::dealloc(self.slice.as_mut_ptr() as *mut u8, lay);
+//         }
+//     }
+// }
 
 
 struct Entry<K> {
@@ -42,24 +42,49 @@ struct Entry<K> {
 }
 
 
-pub struct MinimalPerfectHashBuilder<'a, HE: HashAndEq<K>, K> {
-    meta: Array<'a, u64>,
-    data: Array<'a, Entry<K>>,
+pub struct MinimalPerfectHashBuilder<HE: HashAndEq<K>, K> {
+    meta: Vec<u64>,
+    data: Vec<Entry<K>>,
     mask: usize,
     he: HE,
     monotonic: u64,
 }
 
-impl<'a, HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<'a, HE, K> {
+impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
 
     pub fn new(capacity: usize, inst: HE) -> Self {
         let po2 = (capacity << 1).next_power_of_two();
-        Self {
-            meta: Array::new(po2, true),
-            data: Array::new(po2, false),
+        let mut it = Self {
+            meta: vec![0u64; po2],
+            data: Vec::new(),
             mask: po2 - 1,
             he: inst,
             monotonic: 0,
+        };
+        it.data.reserve_exact(po2);
+        unsafe { it.data.set_len(po2) };
+        it
+    }
+
+    fn put(&mut self, key: &K, hash: u64, index: &mut usize, range: Range<usize>)
+    where K: Clone
+    {
+        for i in range {
+            if self.meta[i] == 0 {
+                self.meta[i] = hash;
+                let mph = self.monotonic;
+                self.monotonic += 1;
+                self.data[i] = Entry {
+                    key: key.clone(),
+                    mph,
+                };
+                *index = i;
+                return;
+            }
+            if self.meta[i] == hash && self.he.eq(&self.data[i].key, key) {
+                *index = i;
+                return;
+            }
         }
     }
 
@@ -71,24 +96,17 @@ impl<'a, HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<'a, HE, K> {
          */
         let hash = self.he.hash(&key) | 1;
         let start = hash as usize & self.mask;
-        let matchit = |v: (usize, &u64)| *v.1 == 0 || (*v.1 == hash && self.he.eq(&self.data.slice[v.0].key, key));
-        let mut position = self.meta.slice[start..].iter().enumerate().position(matchit);
-        if position.is_none() {
-            position = self.meta.slice[..start].iter().enumerate().position(matchit);
+        let mut index = INVALID_INDEX;
+        self.put(key, hash, &mut index, start..self.meta.len());
+        if index == INVALID_INDEX {
+            self.put(key, hash, &mut index, 0..start);
         }
-        let index = position.unwrap();
 
-        if self.meta.slice[index] == 0 {
-            let mph = self.monotonic;
-            self.data.slice[index] = Entry {
-                key: key.clone(),
-                mph,
-            };
-            self.monotonic += 1;
-            mph
-        } else {
-            self.data.slice[index].mph
+        if index == INVALID_INDEX {
+            panic!("MinimalPerfectHashBuilder ran out of memory");
         }
+
+        self.data[index].mph
     }
 
     pub fn finish(self) -> usize {
@@ -115,16 +133,19 @@ mod tests {
     use crate::mphb::{Entry, HashAndEq, MinimalPerfectHashBuilder};
     use crate::xrecord::{xrecord_he, xrecord_t};
 
-    const FURNITURE: [&str; 40] = [
+    const FURNITURE: [&str; 41] = [
         "Chair", "Table", "Sofa", "Couch", "Bench", "Stool", "Recliner", "Armchair",
         "Ottoman", "Loveseat", "Desk", "Bookshelf", "Cabinet", "Dresser", "Wardrobe",
         "Nightstand", "Bed", "Headboard", "Bunk bed", "Futon", "Crib", "High chair",
         "Rocking chair", "Barstool", "Chaise lounge", "Side table", "Coffee table",
-        "End table", "Dining table", "Console table", "Buffet", "Hutch", "TV stand",
+        "End table", "Dining table", "Dining table", "Console table", "Buffet", "Hutch", "TV stand",
         "Entertainment center", "Vanity", "Workbench", "Filing cabinet",
         "Chest of drawers", "Curio cabinet", "Hall tree"
     ];
 
+    const FRUIT: [&str; 8] = [
+        "apple", "apple", "apple", "cherry", "cherry", "orange", "apple", "cherry"
+    ];
 
     struct StringHE {}
 
@@ -164,22 +185,24 @@ mod tests {
     fn test_new() {
         let flags = 0;
 
-        let mut mphb_simple = MPHBSimple {
-            map: HashMap::new(),
-            monotonic: 0,
-        };
+        for list in vec![FRUIT.to_vec(), FURNITURE.to_vec()] {
+            let mut mphb_simple = MPHBSimple {
+                map: HashMap::new(),
+                monotonic: 0,
+            };
 
-        let he = StringHE{};
-        let mut lu = MinimalPerfectHashBuilder::<StringHE, String>::new(FURNITURE.len(), he);
-        for v in FURNITURE.iter() {
-            let key = String::from(*v);
-            let expected = (key.clone(), mphb_simple.hash(&key));
-            let actual = (key.clone(), lu.hash(&key));
-            assert_eq!(expected, actual);
+            let he = StringHE{};
+            let mut lu = MinimalPerfectHashBuilder::<StringHE, String>::new(list.len(), he);
+            for v in list.iter() {
+                let key = String::from(*v);
+                let expected = (key.clone(), mphb_simple.hash(&key));
+                let actual = (key.clone(), lu.hash(&key));
+                assert_eq!(expected, actual);
+            }
+
+            let mph_size = lu.finish();
+            assert_eq!(mphb_simple.map.len(), mph_size);
         }
-
-        let mph_size = lu.finish();
-        assert_eq!(mphb_simple.map.len(), mph_size);
     }
 
 }
