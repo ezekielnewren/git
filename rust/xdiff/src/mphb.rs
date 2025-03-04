@@ -36,21 +36,21 @@ use crate::xdiff::INVALID_INDEX;
 // }
 
 
-struct Entry<K> {
-    key: K,
+struct Entry<'a, K> {
+    key: &'a K,
     mph: u64,
 }
 
 
-pub struct MinimalPerfectHashBuilder<HE: HashAndEq<K>, K> {
+pub struct MinimalPerfectHashBuilder<'a, HE: HashAndEq<K>, K> {
     meta: Vec<u64>,
-    data: Vec<Entry<K>>,
+    data: Vec<Entry<'a, K>>,
     mask: usize,
     he: HE,
     monotonic: u64,
 }
 
-impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
+impl<'a, HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<'a, HE, K> {
 
     pub fn new(capacity: usize, inst: HE) -> Self {
         let po2 = (capacity*2).next_power_of_two();
@@ -66,16 +66,14 @@ impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
         it
     }
 
-    fn put(&mut self, key: &K, hash: u64, index: &mut usize, it: Box<dyn Iterator<Item = usize>>)
-    where K: Clone
-    {
+    fn put(&mut self, key: &'a K, hash: u64, index: &mut usize, it: Box<dyn Iterator<Item = usize>>) {
         for i in it {
             if self.meta[i] == 0 {
                 self.meta[i] = hash;
                 let mph = self.monotonic;
                 self.monotonic += 1;
                 self.data[i] = Entry {
-                    key: key.clone(),
+                    key,
                     mph,
                 };
                 *index = i;
@@ -88,7 +86,7 @@ impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
         }
     }
 
-    pub fn hash(&mut self, key: &K) -> u64
+    pub fn hash(&mut self, key: &'a K) -> u64
     where K: Clone
     {
         /*
@@ -109,7 +107,7 @@ impl<HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<HE, K> {
         self.data[index].mph
     }
 
-    pub fn finish(self) -> usize {
+    pub fn finish(mut self) -> usize {
         self.monotonic as usize
     }
 }
@@ -129,7 +127,10 @@ pub trait HashAndEq<T> {
 mod tests {
     use std::collections::HashMap;
     use std::hash::Hash;
+    use std::io::BufRead;
+    use std::path::PathBuf;
     use xxhash_rust::xxh3::xxh3_64;
+    use crate::mock::helper::read_test_file;
     use crate::mphb::{Entry, HashAndEq, MinimalPerfectHashBuilder};
     use crate::xrecord::{xrecord_he, xrecord_t};
 
@@ -185,7 +186,14 @@ mod tests {
     fn test_new() {
         let flags = 0;
 
-        for list in vec![FRUIT.to_vec(), FURNITURE.to_vec()] {
+        let mut list_vec: Vec<Vec<String>> = Vec::new();
+        list_vec.push(FRUIT.iter().map(|s| s.to_string()).collect());
+        list_vec.push(FURNITURE.iter().map(|s| s.to_string()).collect());
+        let data = read_test_file(&PathBuf::from("xhistogram/gitdump.txt")).unwrap();
+        let dump: Vec<String> = data.lines().map(|v| v.unwrap()).collect();
+        list_vec.push(dump);
+
+        for list in list_vec {
             let mut mphb_simple = MPHBSimple {
                 map: HashMap::new(),
                 monotonic: 0,
@@ -193,8 +201,7 @@ mod tests {
 
             let he = StringHE{};
             let mut lu = MinimalPerfectHashBuilder::<StringHE, String>::new(list.len(), he);
-            for v in list.iter() {
-                let key = String::from(*v);
+            for key in list.iter() {
                 let expected = (key.clone(), mphb_simple.hash(&key));
                 let actual = (key.clone(), lu.hash(&key));
                 assert_eq!(expected, actual);
