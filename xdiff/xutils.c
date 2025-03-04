@@ -601,6 +601,9 @@ void xdl_whitespace_iter_assert_done(struct xwhitespaceiter_t* it) {
 	it->flags = 0;
 }
 
+#ifdef WITH_RUST
+extern u64 xdl_line_hash(u8 const* ptr, usize line_size_no_eol, u64 flags);
+#else
 u64 xdl_line_hash(u8 const* ptr, usize line_size_no_eol, u64 flags) {
 	if ((flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
 		u64 hash = 5381;
@@ -626,6 +629,7 @@ u64 xdl_line_hash(u8 const* ptr, usize line_size_no_eol, u64 flags) {
 		return hash;
 	}
 }
+#endif
 
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags) {
 	if ((flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
