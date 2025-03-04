@@ -310,27 +310,31 @@ static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdlo
 }
 
 
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
+#ifdef WITH_RUST
+
+#else
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags,
 		    xdfenv_t *xe) {
 	ivec_xdloccurrence_t occurrences;
 	ivec_xdloccurrence_t *occ_ptr;
 	IVEC_INIT(occurrences);
 
-	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		occ_ptr = &occurrences;
 	} else {
 		occ_ptr = NULL;
 	}
 
-	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
-	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
+	xdl_prepare_ctx(mf1, &xe->xdf1, flags);
+	xdl_prepare_ctx(mf2, &xe->xdf2, flags);
 
-	xdl_construct_mph_and_occurrences(xe, xpp->flags, occ_ptr);
+	xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
 
 
-	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		xdl_optimize_ctxs(xe, &occurrences);
 	}
 
 	return 0;
 }
+#endif
