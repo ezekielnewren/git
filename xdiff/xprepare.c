@@ -261,6 +261,9 @@ static int xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 	return 0;
 }
 
+#ifdef WITH_RUST
+extern void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence);
+#else
 static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
 	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length, flags);
@@ -308,7 +311,7 @@ static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdlo
 		occurrence->ptr[mph].file2 += 1;
 	}
 }
-
+#endif
 
 #ifdef WITH_RUST
 extern int rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, ivec_xdloccurrence_t *occ_ptr, u64 flags, xdfenv_t *xe);

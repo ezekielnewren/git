@@ -25,6 +25,20 @@ unsafe extern "C" fn xdl_prepare_ctx(_mf: *const mmfile_t, _xdf: *mut xdfile_t, 
 }
 
 #[no_mangle]
+unsafe extern "C" fn xdl_construct_mph_and_occurrences(xe: *mut xdfenv_t, flags: u64, occurrence: *mut IVec<Occurrence>) {
+    let xe = xdfenv_t::from_raw(xe, false);
+    let occ = if occurrence.is_null() {
+        None
+    } else {
+        Some(IVec::from_raw_mut(occurrence))
+    };
+
+    xe.construct_mph_and_occurrences(occ, flags);
+
+}
+
+
+#[no_mangle]
 unsafe extern "C" fn rust_xdl_prepare_env(mf1: *const mmfile_t, mf2: *const mmfile_t, occ: *mut IVec<Occurrence>, flags: u64, xe: *mut xdfenv_t) -> i32 {
     let mf1 = mmfile_t::from_raw(mf1);
     let mf2 = mmfile_t::from_raw(mf2);
