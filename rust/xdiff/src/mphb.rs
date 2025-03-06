@@ -1,158 +1,333 @@
 use std::alloc::{Layout};
+use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher, Hash, Hasher, RandomState};
+use std::marker::PhantomData;
 use std::ops::{Index, IndexMut, Range};
-use typed_arena::Arena;
+use xxhash_rust::xxh3::Xxh3Builder;
 use crate::xdiff::INVALID_INDEX;
+use crate::xrecord::xrecord_t;
 
-// pub struct Array<'a, T> {
-//     slice: &'a mut [T],
-// }
-//
-//
-// impl<'a, T> Array<'a, T> {
-//
-//     pub fn new(capacity: usize, zero: bool) -> Self {
-//         let lay = Layout::array::<T>(capacity).unwrap();
-//         unsafe {
-//             let ptr = if zero {
-//                 std::alloc::alloc_zeroed(lay)
-//             } else {
-//                 std::alloc::alloc(lay)
-//             };
-//             Self {
-//                 slice: std::slice::from_raw_parts_mut(ptr as *mut T, capacity),
-//             }
-//         }
-//     }
-//
-// }
-//
-// impl<'a, T> Drop for Array<'a, T> {
-//     fn drop(&mut self) {
-//         let lay = Layout::array::<T>(self.slice.len()).unwrap();
-//         unsafe {
-//             std::alloc::dealloc(self.slice.as_mut_ptr() as *mut u8, lay);
-//         }
-//     }
-// }
-//
-//
-// struct Entry<'a, K> {
-//     key: &'a K,
-//     mph: u64,
-// }
-//
-//
-// pub struct MinimalPerfectHashBuilder<'a, HE: HashAndEq<K>, K> {
-//     meta: Vec<u64>,
-//     data: Vec<Entry<'a, K>>,
-//     mask: usize,
-//     he: HE,
-//     monotonic: u64,
-// }
-//
-// impl<'a, HE: HashAndEq<K>, K> MinimalPerfectHashBuilder<'a, HE, K> {
-//
-//     pub fn new(capacity: usize, inst: HE) -> Self {
-//         let po2 = (capacity*2).next_power_of_two();
-//         let mut it = Self {
-//             meta: vec![0u64; po2],
-//             data: Vec::new(),
-//             mask: po2 - 1,
-//             he: inst,
-//             monotonic: 0,
-//         };
-//         it.data.reserve_exact(po2);
-//         unsafe { it.data.set_len(po2) };
-//         it
-//     }
-//
-//     fn put(&mut self, key: &'a K, hash: u64, index: &mut usize, it: Box<dyn Iterator<Item = usize>>) {
-//         for i in it {
-//             if self.meta[i] == 0 {
-//                 self.meta[i] = hash;
-//                 let mph = self.monotonic;
-//                 self.monotonic += 1;
-//                 self.data[i] = Entry {
-//                     key,
-//                     mph,
-//                 };
-//                 *index = i;
-//                 return;
-//             }
-//             if self.meta[i] == hash && self.he.eq(&self.data[i].key, key) {
-//                 *index = i;
-//                 return;
-//             }
-//         }
-//     }
-//
-//     pub fn hash(&mut self, key: &'a K) -> u64
-//     where K: Clone
-//     {
-//         /*
-//          * or with 1 to ensure valid hashes are never 0
-//          */
-//         let hash = self.he.hash(&key) | 1;
-//         let start = hash as usize & self.mask;
-//         let mut index = INVALID_INDEX;
-//         self.put(key, hash, &mut index, Box::new((start..self.meta.len()).into_iter()));
-//         if index == INVALID_INDEX {
-//             self.put(key, hash, &mut index, Box::new((0..start).rev().into_iter()));
-//         }
-//
-//         if index == INVALID_INDEX {
-//             panic!("MinimalPerfectHashBuilder ran out of memory");
-//         }
-//
-//         self.data[index].mph
-//     }
-//
-//     pub fn finish(mut self) -> usize {
-//         self.monotonic as usize
-//     }
-// }
+pub trait HashEq<K> {
 
+    fn hash(&self, key: &K) -> u64;
 
-pub trait HashAndEq<T> {
-
-    fn hash(&self, key: &T) -> u64;
-
-    fn eq(&self, lhs: &T, rhs: &T) -> bool;
+    fn eq(&self, lhs: &K, rhs: &K) -> bool;
 
 }
 
 
-pub struct KeyWrapper<'a, K, HE: HashAndEq<K>> {
+pub trait Comparator<T: Ord> {
+    fn cmp(lhs: &T, rhs: &T) -> Ordering;
+}
+
+enum ProbeResult {
+    Found(usize),
+    Empty(usize),
+    OutOfMemory,
+}
+
+struct Entry<K, V> {
+    key: K,
+    value: V,
+}
+
+
+pub struct FixedMap<'a, K, V, HE: HashEq<K>> {
+    meta: &'a mut [u64],
+    data: &'a mut [Entry<K, V>],
+    meta_layout: Layout,
+    data_layout: Layout,
+    size: usize,
+    mask: usize,
+    he: HE,
+}
+
+
+impl<'a, K, V, HE: HashEq<K>> Drop for FixedMap<'a, K, V, HE> {
+    fn drop(&mut self) {
+        unsafe {
+            if std::mem::needs_drop::<V>() {
+                for i in 0..self.meta.len() {
+                    if self.meta[i] != 0 {
+                        std::ptr::drop_in_place(&mut self.data[i]);
+                    }
+                }
+            }
+
+            std::alloc::dealloc(self.meta.as_mut_ptr() as *mut u8, self.meta_layout);
+            std::alloc::dealloc(self.data.as_mut_ptr() as *mut u8, self.data_layout);
+        }
+    }
+}
+
+
+impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
+
+    pub fn with_capacity_and_hash_eq(capacity: usize, inst: HE) -> Self
+    {
+        let po2 = (capacity*2).next_power_of_two();
+        let meta_layout = Layout::array::<u64>(po2).unwrap();
+        let data_layout = Layout::array::<Entry<K, V>>(po2).unwrap();
+
+        let ptr1 = unsafe { std::alloc::alloc_zeroed(meta_layout) };
+        let ptr2 = unsafe { std::alloc::alloc(data_layout) };
+
+        Self {
+            meta: unsafe { std::slice::from_raw_parts_mut(ptr1 as *mut u64, po2) },
+            data: unsafe { std::slice::from_raw_parts_mut(ptr2 as *mut Entry<K, V>, po2) },
+            meta_layout,
+            data_layout,
+            size: 0,
+            mask: po2 - 1,
+            he: inst,
+        }
+    }
+
+
+    fn hash(&self, key: &K) -> u64 {
+        /*
+         * or with 1 << 63 to ensure valid hashes are never 0
+         */
+        self.he.hash(&key) | (1 << 63)
+    }
+
+    fn probe_slots(&self, key: &K, hash: u64, range: Range<usize>) -> Result<usize, usize> {
+        for i in range {
+            match self.meta[i] {
+                0 => return Err(i),
+                h if h == hash && self.he.eq(&self.data[i].key, key) => return Ok(i),
+                _ => continue,
+            }
+        }
+        Err(INVALID_INDEX)
+    }
+
+    fn find_entry(&self, key: &K, hash: u64) -> ProbeResult {
+        let start = hash as usize & self.mask;
+        let mut index = self.probe_slots(key, hash, start..self.meta.len());
+        if let Err(i) = index {
+            if i == INVALID_INDEX {
+                index = self.probe_slots(key, hash, 0..start);
+            }
+        }
+        match index {
+            Ok(i) => ProbeResult::Found(i),
+            Err(i) => {
+                if i == INVALID_INDEX {
+                    ProbeResult::OutOfMemory
+                } else {
+                    ProbeResult::Empty(i)
+                }
+            }
+        }
+    }
+
+    fn overwrite(&mut self, index: usize, hash: u64, key: K, value: V) {
+        self.meta[index] = hash;
+        unsafe {
+            std::ptr::write(&mut self.data[index], Entry {
+                key,
+                value,
+            });
+        }
+        self.size += 1;
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V> {
+        let hash = self.hash(key);
+        let index = self.find_entry(key, hash);
+        match index {
+            ProbeResult::Found(i) => Some(&self.data[i].value),
+            _ => None,
+        }
+    }
+
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        let hash = self.hash(key);
+        let index = self.find_entry(key, hash);
+        match index {
+            ProbeResult::Found(i) => Some(&mut self.data[i].value),
+            _ => None,
+        }
+    }
+
+    pub fn get_or_insert(&mut self, key: &K, value: V) -> &mut V
+    where K: Clone, V: Default
+    {
+        let hash = self.hash(key);
+        let index = self.find_entry(key, hash);
+        match index {
+            ProbeResult::Found(i) => &mut self.data[i].value,
+            ProbeResult::Empty(i) => {
+                self.overwrite(i, hash, key.clone(), value);
+                &mut self.data[i].value
+            }
+            ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
+        }
+
+    }
+
+    pub fn get_or_default(&mut self, key: &K) -> &mut V
+    where K: Clone, V: Default
+    {
+        let hash = self.hash(key);
+        let index = self.find_entry(key, hash);
+        match index {
+            ProbeResult::Found(i) => &mut self.data[i].value,
+            ProbeResult::Empty(i) => {
+                self.overwrite(i, hash, key.clone(), V::default());
+                &mut self.data[i].value
+            }
+            ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
+        }
+
+    }
+
+    pub fn insert(&mut self, key: &K, value: V)
+    where K: Clone
+    {
+        let hash = self.hash(key);
+        let index = self.find_entry(key, hash);
+        match index {
+            ProbeResult::Found(i) => {
+                self.data[i].value = value;
+            }
+            ProbeResult::Empty(i) => {
+                self.overwrite(i, hash, key.clone(), value);
+            }
+            ProbeResult::OutOfMemory => panic!("OATable ran out of memory"),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+}
+
+impl<'a, K: Hash + Eq, V> FixedMap<'a, K, V, DefaultHashEq<K>> {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::with_capacity_and_hash_eq(capacity, DefaultHashEq::new())
+    }
+}
+
+
+struct DefaultComparator<T> {
+    _phantom: PhantomData<T>,
+}
+
+impl<T> Default for DefaultComparator<T> {
+    fn default() -> Self {
+        Self {
+            _phantom: PhantomData::default()
+        }
+    }
+}
+
+impl<T> DefaultComparator<T> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<T: Ord> Comparator<T> for DefaultComparator<T> {
+    fn cmp(lhs: &T, rhs: &T) -> Ordering {
+        lhs.cmp(rhs)
+    }
+}
+
+
+struct HashEqHasher<K, B: BuildHasher> {
+    builder: B,
+    _phantom: PhantomData<K>,
+}
+
+
+impl<K, B: BuildHasher> HashEqHasher<K, B> {
+    pub fn new(builder: B) -> Self {
+        Self {
+            builder,
+            _phantom: PhantomData::default(),
+        }
+    }
+}
+
+impl<K: Hash + Eq, B: BuildHasher> HashEq<K> for HashEqHasher<K, B> {
+    fn hash(&self, key: &K) -> u64 {
+        let mut state = self.builder.build_hasher();
+        key.hash(&mut state);
+        state.finish()
+    }
+
+    fn eq(&self, lhs: &K, rhs: &K) -> bool {
+        lhs == rhs
+    }
+}
+
+struct DefaultHashEq<K> {
+    hasher: HashEqHasher<K, RandomState>,
+}
+
+impl<K> DefaultHashEq<K> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> Default for DefaultHashEq<K> {
+    fn default() -> Self {
+        Self {
+            hasher: HashEqHasher::new(RandomState::new()),
+        }
+    }
+}
+
+impl<K: Hash + Eq> HashEq<K> for DefaultHashEq<K> {
+    fn hash(&self, key: &K) -> u64 {
+        let mut hasher = self.hasher.builder.build_hasher();
+        key.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn eq(&self, lhs: &K, rhs: &K) -> bool {
+        lhs == rhs
+    }
+}
+
+
+
+
+
+pub struct KeyWrapper<'a, K, HE: HashEq<K>> {
     key: &'a K,
     he: &'a HE,
 }
 
 
-impl<'a, K, HE: HashAndEq<K>> Hash for KeyWrapper<'a, K, HE> {
+impl<'a, K, HE: HashEq<K>> Hash for KeyWrapper<'a, K, HE> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let hash = self.he.hash(self.key);
         state.write_u64(hash);
     }
 }
 
-impl<'a, K, HE: HashAndEq<K>> PartialEq for KeyWrapper<'a, K, HE> {
+impl<'a, K, HE: HashEq<K>> PartialEq for KeyWrapper<'a, K, HE> {
     fn eq(&self, other: &Self) -> bool {
         self.he.eq(self.key, other.key)
     }
 }
 
-impl<'a, K, HE: HashAndEq<K>> Eq for KeyWrapper<'a, K, HE> {}
+impl<'a, K, HE: HashEq<K>> Eq for KeyWrapper<'a, K, HE> {}
 
 
-pub struct MPHB<'a, K, HE: HashAndEq<K>> {
+pub struct MPHB<'a, K, HE: HashEq<K>> {
     map: HashMap<KeyWrapper<'a, K, HE>, u64>,
     he: &'a HE,
     monotonic: u64,
 }
 
-impl<'a, K, HE: HashAndEq<K>> MPHB<'a, K, HE> {
+impl<'a, K, HE: HashEq<K>> MPHB<'a, K, HE> {
 
     pub fn new(capacity: usize, he: &'a HE) -> Self {
         Self {
@@ -193,9 +368,9 @@ mod tests {
     use std::hash::Hash;
     use std::io::BufRead;
     use std::path::PathBuf;
-    use xxhash_rust::xxh3::xxh3_64;
+    use xxhash_rust::xxh3::{xxh3_64, Xxh3Builder};
     use crate::mock::helper::read_test_file;
-    use crate::mphb::{HashAndEq, MPHB};
+    use crate::mphb::{DefaultHashEq, HashEq, HashEqHasher, FixedMap, MPHB};
     use crate::xrecord::{xrecord_he, xrecord_t};
 
     const FURNITURE: [&str; 41] = [
@@ -212,17 +387,17 @@ mod tests {
         "apple", "apple", "apple", "cherry", "cherry", "orange", "apple", "cherry"
     ];
 
-    struct StringHE {}
-
-    impl HashAndEq<String> for StringHE {
-        fn hash(&self, key: &String) -> u64 {
-            xxh3_64(key.as_bytes())
-        }
-
-        fn eq(&self, lhs: &String, rhs: &String) -> bool {
-            lhs == rhs
-        }
-    }
+    // struct StringHE {}
+    //
+    // impl HashEq<String> for StringHE {
+    //     fn hash(&self, key: &String) -> u64 {
+    //         xxh3_64(key.as_bytes())
+    //     }
+    //
+    //     fn eq(&self, lhs: &String, rhs: &String) -> bool {
+    //         lhs == rhs
+    //     }
+    // }
 
 
     struct MPHBSimple<K: Hash + Eq> {
@@ -245,6 +420,23 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_oa_table() {
+        let flags = 0;
+        let he = xrecord_he::new(flags);
+
+        let data = "alsdfkjalsdvnlas";
+
+        let key = xrecord_t::new(data.as_ptr(), data.len(), data.len());
+
+        let mut table = FixedMap::with_capacity_and_hash_eq(300, he);
+        table.insert(&key, 0u64);
+
+
+
+
+
+    }
 
     #[test]
     fn test_new() {
@@ -263,15 +455,19 @@ mod tests {
                 monotonic: 0,
             };
 
-            let he = StringHE{};
-            let mut lu = MPHB::<String, StringHE>::new(list.len(), &he);
+            // let he = HashEqHasher::new(Xxh3Builder::new());
+            // let he = DefaultHashEq::new();
+
+            let mut lu = FixedMap::with_capacity(list.len());
             for key in list.iter() {
+                let mut v: &mut u64 = lu.get_or_default(key);
+                *v = 0;
                 let expected = (key.clone(), mphb_simple.hash(&key));
                 let actual = (key.clone(), lu.hash(&key));
                 assert_eq!(expected, actual);
             }
 
-            let mph_size = lu.finish();
+            let mph_size = lu.len();
             assert_eq!(mphb_simple.map.len(), mph_size);
         }
     }
