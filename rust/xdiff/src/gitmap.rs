@@ -85,14 +85,14 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
     }
 
 
-    fn hash(&self, key: &K) -> u64 {
+    fn _hash(&self, key: &K) -> u64 {
         /*
          * or with 1 << 63 to ensure valid hashes are never 0
          */
         self.he.hash(&key) | (1 << 63)
     }
 
-    fn probe_slots(&self, key: &K, hash: u64, range: Range<usize>) -> Result<usize, usize> {
+    fn _probe_slots(&self, key: &K, hash: u64, range: Range<usize>) -> Result<usize, usize> {
         for i in range {
             match self.meta[i] {
                 0 => return Err(i),
@@ -103,12 +103,12 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
         Err(INVALID_INDEX)
     }
 
-    fn find_entry(&self, key: &K, hash: u64) -> ProbeResult {
+    fn _find_entry(&self, key: &K, hash: u64) -> ProbeResult {
         let start = hash as usize & self.mask;
-        let mut index = self.probe_slots(key, hash, start..self.meta.len());
+        let mut index = self._probe_slots(key, hash, start..self.meta.len());
         if let Err(i) = index {
             if i == INVALID_INDEX {
-                index = self.probe_slots(key, hash, 0..start);
+                index = self._probe_slots(key, hash, 0..start);
             }
         }
         match index {
@@ -123,7 +123,7 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
         }
     }
 
-    fn overwrite(&mut self, index: usize, hash: u64, key: K, value: V) {
+    fn _overwrite(&mut self, index: usize, hash: u64, key: K, value: V) {
         self.meta[index] = hash;
         unsafe {
             std::ptr::write(&mut self.data[index], Entry {
@@ -135,8 +135,8 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        let hash = self.hash(key);
-        let index = self.find_entry(key, hash);
+        let hash = self._hash(key);
+        let index = self._find_entry(key, hash);
         match index {
             ProbeResult::Found(i) => Some(&self.data[i].value),
             _ => None,
@@ -144,8 +144,8 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
     }
 
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        let hash = self.hash(key);
-        let index = self.find_entry(key, hash);
+        let hash = self._hash(key);
+        let index = self._find_entry(key, hash);
         match index {
             ProbeResult::Found(i) => Some(&mut self.data[i].value),
             _ => None,
@@ -155,12 +155,12 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
     pub fn get_or_insert(&mut self, key: &K, value: V) -> &mut V
     where K: Clone, V: Default
     {
-        let hash = self.hash(key);
-        let index = self.find_entry(key, hash);
+        let hash = self._hash(key);
+        let index = self._find_entry(key, hash);
         match index {
             ProbeResult::Found(i) => &mut self.data[i].value,
             ProbeResult::Empty(i) => {
-                self.overwrite(i, hash, key.clone(), value);
+                self._overwrite(i, hash, key.clone(), value);
                 &mut self.data[i].value
             }
             ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
@@ -171,12 +171,12 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
     pub fn get_or_default(&mut self, key: &K) -> &mut V
     where K: Clone, V: Default
     {
-        let hash = self.hash(key);
-        let index = self.find_entry(key, hash);
+        let hash = self._hash(key);
+        let index = self._find_entry(key, hash);
         match index {
             ProbeResult::Found(i) => &mut self.data[i].value,
             ProbeResult::Empty(i) => {
-                self.overwrite(i, hash, key.clone(), V::default());
+                self._overwrite(i, hash, key.clone(), V::default());
                 &mut self.data[i].value
             }
             ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
@@ -187,16 +187,16 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
     pub fn insert(&mut self, key: &K, value: V)
     where K: Clone
     {
-        let hash = self.hash(key);
-        let index = self.find_entry(key, hash);
+        let hash = self._hash(key);
+        let index = self._find_entry(key, hash);
         match index {
             ProbeResult::Found(i) => {
                 self.data[i].value = value;
             }
             ProbeResult::Empty(i) => {
-                self.overwrite(i, hash, key.clone(), value);
+                self._overwrite(i, hash, key.clone(), value);
             }
-            ProbeResult::OutOfMemory => panic!("OATable ran out of memory"),
+            ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
         }
     }
 
