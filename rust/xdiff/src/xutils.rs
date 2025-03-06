@@ -3,8 +3,9 @@
 use std::collections::{Bound, HashMap};
 use std::hash::{BuildHasher, Hash};
 use std::ops::{Range, RangeBounds};
+use crate::gitmap::{FixedMap, HashEq};
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
-
+use crate::xrecord::xrecord_t;
 
 pub struct LineReader {
 	cur: *const u8,
@@ -48,6 +49,36 @@ impl LineReader {
 }
 
 
+
+pub struct MinimalPerfectHashBuilder<'a, K, HE: HashEq<K>> {
+	fm: FixedMap<'a, K, u64, HE>,
+	monotonic: u64,
+}
+
+impl<'a, K, HE: HashEq<K>> MinimalPerfectHashBuilder<'a, K, HE> {
+
+	pub fn with_capacity(capacity: usize, he: HE) -> Self {
+		Self {
+			fm: FixedMap::with_capacity_and_hash_eq(capacity, he),
+			monotonic: 0,
+		}
+	}
+
+	pub fn hash(&mut self, key: &K) -> u64
+	where K: Clone
+	{
+		let mph = *self.fm.get_or_insert(key, self.monotonic);
+		if mph == self.monotonic {
+			self.monotonic += 1;
+		}
+		mph
+	}
+
+	pub fn finish(self) -> usize {
+		self.monotonic as usize
+	}
+
+}
 
 
 

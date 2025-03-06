@@ -7,7 +7,7 @@ use crate::xdiff::{LINE_SHIFT, XDF_HISTOGRAM_DIFF, XDF_IGNORE_CR_AT_EOL, XDF_PAT
 use crate::xrecord::{xrecord_he, xrecord_t};
 use crate::xtypes::ConsiderLine::*;
 use crate::xtypes::{Occurrence};
-use crate::xutils::{xdl_bogosqrt, LineReader};
+use crate::xutils::{xdl_bogosqrt, LineReader, MinimalPerfectHashBuilder};
 
 const XDL_KPDIS_RUN: u64 = 4;
 const XDL_MAX_EQLIMIT: u64 = 1024;
@@ -271,7 +271,7 @@ impl xdfenv_t {
 	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>, flags: u64) {
 		let capacity = self.xdf1.record.len() + self.xdf2.record.len();
 		let he = xrecord_he::new(flags);
-		let mut mphb = MPHB::<xrecord_t, xrecord_he>::new(capacity, &he);
+		let mut mphb = MinimalPerfectHashBuilder::<xrecord_t, xrecord_he>::with_capacity(capacity, he);
 
 		for rec in self.xdf1.record.as_slice() {
 			self.xdf1.minimal_perfect_hash.push(mphb.hash(rec));
@@ -344,9 +344,11 @@ impl xdfenv_t {
 #[cfg(test)]
 mod tests {
 	use std::path::Path;
+	use interop::ivec::IVec;
 	use crate::mock::helper::read_test_file;
 	use crate::xdfenv::{xdfenv_t, xdfile_t};
 	use crate::xdiff::{XDF_HISTOGRAM_DIFF, XDF_IGNORE_WHITESPACE_CHANGE, XDF_INDENT_HEURISTIC};
+	use crate::xtypes::Occurrence;
 
 	#[test]
 	fn test_prepare() {
@@ -373,6 +375,10 @@ mod tests {
 			let mut xe = xdfenv_t::default();
 			xe.xdf1 = xdfile_t::new(before.as_slice(), _flags);
 			xe.xdf2 = xdfile_t::new(after.as_slice(), _flags);
+
+			let mut occ = IVec::<Occurrence>::new();
+			xe.construct_mph_and_occurrences(Some(&mut occ), _flags);
+
 		}
 	}
 
