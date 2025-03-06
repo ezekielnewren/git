@@ -370,7 +370,7 @@ mod tests {
     use std::path::PathBuf;
     use xxhash_rust::xxh3::{xxh3_64, Xxh3Builder};
     use crate::mock::helper::read_test_file;
-    use crate::mphb::{DefaultHashEq, HashEq, HashEqHasher, FixedMap, MPHB};
+    use crate::gitmap::{DefaultHashEq, HashEq, HashEqHasher, FixedMap, MPHB};
     use crate::xrecord::{xrecord_he, xrecord_t};
 
     const FURNITURE: [&str; 41] = [
@@ -421,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn test_oa_table() {
+    fn test_fixed_map() {
         let flags = 0;
         let he = xrecord_he::new(flags);
 
@@ -440,7 +440,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let flags = 0;
+        let flags = 0u64;
 
         let mut list_vec: Vec<Vec<String>> = Vec::new();
         list_vec.push(FRUIT.iter().map(|s| s.to_string()).collect());
@@ -455,19 +455,20 @@ mod tests {
                 monotonic: 0,
             };
 
-            // let he = HashEqHasher::new(Xxh3Builder::new());
-            // let he = DefaultHashEq::new();
+            let mut monotonic = 0u64;
 
-            let mut lu = FixedMap::with_capacity(list.len());
+            let mut fm = FixedMap::with_capacity(list.len());
             for key in list.iter() {
-                let mut v: &mut u64 = lu.get_or_default(key);
-                *v = 0;
                 let expected = (key.clone(), mphb_simple.hash(&key));
-                let actual = (key.clone(), lu.hash(&key));
+                let mph = *fm.get_or_insert(key, monotonic);
+                if mph == monotonic {
+                    monotonic += 1;
+                }
+                let actual = (key.clone(), mph);
                 assert_eq!(expected, actual);
             }
 
-            let mph_size = lu.len();
+            let mph_size = fm.len();
             assert_eq!(mphb_simple.map.len(), mph_size);
         }
     }

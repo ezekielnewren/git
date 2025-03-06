@@ -2,7 +2,7 @@
 
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-use crate::mphb::HashEq;
+use crate::gitmap::HashEq;
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN, XDF_WHITESPACE_FLAGS};
 use crate::xtypes::DJB2a;
 use crate::xutils::{chunked_iter_equal, XDL_ISSPACE};

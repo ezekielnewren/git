@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use interop::ivec::IVec;
-use crate::mphb::MPHB;
+use crate::gitmap::MPHB;
 use crate::xdiff::{LINE_SHIFT, XDF_HISTOGRAM_DIFF, XDF_IGNORE_CR_AT_EOL, XDF_PATIENCE_DIFF, XDF_WHITESPACE_FLAGS};
 use crate::xrecord::{xrecord_he, xrecord_t};
 use crate::xtypes::ConsiderLine::*;

@@ -15,7 +15,7 @@ pub(crate) mod xtypes;
 pub(crate) mod xdfenv;
 #[cfg(test)]
 pub(crate) mod mock;
-mod mphb;
+pub mod gitmap;
 
 #[no_mangle]
 unsafe extern "C" fn xdl_line_hash(ptr: *const u8, line_size_no_eol: usize, flags: u64) -> u64 {
