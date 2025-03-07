@@ -393,7 +393,7 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	 * ranges of lines instead of the whole files.
 	 */
 	mmfile_t subfile1, subfile2;
-	xdfile_t xdf1, xdf2;
+	struct xd2way two_way;
 	xdfenv_t env;
 
 
@@ -404,10 +404,9 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	subfile2.size = (char *) diff_env->xdf2->record.ptr[line2 + count2 - 2].ptr +
 		diff_env->xdf2->record.ptr[line2 + count2 - 2].size_with_eol - subfile2.ptr;
 
-	xdl_file_prepare(&subfile1, xpp->flags, &xdf1);
-	xdl_file_prepare(&subfile2, xpp->flags, &xdf2);
+	xdl_2way_prepare(&subfile1, &subfile2, xpp->flags, &two_way);
 
-	if (xdl_do_diff(&xdf1, &xdf2, xpp, 0, &env) < 0)
+	if (xdl_do_diff(&two_way.xdf1, &two_way.xdf2, xpp, two_way.minimal_perfect_hash_size, &env) < 0)
 		return -1;
 
 	memcpy(diff_env->xdf1->consider.ptr + SENTINEL + line1 - 1, env.xdf1->consider.ptr + SENTINEL, count1);
