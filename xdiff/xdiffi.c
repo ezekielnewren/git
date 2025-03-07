@@ -315,7 +315,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xdalgoenv_t xenv;
 	int res;
 
-	if (xdl_prepare_env(mf1, mf2, xpp->flags, xe) < 0)
+	if (xdl_env_prepare(mf1, mf2, xpp->flags, xe) < 0)
 		return -1;
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
@@ -337,7 +337,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	ndiags = xe->xdf1->rindex.length + xe->xdf2->rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
-		xdl_free_env(xe);
+		xdl_env_free(xe);
 		return -1;
 	}
 	kvdf = kvd;
@@ -358,7 +358,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xdl_free(kvd);
  out:
 	if (res < 0)
-		xdl_free_env(xe);
+		xdl_env_free(xe);
 
 	return res;
 }
@@ -1051,7 +1051,7 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	    xdl_change_compact(xe.xdf2, xe.xdf1, xpp->flags) < 0 ||
 	    xdl_build_script(&xe, &xscr) < 0) {
 
-		xdl_free_env(&xe);
+		xdl_env_free(&xe);
 		return -1;
 	}
 	if (xscr) {
@@ -1064,12 +1064,12 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		if (ef(&xe, xscr, ecb, xecfg) < 0) {
 
 			xdl_free_script(xscr);
-			xdl_free_env(&xe);
+			xdl_env_free(&xe);
 			return -1;
 		}
 		xdl_free_script(xscr);
 	}
-	xdl_free_env(&xe);
+	xdl_env_free(&xe);
 
 	return 0;
 }

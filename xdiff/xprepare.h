@@ -24,9 +24,13 @@
 #define XPREPARE_H
 
 
+void xdl_file_init(xdfile_t *xdf);
+void xdl_file_prepare(mmfile_t *mf, u64 flags, xdfile_t *xdf);
+void xdl_file_free(xdfile_t *xdf);
 
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe);
-void xdl_free_env(xdfenv_t *xe);
+void xdl_env_init(xdfenv_t *xe);
+int  xdl_env_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe);
+void xdl_env_free(xdfenv_t *xe);
 
 
 

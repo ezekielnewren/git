@@ -28,19 +28,19 @@
 #define XDL_SIMSCAN_WINDOW 100
 
 
-static void xdl_free_ctx(xdfile_t *xdf);
-static int xdl_clean_mmatch(char const *dis, long i, long start, long e);
-
-#ifdef WITH_RUST
-extern int rust_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags);
-#endif
-static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
-	struct xlinereader_t reader;
-
+void xdl_file_init(xdfile_t *xdf) {
 	IVEC_INIT(xdf->minimal_perfect_hash);
 	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->rindex);
 	IVEC_INIT(xdf->consider);
+}
+
+
+#ifdef WITH_RUST
+extern void rust_xdl_file_prepare(mmfile_t *mf, xdfile_t *xdf, u64 flags);
+#endif
+void xdl_file_prepare(mmfile_t *mf, u64 flags, xdfile_t *xdf) {
+	struct xlinereader_t reader;
 
 	rust_ivec_reserve_exact(&xdf->record, mf->size >> 4);
 
@@ -68,12 +68,10 @@ static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	XDL_CALLOC_ARRAY(xdf->consider.ptr, xdf->consider.capacity);
 
 	rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
-
-	return 0;
 }
 
 
-static void xdl_free_ctx(xdfile_t *xdf) {
+void xdl_file_free(xdfile_t *xdf) {
 	rust_ivec_free(&xdf->minimal_perfect_hash);
 	rust_ivec_free(&xdf->record);
 	rust_ivec_free(&xdf->consider);
@@ -81,9 +79,10 @@ static void xdl_free_ctx(xdfile_t *xdf) {
 }
 
 
-void xdl_free_env(xdfenv_t *xe) {
-	xdl_free_ctx(&xe->left);
-	xdl_free_ctx(&xe->right);
+void xdl_env_free(xdfenv_t *xe) {
+	xdl_file_free(xe->xdf1);
+	xdl_file_free(xe->xdf2);
+	rust_ivec_free(&xe->occurrence);
 }
 
 
@@ -318,17 +317,19 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	return 0;
 }
 #else
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
+int xdl_env_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	bool count_occurrences = (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0;
 	IVEC_INIT(xe->occurrence);
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
+	xdl_file_init(&xe->left);
 	xe->xdf1 = &xe->left;
-	c_xdl_prepare_ctx(mf1, xe->xdf1, flags);
+	xdl_file_prepare(mf1, flags, xe->xdf1);
 
+	xdl_file_init(&xe->right);
 	xe->xdf2 = &xe->right;
-	c_xdl_prepare_ctx(mf2, xe->xdf2, flags);
+	xdl_file_prepare(mf2, flags, xe->xdf2);
 
 	c_xdl_construct_mph_and_occurrences(xe, count_occurrences, flags);
 

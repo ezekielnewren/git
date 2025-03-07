@@ -407,7 +407,7 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	memcpy(diff_env->xdf1->consider.ptr + SENTINEL + line1 - 1, env.xdf1->consider.ptr + SENTINEL, count1);
 	memcpy(diff_env->xdf2->consider.ptr + SENTINEL + line2 - 1, env.xdf2->consider.ptr + SENTINEL, count2);
 
-	xdl_free_env(&env);
+	xdl_env_free(&env);
 
 	return 0;
 }
