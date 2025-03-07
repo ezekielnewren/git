@@ -24,12 +24,17 @@
 #define XPREPARE_H
 
 
-void xdl_file_init(xdfile_t *xdf);
 void xdl_file_prepare(mmfile_t *mf, u64 flags, xdfile_t *xdf);
 void xdl_file_free(xdfile_t *xdf);
 
+int xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way);
+int xdl_2way_free(struct xd2way *two_way);
+
+int xdl_3way_prepare(mmfile_t *mf_base, mmfile_t *mf_side1, mmfile_t *mf_side2, u64 flags, struct xd3way *three_way);
+int xdl_3way_free(struct xd3way *three_way);
+
 void xdl_env_init(xdfenv_t *xe);
-int  xdl_env_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe);
+int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, xdfenv_t *xe);
 void xdl_env_free(xdfenv_t *xe);
 
 

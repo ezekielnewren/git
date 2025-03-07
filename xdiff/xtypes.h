@@ -68,5 +68,15 @@ typedef struct s_xdfenv {
 } xdfenv_t;
 
 
+struct xd2way {
+	xdfile_t xdf1, xdf2;
+	usize minimal_perfect_hash_size;
+};
+
+struct xd3way {
+	xdfile_t base, side1, side2;
+	usize minimal_perfect_hash_size;
+};
+
 
 #endif /* #if !defined(XTYPES_H) */

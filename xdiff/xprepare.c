@@ -28,19 +28,17 @@
 #define XDL_SIMSCAN_WINDOW 100
 
 
-void xdl_file_init(xdfile_t *xdf) {
-	IVEC_INIT(xdf->minimal_perfect_hash);
-	IVEC_INIT(xdf->record);
-	IVEC_INIT(xdf->rindex);
-	IVEC_INIT(xdf->consider);
-}
-
 
 #ifdef WITH_RUST
 extern void rust_xdl_file_prepare(mmfile_t *mf, xdfile_t *xdf, u64 flags);
 #endif
 void xdl_file_prepare(mmfile_t *mf, u64 flags, xdfile_t *xdf) {
 	struct xlinereader_t reader;
+
+	IVEC_INIT(xdf->minimal_perfect_hash);
+	IVEC_INIT(xdf->record);
+	IVEC_INIT(xdf->rindex);
+	IVEC_INIT(xdf->consider);
 
 	rust_ivec_reserve_exact(&xdf->record, mf->size >> 4);
 
@@ -302,17 +300,20 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	return 0;
 }
 #else
-int xdl_env_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
+int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, xdfenv_t *xe) {
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
 	// xdl_file_init(&xe->left);
 	// xe->xdf1 = &xe->left;
-	xdl_file_prepare(mf1, flags, xe->xdf1);
+	// xdl_file_prepare(mf1, flags, xe->xdf1);
 
 	// xdl_file_init(&xe->right);
 	// xe->xdf2 = &xe->right;
-	xdl_file_prepare(mf2, flags, xe->xdf2);
+	// xdl_file_prepare(mf2, flags, xe->xdf2);
+
+	xe->xdf1 = xdf1;
+	xe->xdf2 = xdf2;
 
 	xdl_build_mph(xe, flags);
 
@@ -324,3 +325,61 @@ int xdl_env_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	return 0;
 }
 #endif
+
+int xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way) {
+	struct xdl_minimal_perfect_hash_builder_t mphb;
+
+	xdl_file_prepare(mf1, flags, &two_way->xdf1);
+	xdl_file_prepare(mf2, flags, &two_way->xdf2);
+
+
+	xdl_mphb_init(&mphb, two_way->xdf1.record.length + two_way->xdf2.record.length, flags);
+	for (usize i = 0; i < two_way->xdf1.record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &two_way->xdf1.record.ptr[i]);
+		two_way->xdf1.minimal_perfect_hash.ptr[two_way->xdf1.minimal_perfect_hash.length++] = mph;
+	}
+
+	for (usize i = 0; i < two_way->xdf2.record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &two_way->xdf2.record.ptr[i]);
+		two_way->xdf2.minimal_perfect_hash.ptr[two_way->xdf2.minimal_perfect_hash.length++] = mph;
+	}
+
+	two_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
+
+	return 0;
+}
+
+int xdl_3way_prepare(mmfile_t *mf_base, mmfile_t *mf_side1, mmfile_t *mf_side2, u64 flags, struct xd3way *three_way) {
+	struct xdl_minimal_perfect_hash_builder_t mphb;
+	usize max_unique_size = 0;
+
+	xdl_file_prepare(mf_base, flags, &three_way->base);
+	xdl_file_prepare(mf_side1, flags, &three_way->side1);
+	xdl_file_prepare(mf_side2, flags, &three_way->side2);
+
+	max_unique_size += three_way->base.record.length;
+	max_unique_size += three_way->side1.record.length;
+	max_unique_size += three_way->side2.record.length;
+	xdl_mphb_init(&mphb, max_unique_size, flags);
+
+	for (usize i = 0; i < three_way->base.record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &three_way->base.record.ptr[i]);
+		three_way->base.minimal_perfect_hash.ptr[three_way->base.minimal_perfect_hash.length++] = mph;
+	}
+
+	for (usize i = 0; i < three_way->side1.record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &three_way->side1.record.ptr[i]);
+		three_way->side1.minimal_perfect_hash.ptr[three_way->side1.minimal_perfect_hash.length++] = mph;
+	}
+
+	for (usize i = 0; i < three_way->side2.record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &three_way->side2.record.ptr[i]);
+		three_way->side2.minimal_perfect_hash.ptr[three_way->side2.minimal_perfect_hash.length++] = mph;
+	}
+
+	three_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
+
+	return 0;
+}
+
+

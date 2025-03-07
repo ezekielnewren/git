@@ -89,6 +89,7 @@ bool rust_ivec_equal(void* self, void* other) {
 void rust_ivec_free(void* self) {
 	rawivec_t *this = self;
 	free(this->ptr);
+	this->ptr = NULL;
 	this->capacity = 0;
 	this->length = 0;
 	// don't modify self->element_size
