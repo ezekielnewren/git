@@ -689,7 +689,7 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
 	xdchange_t *xscr1 = NULL, *xscr2 = NULL;
-	xdfile_t base, base_copy, side1, side2;
+	struct xd2way a2way, b2way;
 	xdfenv_t xe1, xe2;
 	int status = -1;
 	xpparam_t const *xpp = &xmp->xpp;
@@ -697,15 +697,14 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	result->ptr = NULL;
 	result->size = 0;
 
-	xdl_file_prepare(orig, xpp->flags, &base);
-	xdl_file_prepare(orig, xpp->flags, &base_copy);
-	xdl_file_prepare(mf1, xpp->flags, &side1);
-	xdl_file_prepare(mf2, xpp->flags, &side2);
+	xdl_2way_prepare(orig, mf1, xpp->flags, &a2way);
+	xdl_2way_prepare(orig, mf2, xpp->flags, &b2way);
 
-	if (xdl_do_diff(&base, &side1, xpp, 0, &xe1) < 0)
+
+	if (xdl_do_diff(&a2way.xdf1, &a2way.xdf2, xpp, a2way.minimal_perfect_hash_size, &xe1) < 0)
 		return -1;
 
-	if (xdl_do_diff(&base_copy, &side2, xpp, 0, &xe2) < 0)
+	if (xdl_do_diff(&b2way.xdf1, &b2way.xdf2, xpp, b2way.minimal_perfect_hash_size, &xe2) < 0)
 		goto free_xe1; /* avoid double free of xe2 */
 
 	if (xdl_change_compact(xe1.xdf1, xe1.xdf2, xpp->flags) < 0 ||
