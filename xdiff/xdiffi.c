@@ -275,10 +275,10 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 	 */
 	if (off1 == lim1) {
 		for (; off2 < lim2; off2++)
-			xdf2->rchg[xdf2->rindex.ptr[off2]] = YES;
+			xdf2->consider.ptr[SENTINEL + xdf2->rindex.ptr[off2]] = YES;
 	} else if (off2 == lim2) {
 		for (; off1 < lim1; off1++)
-			xdf1->rchg[xdf1->rindex.ptr[off1]] = YES;
+			xdf1->consider.ptr[SENTINEL + xdf1->rindex.ptr[off1]] = YES;
 	} else {
 		xdpsplit_t spl;
 		spl.i1 = spl.i2 = 0;
@@ -701,7 +701,7 @@ struct xdlgroup {
 static void group_init(xdfile_t *xdf, struct xdlgroup *g)
 {
 	g->start = g->end = 0;
-	while (xdf->rchg[g->end] != NO)
+	while (xdf->consider.ptr[SENTINEL + g->end] != NO)
 		g->end++;
 }
 
@@ -715,7 +715,7 @@ static inline int group_next(xdfile_t *xdf, struct xdlgroup *g)
 		return -1;
 
 	g->start = g->end + 1;
-	for (g->end = g->start; xdf->rchg[g->end] != NO; g->end++)
+	for (g->end = g->start; xdf->consider.ptr[SENTINEL + g->end] != NO; g->end++)
 		;
 
 	return 0;
@@ -731,7 +731,7 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
 		return -1;
 
 	g->end = g->start - 1;
-	for (g->start = g->end; xdf->rchg[g->start - 1] != NO; g->start--)
+	for (g->start = g->end; xdf->consider.ptr[SENTINEL + g->start - 1] != NO; g->start--)
 		;
 
 	return 0;
@@ -747,10 +747,10 @@ static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g) {
 	u64 mph2 = xdf->minimal_perfect_hash.ptr[g->end];
 
 	if (g->end < xdf->record.length && mph1 == mph2) {
-		xdf->rchg[g->start++] = NO;
-		xdf->rchg[g->end++] = YES;
+		xdf->consider.ptr[SENTINEL + g->start++] = NO;
+		xdf->consider.ptr[SENTINEL + g->end++] = YES;
 
-		while (xdf->rchg[g->end] != NO)
+		while (xdf->consider.ptr[SENTINEL + g->end] != NO)
 			g->end++;
 
 		return 0;
@@ -769,10 +769,10 @@ static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g) {
 	u64 mph2 = xdf->minimal_perfect_hash.ptr[g->end - 1];
 
 	if (g->start > 0 && mph1 == mph2) {
-		xdf->rchg[--g->start] = YES;
-		xdf->rchg[--g->end] = NO;
+		xdf->consider.ptr[SENTINEL + --g->start] = YES;
+		xdf->consider.ptr[SENTINEL + --g->end] = NO;
 
-		while (xdf->rchg[g->start - 1] != NO)
+		while (xdf->consider.ptr[SENTINEL + g->start - 1] != NO)
 			g->start--;
 
 		return 0;
@@ -927,16 +927,16 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
 	xdchange_t *cscr = NULL, *xch;
-	char *rchg1 = (char *) xe->xdf1.rchg, *rchg2 = (char *) xe->xdf2.rchg;
+	// char *rchg1 = (char *) xe->xdf1.rchg, *rchg2 = (char *) xe->xdf2.rchg;
 	long i1, i2, l1, l2;
 
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
 	for (i1 = xe->xdf1.record.length, i2 = xe->xdf2.record.length; i1 >= 0 || i2 >= 0; i1--, i2--)
-		if (rchg1[i1 - 1] != NO || rchg2[i2 - 1] != NO) {
-			for (l1 = i1; rchg1[i1 - 1] != NO; i1--);
-			for (l2 = i2; rchg2[i2 - 1] != NO; i2--);
+		if (xe->xdf1.consider.ptr[SENTINEL + i1 - 1] != NO || xe->xdf2.consider.ptr[SENTINEL + i2 - 1] != NO) {
+			for (l1 = i1; xe->xdf1.consider.ptr[SENTINEL + i1 - 1] != NO; i1--);
+			for (l2 = i2; xe->xdf2.consider.ptr[SENTINEL + i2 - 1] != NO; i2--);
 
 			if (!(xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2))) {
 				xdl_free_script(cscr);

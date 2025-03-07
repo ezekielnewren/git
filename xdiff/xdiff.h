@@ -29,6 +29,7 @@ extern "C" {
 
 #define INVALID_INDEX SIZE_MAX
 #define LINE_SHIFT 1
+#define SENTINEL 1
 
 #define NO 0
 #define YES 1

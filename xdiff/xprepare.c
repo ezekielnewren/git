@@ -65,13 +65,11 @@ static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		}
 	}
 
-	xdf->consider.capacity = xdf->record.length + 2;
+	xdf->consider.capacity = xdf->consider.length = SENTINEL + xdf->record.length + SENTINEL;
 	XDL_CALLOC_ARRAY(xdf->consider.ptr, xdf->consider.capacity);
-	xdf->consider.length = xdf->consider.capacity;
 
 	rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
 
-	xdf->rchg = xdf->consider.ptr + 1;
 	xdf->dstart = 0;
 	xdf->dend = xdf->record.length - 1;
 
@@ -80,18 +78,16 @@ static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 
 static void xdl_free_ctx(xdfile_t *xdf) {
-
-	rust_ivec_free(&xdf->consider);
 	rust_ivec_free(&xdf->minimal_perfect_hash);
-	rust_ivec_free(&xdf->rindex);
 	rust_ivec_free(&xdf->record);
+	rust_ivec_free(&xdf->consider);
+	rust_ivec_free(&xdf->rindex);
 }
 
 
 void xdl_free_env(xdfenv_t *xe) {
-
-	xdl_free_ctx(&xe->xdf2);
 	xdl_free_ctx(&xe->xdf1);
+	xdl_free_ctx(&xe->xdf2);
 }
 
 
@@ -195,7 +191,7 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xe->xdf1.dstart, xe->xdf1.dend))) {
 			rust_ivec_push(&xe->xdf1.rindex, &i);
 		} else
-			xe->xdf1.rchg[i] = 1;
+			xe->xdf1.consider.ptr[SENTINEL + i] = YES;
 	}
 
 	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
@@ -203,7 +199,7 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xe->xdf2.dstart, xe->xdf2.dend))) {
 			rust_ivec_push(&xe->xdf2.rindex, &i);
 		} else
-			xe->xdf2.rchg[i] = 1;
+			xe->xdf2.consider.ptr[SENTINEL + i] = YES;
 	}
 
 	rust_ivec_free(&dis1);

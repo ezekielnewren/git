@@ -53,7 +53,6 @@ typedef struct s_xdfile {
 	ivec_u8 consider;
 	ivec_isize rindex;
 	isize dstart, dend;
-	u8 *rchg;
 } xdfile_t;
 
 struct xdloccurrence_t {

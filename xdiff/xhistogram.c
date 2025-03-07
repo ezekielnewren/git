@@ -312,11 +312,11 @@ redo:
 
 	if (!count1) {
 		while(count2--)
-			env->xdf2.rchg[line2++ - 1] = 1;
+			env->xdf2.consider.ptr[SENTINEL + line2++ - 1] = YES;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			env->xdf1.rchg[line1++ - 1] = 1;
+			env->xdf1.consider.ptr[SENTINEL + line1++ - 1] = YES;
 		return 0;
 	}
 
@@ -329,9 +329,9 @@ redo:
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
-				env->xdf1.rchg[line1++ - 1] = 1;
+				env->xdf1.consider.ptr[SENTINEL + line1++ - 1] = YES;
 			while (count2--)
-				env->xdf2.rchg[line2++ - 1] = 1;
+				env->xdf2.consider.ptr[SENTINEL + line2++ - 1] = YES;
 			result = 0;
 		} else {
 			result = histogram_diff(xpp, env,
