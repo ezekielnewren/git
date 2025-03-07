@@ -301,7 +301,7 @@ impl xdfenv_t {
 				if *minimal_perfect_hash == self.occurrence.len() as u64 {
 					self.occurrence.push(Occurrence::default());
 				}
-				self.occurrence[*minimal_perfect_hash as usize].file1 += 1;
+				self.occurrence[*minimal_perfect_hash as usize].file2 += 1;
 			}
 		}
 	}
