@@ -82,8 +82,8 @@ static void xdl_free_ctx(xdfile_t *xdf) {
 
 
 void xdl_free_env(xdfenv_t *xe) {
-	xdl_free_ctx(&xe->xdf1);
-	xdl_free_ctx(&xe->xdf2);
+	xdl_free_ctx(&xe->left);
+	xdl_free_ctx(&xe->right);
 }
 
 
@@ -153,33 +153,33 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 	long i, nm, mlim;
 	ivec_u8 dis1;
 	ivec_u8 dis2;
-	usize end1 = xe->xdf1.record.length - xe->delta_end;
-	usize end2 = xe->xdf2.record.length - xe->delta_end;
+	usize end1 = xe->xdf1->record.length - xe->delta_end;
+	usize end2 = xe->xdf2->record.length - xe->delta_end;
 
 	IVEC_INIT(dis1);
 	IVEC_INIT(dis2);
 
-	dis1.capacity = dis1.length = xe->xdf1.consider.length;
+	dis1.capacity = dis1.length = xe->xdf1->consider.length;
 	XDL_CALLOC_ARRAY(dis1.ptr, dis1.capacity);
 
-	dis2.capacity = dis2.length = xe->xdf2.consider.length;
+	dis2.capacity = dis2.length = xe->xdf2->consider.length;
 	XDL_CALLOC_ARRAY(dis2.ptr, dis2.capacity);
 
-	rust_ivec_reserve_exact(&xe->xdf1.rindex, xe->xdf1.record.length);
-	rust_ivec_reserve_exact(&xe->xdf2.rindex, xe->xdf2.record.length);
+	rust_ivec_reserve_exact(&xe->xdf1->rindex, xe->xdf1->record.length);
+	rust_ivec_reserve_exact(&xe->xdf2->rindex, xe->xdf2->record.length);
 
-	if ((mlim = xdl_bogosqrt(xe->xdf1.record.length)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(xe->xdf1->record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->delta_start; i < end1; i++) {
-		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
+		u64 mph = xe->xdf1->minimal_perfect_hash.ptr[i];
 		nm = xe->occurrence.ptr[mph].file2;
 		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	if ((mlim = xdl_bogosqrt(xe->xdf2.record.length)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(xe->xdf2->record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->delta_start; i < end2; i++) {
-		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
+		u64 mph = xe->xdf2->minimal_perfect_hash.ptr[i];
 		nm = xe->occurrence.ptr[mph].file1;
 		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
@@ -187,17 +187,17 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 	for (i = xe->delta_start; i < end1; i++) {
 		if (dis1.ptr[i] == 1 ||
 		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xe->delta_start, end1))) {
-			rust_ivec_push(&xe->xdf1.rindex, &i);
+			rust_ivec_push(&xe->xdf1->rindex, &i);
 		} else
-			xe->xdf1.consider.ptr[SENTINEL + i] = YES;
+			xe->xdf1->consider.ptr[SENTINEL + i] = YES;
 	}
 
 	for (i = xe->delta_start; i < end2; i++) {
 		if (dis2.ptr[i] == 1 ||
 		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xe->delta_start, end2))) {
-			rust_ivec_push(&xe->xdf2.rindex, &i);
+			rust_ivec_push(&xe->xdf2->rindex, &i);
 		} else
-			xe->xdf2.consider.ptr[SENTINEL + i] = YES;
+			xe->xdf2->consider.ptr[SENTINEL + i] = YES;
 	}
 
 	rust_ivec_free(&dis1);
@@ -211,11 +211,11 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
  * Early trim initial and terminal matching records.
  */
 static void xdl_trim_ends(xdfenv_t *xe) {
-	usize lim = XDL_MIN(xe->xdf1.record.length, xe->xdf2.record.length);
+	usize lim = XDL_MIN(xe->xdf1->record.length, xe->xdf2->record.length);
 
 	for (usize i = 0; i < lim; i++) {
-		u64 mph1 = xe->xdf1.minimal_perfect_hash.ptr[i];
-		u64 mph2 = xe->xdf2.minimal_perfect_hash.ptr[i];
+		u64 mph1 = xe->xdf1->minimal_perfect_hash.ptr[i];
+		u64 mph2 = xe->xdf2->minimal_perfect_hash.ptr[i];
 		if (mph1 != mph2) {
 			xe->delta_start = i;
 			break;
@@ -223,8 +223,8 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 	}
 
 	for (usize i = 0; i < lim; i++) {
-		u64 mph1 = xe->xdf1.minimal_perfect_hash.ptr[xe->xdf1.minimal_perfect_hash.length - 1 - i];
-		u64 mph2 = xe->xdf2.minimal_perfect_hash.ptr[xe->xdf2.minimal_perfect_hash.length - 1 - i];
+		u64 mph1 = xe->xdf1->minimal_perfect_hash.ptr[xe->xdf1->minimal_perfect_hash.length - 1 - i];
+		u64 mph2 = xe->xdf2->minimal_perfect_hash.ptr[xe->xdf2->minimal_perfect_hash.length - 1 - i];
 		if (mph1 != mph2) {
 			xe->delta_end = i;
 			break;
@@ -250,17 +250,17 @@ extern void rust_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec
 #endif
 static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, bool count_occurrences, u64 flags) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
-	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length, flags);
+	xdl_mphb_init(&mphb, xe->xdf1->record.length + xe->xdf2->record.length, flags);
 
 
-	for (usize i = 0; i < xe->xdf1.record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf1.record.ptr[i]);
-		xe->xdf1.minimal_perfect_hash.ptr[xe->xdf1.minimal_perfect_hash.length++] = mph;
+	for (usize i = 0; i < xe->xdf1->record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf1->record.ptr[i]);
+		xe->xdf1->minimal_perfect_hash.ptr[xe->xdf1->minimal_perfect_hash.length++] = mph;
 	}
 
-	for (usize i = 0; i < xe->xdf2.record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf2.record.ptr[i]);
-		xe->xdf2.minimal_perfect_hash.ptr[xe->xdf2.minimal_perfect_hash.length++] = mph;
+	for (usize i = 0; i < xe->xdf2->record.length; i++) {
+		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf2->record.ptr[i]);
+		xe->xdf2->minimal_perfect_hash.ptr[xe->xdf2->minimal_perfect_hash.length++] = mph;
 	}
 
 	xe->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
@@ -273,8 +273,8 @@ static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, bool count_occurre
 	 * the records are iterated over in the same way that the mph set
 	 * was constructed
 	 */
-	for (usize i = 0; i < xe->xdf1.minimal_perfect_hash.length; i++) {
-		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
+	for (usize i = 0; i < xe->xdf1->minimal_perfect_hash.length; i++) {
+		u64 mph = xe->xdf1->minimal_perfect_hash.ptr[i];
 		if (mph == xe->occurrence.length) {
 			struct xdloccurrence_t occ;
 			occ.file1 = 0;
@@ -284,8 +284,8 @@ static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, bool count_occurre
 		xe->occurrence.ptr[mph].file1 += 1;
 	}
 
-	for (usize i = 0; i < xe->xdf2.minimal_perfect_hash.length; i++) {
-		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
+	for (usize i = 0; i < xe->xdf2->minimal_perfect_hash.length; i++) {
+		u64 mph = xe->xdf2->minimal_perfect_hash.ptr[i];
 		if (mph == xe->occurrence.length) {
 			struct xdloccurrence_t occ;
 			occ.file1 = 0;
@@ -324,8 +324,11 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
-	c_xdl_prepare_ctx(mf1, &xe->xdf1, flags);
-	c_xdl_prepare_ctx(mf2, &xe->xdf2, flags);
+	xe->xdf1 = &xe->left;
+	c_xdl_prepare_ctx(mf1, xe->xdf1, flags);
+
+	xe->xdf2 = &xe->right;
+	c_xdl_prepare_ctx(mf2, xe->xdf2, flags);
 
 	c_xdl_construct_mph_and_occurrences(xe, count_occurrences, flags);
 

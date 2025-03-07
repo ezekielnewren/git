@@ -334,7 +334,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = xe->xdf1.rindex.length + xe->xdf2.rindex.length + 3;
+	ndiags = xe->xdf1->rindex.length + xe->xdf2->rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
 		xdl_free_env(xe);
@@ -342,8 +342,8 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += xe->xdf2.rindex.length + 1;
-	kvdb += xe->xdf2.rindex.length + 1;
+	kvdf += xe->xdf2->rindex.length + 1;
+	kvdb += xe->xdf2->rindex.length + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -352,7 +352,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 
-	res = xdl_recs_cmp(&xe->xdf1, 0, xe->xdf1.rindex.length, &xe->xdf2, 0, xe->xdf2.rindex.length,
+	res = xdl_recs_cmp(xe->xdf1, 0, xe->xdf1->rindex.length, xe->xdf2, 0, xe->xdf2->rindex.length,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 	xdl_free(kvd);
@@ -927,16 +927,15 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
 	xdchange_t *cscr = NULL, *xch;
-	// char *rchg1 = (char *) xe->xdf1.rchg, *rchg2 = (char *) xe->xdf2.rchg;
 	long i1, i2, l1, l2;
 
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
-	for (i1 = xe->xdf1.record.length, i2 = xe->xdf2.record.length; i1 >= 0 || i2 >= 0; i1--, i2--)
-		if (xe->xdf1.consider.ptr[SENTINEL + i1 - 1] != NO || xe->xdf2.consider.ptr[SENTINEL + i2 - 1] != NO) {
-			for (l1 = i1; xe->xdf1.consider.ptr[SENTINEL + i1 - 1] != NO; i1--);
-			for (l2 = i2; xe->xdf2.consider.ptr[SENTINEL + i2 - 1] != NO; i2--);
+	for (i1 = xe->xdf1->record.length, i2 = xe->xdf2->record.length; i1 >= 0 || i2 >= 0; i1--, i2--)
+		if (xe->xdf1->consider.ptr[SENTINEL + i1 - 1] != NO || xe->xdf2->consider.ptr[SENTINEL + i2 - 1] != NO) {
+			for (l1 = i1; xe->xdf1->consider.ptr[SENTINEL + i1 - 1] != NO; i1--);
+			for (l2 = i2; xe->xdf2->consider.ptr[SENTINEL + i2 - 1] != NO; i2--);
 
 			if (!(xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2))) {
 				xdl_free_script(cscr);
@@ -986,11 +985,11 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
 		xrecord_t *rec;
 		long i;
 
-		rec = &xe->xdf1.record.ptr[xch->i1];
+		rec = &xe->xdf1->record.ptr[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
 			ignore = xdl_blankline((const char *) rec[i].ptr, rec[i].size_with_eol, flags);
 
-		rec = &xe->xdf2.record.ptr[xch->i2];
+		rec = &xe->xdf2->record.ptr[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
 			ignore = xdl_blankline((const char *) rec[i].ptr, rec[i].size_with_eol, flags);
 
@@ -1026,11 +1025,11 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
 		if (xch->ignore)
 			continue;
 
-		rec = &xe->xdf1.record.ptr[xch->i1];
+		rec = &xe->xdf1->record.ptr[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
 			ignore = record_matches_regex(&rec[i], xpp);
 
-		rec = &xe->xdf2.record.ptr[xch->i2];
+		rec = &xe->xdf2->record.ptr[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
 			ignore = record_matches_regex(&rec[i], xpp);
 
@@ -1048,8 +1047,8 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 		return -1;
 	}
-	if (xdl_change_compact(&xe.xdf1, &xe.xdf2, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe.xdf2, &xe.xdf1, xpp->flags) < 0 ||
+	if (xdl_change_compact(xe.xdf1, xe.xdf2, xpp->flags) < 0 ||
+	    xdl_change_compact(xe.xdf2, xe.xdf1, xpp->flags) < 0 ||
 	    xdl_build_script(&xe, &xscr) < 0) {
 
 		xdl_free_env(&xe);

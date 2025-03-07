@@ -141,8 +141,8 @@ static long get_func_line(xdfenv_t *xe, xdemitconf_t const *xecfg,
 	buf = func_line ? func_line->buf : dummy;
 	size = func_line ? sizeof(func_line->buf) : sizeof(dummy);
 
-	for (l = start; l != limit && 0 <= l && l < xe->xdf1.record.length; l += step) {
-		long len = match_func_rec(&xe->xdf1, xecfg, l, buf, size);
+	for (l = start; l != limit && 0 <= l && l < xe->xdf1->record.length; l += step) {
+		long len = match_func_rec(xe->xdf1, xecfg, l, buf, size);
 		if (len >= 0) {
 			if (func_line)
 				func_line->len = len;
@@ -185,15 +185,15 @@ pre_context_calculation:
 			long fs1, i1 = xch->i1;
 
 			/* Appended chunk? */
-			if (i1 >= xe->xdf1.record.length) {
+			if (i1 >= xe->xdf1->record.length) {
 				long i2 = xch->i2;
 
 				/*
 				 * We don't need additional context if
 				 * a whole function was added.
 				 */
-				while (i2 < xe->xdf2.record.length) {
-					if (is_func_rec(&xe->xdf2, xecfg, i2))
+				while (i2 < xe->xdf2->record.length) {
+					if (is_func_rec(xe->xdf2, xecfg, i2))
 						goto post_context_calculation;
 					i2++;
 				}
@@ -202,12 +202,12 @@ pre_context_calculation:
 				 * Otherwise get more context from the
 				 * pre-image.
 				 */
-				i1 = xe->xdf1.record.length - 1;
+				i1 = xe->xdf1->record.length - 1;
 			}
 
 			fs1 = get_func_line(xe, xecfg, NULL, i1, -1);
-			while (fs1 > 0 && !is_empty_rec(&xe->xdf1, fs1 - 1) &&
-			       !is_func_rec(&xe->xdf1, xecfg, fs1 - 1))
+			while (fs1 > 0 && !is_empty_rec(xe->xdf1, fs1 - 1) &&
+			       !is_func_rec(xe->xdf1, xecfg, fs1 - 1))
 				fs1--;
 			if (fs1 < 0)
 				fs1 = 0;
@@ -234,8 +234,8 @@ pre_context_calculation:
 
  post_context_calculation:
 		lctx = xecfg->ctxlen;
-		lctx = XDL_MIN(lctx, xe->xdf1.record.length - (xche->i1 + xche->chg1));
-		lctx = XDL_MIN(lctx, xe->xdf2.record.length - (xche->i2 + xche->chg2));
+		lctx = XDL_MIN(lctx, xe->xdf1->record.length - (xche->i1 + xche->chg1));
+		lctx = XDL_MIN(lctx, xe->xdf2->record.length - (xche->i2 + xche->chg2));
 
 		e1 = xche->i1 + xche->chg1 + lctx;
 		e2 = xche->i2 + xche->chg2 + lctx;
@@ -243,13 +243,13 @@ pre_context_calculation:
 		if (xecfg->flags & XDL_EMIT_FUNCCONTEXT) {
 			long fe1 = get_func_line(xe, xecfg, NULL,
 						 xche->i1 + xche->chg1,
-						 xe->xdf1.record.length);
-			while (fe1 > 0 && is_empty_rec(&xe->xdf1, fe1 - 1))
+						 xe->xdf1->record.length);
+			while (fe1 > 0 && is_empty_rec(xe->xdf1, fe1 - 1))
 				fe1--;
 			if (fe1 < 0)
-				fe1 = xe->xdf1.record.length;
+				fe1 = xe->xdf1->record.length;
 			if (fe1 > e1) {
-				e2 = XDL_MIN(e2 + (fe1 - e1), xe->xdf2.record.length);
+				e2 = XDL_MIN(e2 + (fe1 - e1), xe->xdf2->record.length);
 				e1 = fe1;
 			}
 
@@ -260,7 +260,7 @@ pre_context_calculation:
 			 */
 			if (xche->next) {
 				long l = XDL_MIN(xche->next->i1,
-						 xe->xdf1.record.length - 1);
+						 xe->xdf1->record.length - 1);
 				if (l - xecfg->ctxlen <= e1 ||
 				    get_func_line(xe, xecfg, NULL, l, e1) < 0) {
 					xche = xche->next;
@@ -287,7 +287,7 @@ pre_context_calculation:
 		 * Emit pre-context.
 		 */
 		for (; s2 < xch->i2; s2++)
-			if (xdl_emit_record(&xe->xdf2, s2, " ", ecb) < 0)
+			if (xdl_emit_record(xe->xdf2, s2, " ", ecb) < 0)
 				return -1;
 
 		for (s1 = xch->i1, s2 = xch->i2;; xch = xch->next) {
@@ -295,21 +295,21 @@ pre_context_calculation:
 			 * Merge previous with current change atom.
 			 */
 			for (; s1 < xch->i1 && s2 < xch->i2; s1++, s2++)
-				if (xdl_emit_record(&xe->xdf2, s2, " ", ecb) < 0)
+				if (xdl_emit_record(xe->xdf2, s2, " ", ecb) < 0)
 					return -1;
 
 			/*
 			 * Removes lines from the first file.
 			 */
 			for (s1 = xch->i1; s1 < xch->i1 + xch->chg1; s1++)
-				if (xdl_emit_record(&xe->xdf1, s1, "-", ecb) < 0)
+				if (xdl_emit_record(xe->xdf1, s1, "-", ecb) < 0)
 					return -1;
 
 			/*
 			 * Adds lines from the second file.
 			 */
 			for (s2 = xch->i2; s2 < xch->i2 + xch->chg2; s2++)
-				if (xdl_emit_record(&xe->xdf2, s2, "+", ecb) < 0)
+				if (xdl_emit_record(xe->xdf2, s2, "+", ecb) < 0)
 					return -1;
 
 			if (xch == xche)
@@ -322,7 +322,7 @@ pre_context_calculation:
 		 * Emit post-context.
 		 */
 		for (s2 = xche->i2 + xche->chg2; s2 < e2; s2++)
-			if (xdl_emit_record(&xe->xdf2, s2, " ", ecb) < 0)
+			if (xdl_emit_record(xe->xdf2, s2, " ", ecb) < 0)
 				return -1;
 	}
 

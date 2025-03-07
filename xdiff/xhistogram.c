@@ -86,7 +86,7 @@ struct region {
 	((LINE_MAP(index, ptr))->cnt)
 
 #define MPH(env, s, l) \
-	(env->xdf##s.minimal_perfect_hash.ptr[l - 1])
+	(env->xdf##s->minimal_perfect_hash.ptr[l - 1])
 
 #define CMP(i, s1, l1, s2, l2) \
 	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
@@ -312,11 +312,11 @@ redo:
 
 	if (!count1) {
 		while(count2--)
-			env->xdf2.consider.ptr[SENTINEL + line2++ - 1] = YES;
+			env->xdf2->consider.ptr[SENTINEL + line2++ - 1] = YES;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			env->xdf1.consider.ptr[SENTINEL + line1++ - 1] = YES;
+			env->xdf1->consider.ptr[SENTINEL + line1++ - 1] = YES;
 		return 0;
 	}
 
@@ -329,9 +329,9 @@ redo:
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
-				env->xdf1.consider.ptr[SENTINEL + line1++ - 1] = YES;
+				env->xdf1->consider.ptr[SENTINEL + line1++ - 1] = YES;
 			while (count2--)
-				env->xdf2.consider.ptr[SENTINEL + line2++ - 1] = YES;
+				env->xdf2->consider.ptr[SENTINEL + line2++ - 1] = YES;
 			result = 0;
 		} else {
 			result = histogram_diff(xpp, env,
@@ -357,8 +357,8 @@ out:
 }
 
 int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
-	isize end1 = env->xdf1.record.length - env->delta_end;
-	isize end2 = env->xdf2.record.length - env->delta_end;
+	isize end1 = env->xdf1->record.length - env->delta_end;
+	isize end2 = env->xdf2->record.length - env->delta_end;
 
 	return histogram_diff(xpp, env,
 		env->delta_start + LINE_SHIFT, end1 - env->delta_start,
