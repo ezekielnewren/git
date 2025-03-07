@@ -337,7 +337,6 @@ int xdl_do_diff(xdfile_t *xdf1, xdfile_t *xdf2, xpparam_t const *xpp,
 	ndiags = xe->xdf1->rindex.length + xe->xdf2->rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
-		xdl_env_free(xe);
 		return -1;
 	}
 	kvdf = kvd;
@@ -357,8 +356,6 @@ int xdl_do_diff(xdfile_t *xdf1, xdfile_t *xdf2, xpparam_t const *xpp,
 			   &xenv);
 	xdl_free(kvd);
  out:
-	if (res < 0)
-		xdl_env_free(xe);
 
 	return res;
 }
@@ -1053,8 +1050,7 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	if (xdl_change_compact(xe.xdf1, xe.xdf2, xpp->flags) < 0 ||
 	    xdl_change_compact(xe.xdf2, xe.xdf1, xpp->flags) < 0 ||
 	    xdl_build_script(&xe, &xscr) < 0) {
-
-		xdl_env_free(&xe);
+		xdl_2way_free(&two_way);
 		return -1;
 	}
 	if (xscr) {
@@ -1067,12 +1063,12 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		if (ef(&xe, xscr, ecb, xecfg) < 0) {
 
 			xdl_free_script(xscr);
-			xdl_env_free(&xe);
+			xdl_2way_free(&two_way);
 			return -1;
 		}
 		xdl_free_script(xscr);
 	}
-	xdl_env_free(&xe);
+	xdl_2way_free(&two_way);
 
 	return 0;
 }

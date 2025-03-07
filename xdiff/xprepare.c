@@ -77,9 +77,9 @@ void xdl_file_free(xdfile_t *xdf) {
 }
 
 
-void xdl_env_free(xdfenv_t *xe) {
-	xdl_file_free(xe->xdf1);
-	xdl_file_free(xe->xdf2);
+void xdl_2way_free(struct xd2way *two_way) {
+	rust_ivec_free(&two_way->xdf1);
+	rust_ivec_free(&two_way->xdf2);
 }
 
 
