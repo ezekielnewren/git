@@ -311,24 +311,14 @@ static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, bool count_occurre
 #ifdef WITH_RUST
 extern int rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, ivec_xdloccurrence_t *occ_ptr, u64 flags, xdfenv_t *xe);
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
-	xdfenv_t xe_alt;
 
 	bool count_occurrences = (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0;
 	IVEC_INIT(xe->occurrence);
-	IVEC_INIT(xe_alt.occurrence);
-
-	c_xdl_prepare_ctx(mf1, &xe_alt.xdf1, flags);
-	c_xdl_prepare_ctx(mf2, &xe_alt.xdf2, flags);
 
 	rust_xdl_prepare_ctx(mf1, &xe->xdf1, flags);
 	rust_xdl_prepare_ctx(mf2, &xe->xdf2, flags);
 
-	rust_env_equal(&xe_alt, xe);
-
-	c_xdl_construct_mph_and_occurrences(&xe_alt, count_occurrences, flags);
 	rust_xdl_construct_mph_and_occurrences(xe, count_occurrences, flags);
-
-	rust_env_equal(xe, &xe_alt);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		xdl_optimize_ctxs(xe);
