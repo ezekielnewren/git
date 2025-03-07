@@ -29,8 +29,7 @@
 
 
 static void xdl_free_ctx(xdfile_t *xdf);
-static int xdl_clean_mmatch(char const *dis, long i, long s, long e);
-static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
+static int xdl_clean_mmatch(char const *dis, long i, long start, long e);
 
 #ifdef WITH_RUST
 extern int rust_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags);
@@ -70,9 +69,6 @@ static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
 
-	xdf->dstart = 0;
-	xdf->dend = xdf->record.length - 1;
-
 	return 0;
 }
 
@@ -91,7 +87,7 @@ void xdl_free_env(xdfenv_t *xe) {
 }
 
 
-static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
+static int xdl_clean_mmatch(char const *dis, long i, long start, long end) {
 	long r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
@@ -101,10 +97,10 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	 * proceed all the way to the extremities by causing huge
 	 * performance penalties in case of big files.
 	 */
-	if (i - s > XDL_SIMSCAN_WINDOW)
-		s = i - XDL_SIMSCAN_WINDOW;
-	if (e - i > XDL_SIMSCAN_WINDOW)
-		e = i + XDL_SIMSCAN_WINDOW;
+	if (i - start > XDL_SIMSCAN_WINDOW)
+		start = i - XDL_SIMSCAN_WINDOW;
+	if (end - i > XDL_SIMSCAN_WINDOW)
+		end = i + XDL_SIMSCAN_WINDOW;
 
 	/*
 	 * Scans the lines before 'i' to find a run of lines that either
@@ -112,7 +108,7 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	 * Note that we always call this function with dis[i] > 1, so the
 	 * current line (i) is already a multimatch line.
 	 */
-	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
+	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= start; r++) {
 		if (!dis[i - r])
 			rdis0++;
 		else if (dis[i - r] == 2)
@@ -128,7 +124,7 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	 */
 	if (rdis0 == 0)
 		return 0;
-	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
+	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < end; r++) {
 		if (!dis[i + r])
 			rdis1++;
 		else if (dis[i + r] == 2)
@@ -157,6 +153,8 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 	long i, nm, mlim;
 	ivec_u8 dis1;
 	ivec_u8 dis2;
+	usize end1 = xe->xdf1.record.length - xe->delta_end;
+	usize end2 = xe->xdf2.record.length - xe->delta_end;
 
 	IVEC_INIT(dis1);
 	IVEC_INIT(dis2);
@@ -172,7 +170,7 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 
 	if ((mlim = xdl_bogosqrt(xe->xdf1.record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
+	for (i = xe->delta_start; i < end1; i++) {
 		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
 		nm = xe->occurrence.ptr[mph].file2;
 		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
@@ -180,23 +178,23 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 
 	if ((mlim = xdl_bogosqrt(xe->xdf2.record.length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
+	for (i = xe->delta_start; i < end2; i++) {
 		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
 		nm = xe->occurrence.ptr[mph].file1;
 		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
+	for (i = xe->delta_start; i < end1; i++) {
 		if (dis1.ptr[i] == 1 ||
-		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xe->xdf1.dstart, xe->xdf1.dend))) {
+		    (dis1.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis1.ptr, i, xe->delta_start, end1))) {
 			rust_ivec_push(&xe->xdf1.rindex, &i);
 		} else
 			xe->xdf1.consider.ptr[SENTINEL + i] = YES;
 	}
 
-	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
+	for (i = xe->delta_start; i < end2; i++) {
 		if (dis2.ptr[i] == 1 ||
-		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xe->xdf2.dstart, xe->xdf2.dend))) {
+		    (dis2.ptr[i] == 2 && !xdl_clean_mmatch((char const *) dis2.ptr, i, xe->delta_start, end2))) {
 			rust_ivec_push(&xe->xdf2.rindex, &i);
 		} else
 			xe->xdf2.consider.ptr[SENTINEL + i] = YES;
@@ -212,36 +210,33 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 /*
  * Early trim initial and terminal matching records.
  */
-static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
-	long i, lim;
-	u64 *mph1, *mph2;
+static void xdl_trim_ends(xdfenv_t *xe) {
+	usize lim = XDL_MIN(xe->xdf1.record.length, xe->xdf2.record.length);
 
-	mph1 = xdf1->minimal_perfect_hash.ptr;
-	mph2 = xdf2->minimal_perfect_hash.ptr;
-	for (i = 0, lim = XDL_MIN(xdf1->record.length, xdf2->record.length); i < lim;
-	     i++, mph1++, mph2++)
-		if (*mph1 != *mph2)
+	for (usize i = 0; i < lim; i++) {
+		u64 mph1 = xe->xdf1.minimal_perfect_hash.ptr[i];
+		u64 mph2 = xe->xdf2.minimal_perfect_hash.ptr[i];
+		if (mph1 != mph2) {
+			xe->delta_start = i;
 			break;
+		}
+	}
 
-	xdf1->dstart = xdf2->dstart = i;
-
-	mph1 = xdf1->minimal_perfect_hash.ptr + xdf1->minimal_perfect_hash.length - 1;
-	mph2 = xdf2->minimal_perfect_hash.ptr + xdf2->minimal_perfect_hash.length - 1;
-	for (lim -= i, i = 0; i < lim; i++, mph1--, mph2--)
-		if (*mph1 != *mph2)
+	for (usize i = 0; i < lim; i++) {
+		u64 mph1 = xe->xdf1.minimal_perfect_hash.ptr[xe->xdf1.minimal_perfect_hash.length - 1 - i];
+		u64 mph2 = xe->xdf2.minimal_perfect_hash.ptr[xe->xdf2.minimal_perfect_hash.length - 1 - i];
+		if (mph1 != mph2) {
+			xe->delta_end = i;
 			break;
-
-	xdf1->dend = xdf1->record.length - i - 1;
-	xdf2->dend = xdf2->record.length - i - 1;
-
-	return 0;
+		}
+	}
 }
 
 
 static int xdl_optimize_ctxs(xdfenv_t *xe) {
+	xdl_trim_ends(xe);
 
-	if (xdl_trim_ends(&xe->xdf1, &xe->xdf2) < 0 ||
-	    xdl_cleanup_records(xe) < 0) {
+	if (xdl_cleanup_records(xe) < 0) {
 
 		return -1;
 	}
@@ -326,6 +321,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	bool count_occurrences = (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0;
 	IVEC_INIT(xe->occurrence);
+	xe->delta_start = 0;
+	xe->delta_end = 0;
 
 	c_xdl_prepare_ctx(mf1, &xe->xdf1, flags);
 	c_xdl_prepare_ctx(mf2, &xe->xdf2, flags);

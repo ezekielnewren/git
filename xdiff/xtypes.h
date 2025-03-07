@@ -52,7 +52,6 @@ typedef struct s_xdfile {
 	ivec_xrecord_t record;
 	ivec_u8 consider;
 	ivec_isize rindex;
-	isize dstart, dend;
 } xdfile_t;
 
 struct xdloccurrence_t {
@@ -65,6 +64,7 @@ DEFINE_IVEC_TYPE(struct xdloccurrence_t, xdloccurrence_t);
 typedef struct s_xdfenv {
 	xdfile_t xdf1, xdf2;
 	ivec_xdloccurrence_t occurrence;
+	isize delta_start, delta_end;
 	usize minimal_perfect_hash_size;
 } xdfenv_t;
 

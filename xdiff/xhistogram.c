@@ -356,9 +356,11 @@ out:
 	return result;
 }
 
-int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env)
-{
+int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
+	isize end1 = env->xdf1.record.length - env->delta_end;
+	isize end2 = env->xdf2.record.length - env->delta_end;
+
 	return histogram_diff(xpp, env,
-		env->xdf1.dstart + 1, env->xdf1.dend - env->xdf1.dstart + 1,
-		env->xdf2.dstart + 1, env->xdf2.dend - env->xdf2.dstart + 1);
+		env->delta_start + LINE_SHIFT, end1 - env->delta_start,
+		env->delta_start + LINE_SHIFT, end2 - env->delta_start);
 }
