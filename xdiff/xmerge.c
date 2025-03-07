@@ -365,7 +365,7 @@ static int xdl_refine_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
 {
 	for (; m; m = m->next) {
 		mmfile_t t1, t2;
-		xdfile_t xdf1, xdf2;
+		struct xd2way two_way;
 		xdfenv_t xe;
 		xdchange_t *xscr, *x;
 		int i1 = m->i1, i2 = m->i2;
@@ -389,10 +389,9 @@ static int xdl_refine_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
 		t2.size = (char *) xe2->xdf2->record.ptr[m->i2 + m->chg2 - 1].ptr
 			+ xe2->xdf2->record.ptr[m->i2 + m->chg2 - 1].size_with_eol - t2.ptr;
 
-		xdl_file_prepare(&t1, xpp->flags, &xdf1);
-		xdl_file_prepare(&t2, xpp->flags, &xdf2);
+		xdl_2way_prepare(&t1, &t2, xpp->flags, &two_way);
 
-		if (xdl_do_diff(&xdf1, &xdf2, xpp, 0, &xe) < 0)
+		if (xdl_do_diff(&two_way.xdf1, &two_way.xdf2, xpp, two_way.minimal_perfect_hash_size, &xe) < 0)
 			return -1;
 		if (xdl_change_compact(xe.xdf1, xe.xdf2, xpp->flags) < 0 ||
 		    xdl_change_compact(xe.xdf2, xe.xdf1, xpp->flags) < 0 ||
