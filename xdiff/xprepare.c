@@ -32,10 +32,10 @@ static void xdl_free_ctx(xdfile_t *xdf);
 static int xdl_clean_mmatch(char const *dis, long i, long s, long e);
 static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
 
-// #ifdef WITH_RUST
-// extern int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags);
-// #else
-static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
+#ifdef WITH_RUST
+extern int rust_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags);
+#endif
+static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	struct xlinereader_t reader;
 
 	IVEC_INIT(xdf->minimal_perfect_hash);
@@ -77,7 +77,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 	return 0;
 }
-// #endif
 
 
 static void xdl_free_ctx(xdfile_t *xdf) {
@@ -261,10 +260,11 @@ static int xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 	return 0;
 }
 
-// #ifdef WITH_RUST
-// extern void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence);
-// #else
-static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence) {
+#ifdef WITH_RUST
+extern void rust_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence);
+#else
+#endif
+static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
 	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length, flags);
 
@@ -311,34 +311,12 @@ static void xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdlo
 		occurrence->ptr[mph].file2 += 1;
 	}
 }
-// #endif
 
-// #ifdef WITH_RUST
-// extern int rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, ivec_xdloccurrence_t *occ_ptr, u64 flags, xdfenv_t *xe);
-// int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
-// 	ivec_xdloccurrence_t occurrences;
-// 	ivec_xdloccurrence_t *occ_ptr;
-// 	IVEC_INIT(occurrences);
-//
-// 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-// 		occ_ptr = &occurrences;
-// 	} else {
-// 		occ_ptr = NULL;
-// 	}
-//
-// 	xdl_prepare_ctx(mf1, &xe->xdf1, flags);
-// 	xdl_prepare_ctx(mf2, &xe->xdf2, flags);
-//
-// 	xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
-//
-//
-// 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-// 		xdl_optimize_ctxs(xe, &occurrences);
-// 	}
-//
-// 	return 0;
-// }
-// #else
+
+
+
+#ifdef WITH_RUST
+extern int rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, ivec_xdloccurrence_t *occ_ptr, u64 flags, xdfenv_t *xe);
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	ivec_xdloccurrence_t occurrences;
 	ivec_xdloccurrence_t *occ_ptr;
@@ -350,10 +328,42 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 		occ_ptr = NULL;
 	}
 
-	xdl_prepare_ctx(mf1, &xe->xdf1, flags);
-	xdl_prepare_ctx(mf2, &xe->xdf2, flags);
+	xdfenv_t xe_alt;
+	c_xdl_prepare_ctx(mf1, &xe_alt.xdf1, flags);
+	c_xdl_prepare_ctx(mf2, &xe_alt.xdf2, flags);
 
-	xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
+	rust_xdl_prepare_ctx(mf1, &xe->xdf1, flags);
+	rust_xdl_prepare_ctx(mf2, &xe->xdf2, flags);
+
+	rust_env_equal(&xe_alt, xe);
+
+	c_xdl_construct_mph_and_occurrences(&xe_alt, flags, occ_ptr);
+	rust_xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
+
+	rust_env_equal(xe, &xe_alt);
+
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(xe, &occurrences);
+	}
+
+	return 0;
+}
+#else
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
+	ivec_xdloccurrence_t occurrences;
+	ivec_xdloccurrence_t *occ_ptr;
+	IVEC_INIT(occurrences);
+
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		occ_ptr = &occurrences;
+	} else {
+		occ_ptr = NULL;
+	}
+
+	c_xdl_prepare_ctx(mf1, &xe->xdf1, flags);
+	c_xdl_prepare_ctx(mf2, &xe->xdf2, flags);
+
+	c_xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
 
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
@@ -362,4 +372,4 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 
 	return 0;
 }
-// #endif
+#endif

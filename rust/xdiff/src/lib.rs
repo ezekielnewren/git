@@ -3,9 +3,10 @@ use std::io::Write;
 use sha2::{Digest};
 use xxhash_rust::xxh3::{xxh3_64, Xxh3};
 use interop::ivec::IVec;
+use crate::gitmap::HashEq;
 use crate::xdfenv::{xdfenv_t, xdfile_t};
 use crate::xdiff::{mmfile_t, XDF_IGNORE_WHITESPACE_WITHIN};
-use crate::xrecord::IterWhiteSpace;
+use crate::xrecord::{xrecord_he, IterWhiteSpace};
 use crate::xtypes::Occurrence;
 
 pub(crate) mod xutils;
@@ -16,6 +17,33 @@ pub(crate) mod xdfenv;
 #[cfg(test)]
 pub(crate) mod mock;
 pub mod gitmap;
+
+#[no_mangle]
+unsafe extern "C" fn rust_env_equal(expected: *mut xdfenv_t, actual: *mut xdfenv_t) {
+    let expected = xdfenv_t::from_raw(expected, false);
+    let actual = xdfenv_t::from_raw(actual, false);
+    let he = xrecord_he::new(0);
+
+    assert_eq!(expected.xdf1.minimal_perfect_hash, actual.xdf1.minimal_perfect_hash);
+    assert_eq!(expected.xdf1.record.len(), actual.xdf1.record.len());
+    for i in 0..expected.xdf1.record.len() {
+        assert!(he.eq(&expected.xdf1.record[i], &actual.xdf1.record[i]));
+    }
+    assert_eq!(expected.xdf1.rchg_vec, actual.xdf1.rchg_vec);
+    assert_eq!(expected.xdf1.rindex, actual.xdf1.rindex);
+
+    assert_eq!(expected.xdf2.minimal_perfect_hash, actual.xdf2.minimal_perfect_hash);
+    assert_eq!(expected.xdf2.record.len(), actual.xdf2.record.len());
+    for i in 0..expected.xdf2.record.len() {
+        assert!(he.eq(&expected.xdf2.record[i], &actual.xdf2.record[i]));
+    }
+    assert_eq!(expected.xdf2.rchg_vec, actual.xdf2.rchg_vec);
+    assert_eq!(expected.xdf2.rindex, actual.xdf2.rindex);
+
+
+
+}
+
 
 #[no_mangle]
 unsafe extern "C" fn xdl_line_hash(ptr: *const u8, line_size_no_eol: usize, flags: u64) -> u64 {
@@ -32,28 +60,28 @@ unsafe extern "C" fn xdl_line_hash(ptr: *const u8, line_size_no_eol: usize, flag
     }
 }
 
-// #[no_mangle]
-// unsafe extern "C" fn xdl_prepare_ctx(_mf: *const mmfile_t, _xdf: *mut xdfile_t, flags: u64) -> i32 {
-//     let mf: &[u8] = mmfile_t::from_raw(_mf);
-//     let xdf: &mut xdfile_t = xdfile_t::from_raw(_xdf, true);
-//
-//     *xdf = xdfile_t::new(mf, flags);
-//
-//     0
-// }
-//
-// #[no_mangle]
-// unsafe extern "C" fn xdl_construct_mph_and_occurrences(xe: *mut xdfenv_t, flags: u64, occurrence: *mut IVec<Occurrence>) {
-//     let xe = xdfenv_t::from_raw(xe, false);
-//     let occ = if occurrence.is_null() {
-//         None
-//     } else {
-//         Some(IVec::from_raw_mut(occurrence))
-//     };
-//
-//     xe.construct_mph_and_occurrences(occ, flags);
-//
-// }
+#[no_mangle]
+unsafe extern "C" fn rust_xdl_prepare_ctx(_mf: *const mmfile_t, _xdf: *mut xdfile_t, flags: u64) -> i32 {
+    let mf: &[u8] = mmfile_t::from_raw(_mf);
+    let xdf: &mut xdfile_t = xdfile_t::from_raw(_xdf, true);
+
+    *xdf = xdfile_t::new(mf, flags);
+
+    0
+}
+
+#[no_mangle]
+unsafe extern "C" fn rust_xdl_construct_mph_and_occurrences(xe: *mut xdfenv_t, flags: u64, occurrence: *mut IVec<Occurrence>) {
+    let xe = xdfenv_t::from_raw(xe, false);
+    let occ = if occurrence.is_null() {
+        None
+    } else {
+        Some(IVec::from_raw_mut(occurrence))
+    };
+
+    xe.construct_mph_and_occurrences(occ, flags);
+
+}
 
 
 // #[no_mangle]
