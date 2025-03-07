@@ -40,7 +40,7 @@ unsafe extern "C" fn rust_env_equal(expected: *mut xdfenv_t, actual: *mut xdfenv
     assert_eq!(expected.xdf2.rchg_vec, actual.xdf2.rchg_vec);
     assert_eq!(expected.xdf2.rindex, actual.xdf2.rindex);
 
-
+    assert_eq!(expected.occurrence, actual.occurrence);
 
 }
 
@@ -71,15 +71,10 @@ unsafe extern "C" fn rust_xdl_prepare_ctx(_mf: *const mmfile_t, _xdf: *mut xdfil
 }
 
 #[no_mangle]
-unsafe extern "C" fn rust_xdl_construct_mph_and_occurrences(xe: *mut xdfenv_t, flags: u64, occurrence: *mut IVec<Occurrence>) {
+unsafe extern "C" fn rust_xdl_construct_mph_and_occurrences(xe: *mut xdfenv_t, count_occurrences: bool, flags: u64) {
     let xe = xdfenv_t::from_raw(xe, false);
-    let occ = if occurrence.is_null() {
-        None
-    } else {
-        Some(IVec::from_raw_mut(occurrence))
-    };
 
-    xe.construct_mph_and_occurrences(occ, flags);
+    xe.construct_mph_and_occurrences(count_occurrences, flags);
 
 }
 

@@ -113,6 +113,7 @@ impl xdfile_t {
 pub struct xdfenv_t {
 	pub xdf1: xdfile_t,
 	pub xdf2: xdfile_t,
+	pub occurrence: IVec<Occurrence>,
 	pub minimal_perfect_hash_size: usize,
 }
 
@@ -268,7 +269,7 @@ impl xdfenv_t {
 	// }
 
 
-	pub(crate) fn construct_mph_and_occurrences(&mut self, occurrence: Option<&mut IVec<Occurrence>>, flags: u64) {
+	pub(crate) fn construct_mph_and_occurrences(&mut self, count_occurrences: bool, flags: u64) {
 		let capacity = self.xdf1.record.len() + self.xdf2.record.len();
 		let he = xrecord_he::new(flags);
 		let mut mphb = MinimalPerfectHashBuilder::<xrecord_t, xrecord_he>::with_capacity(capacity, he);
@@ -283,24 +284,24 @@ impl xdfenv_t {
 
 		self.minimal_perfect_hash_size = mphb.finish();
 
-		if let Some(occ) = occurrence {
+		if count_occurrences {
 			/*
 			 * ORDER MATTERS!!!, counting occurrences will only work properly if
 			 * the records are iterated over in the same way that the mph set
 			 * was constructed
 			 */
 			for minimal_perfect_hash in self.xdf1.minimal_perfect_hash.as_slice() {
-				if *minimal_perfect_hash == occ.len() as u64 {
-					occ.push(Occurrence::default());
+				if *minimal_perfect_hash == self.occurrence.len() as u64 {
+					self.occurrence.push(Occurrence::default());
 				}
-				occ[*minimal_perfect_hash as usize].file1 += 1;
+				self.occurrence[*minimal_perfect_hash as usize].file1 += 1;
 			}
 
 			for minimal_perfect_hash in self.xdf2.minimal_perfect_hash.as_slice() {
-				if *minimal_perfect_hash == occ.len() as u64 {
-					occ.push(Occurrence::default());
+				if *minimal_perfect_hash == self.occurrence.len() as u64 {
+					self.occurrence.push(Occurrence::default());
 				}
-				occ[*minimal_perfect_hash as usize].file1 += 1;
+				self.occurrence[*minimal_perfect_hash as usize].file1 += 1;
 			}
 		}
 	}
@@ -314,13 +315,9 @@ impl xdfenv_t {
 		xe.xdf1 = xdfile_t::new(mf1, flags);
 		xe.xdf2 = xdfile_t::new(mf2, flags);
 
-		let mut occurrence: IVec<Occurrence> = IVec::new();
-		let mut occ = None;
-		if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
-			occ = Some(&mut occurrence);
-		}
+		let count_occurrences = (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0;
 
-		xe.construct_mph_and_occurrences(occ, flags);
+		xe.construct_mph_and_occurrences(count_occurrences, flags);
 
 		// if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
 		// 	xe.trim_ends();
@@ -377,7 +374,7 @@ mod tests {
 			xe.xdf2 = xdfile_t::new(after.as_slice(), _flags);
 
 			let mut occ = IVec::<Occurrence>::new();
-			xe.construct_mph_and_occurrences(Some(&mut occ), _flags);
+			xe.construct_mph_and_occurrences(true, _flags);
 
 		}
 	}

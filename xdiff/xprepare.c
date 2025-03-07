@@ -152,19 +152,12 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	return rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1);
 }
 
-typedef struct {
-	usize file1;
-	usize file2;
-} xdloccurrence_t;
-
-DEFINE_IVEC_TYPE(xdloccurrence_t, xdloccurrence_t);
-
 /*
  * Try to reduce the problem complexity, discard records that have no
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
+static int xdl_cleanup_records(xdfenv_t *xe) {
 	long i, nm, mlim;
 	ivec_u8 dis1;
 	ivec_u8 dis2;
@@ -185,7 +178,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->xdf1.dstart; i <= xe->xdf1.dend; i++) {
 		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
-		nm = occ->ptr[mph].file2;
+		nm = xe->occurrence.ptr[mph].file2;
 		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
@@ -193,7 +186,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->xdf2.dstart; i <= xe->xdf2.dend; i++) {
 		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
-		nm = occ->ptr[mph].file1;
+		nm = xe->occurrence.ptr[mph].file1;
 		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
@@ -249,10 +242,10 @@ static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
 }
 
 
-static int xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
+static int xdl_optimize_ctxs(xdfenv_t *xe) {
 
 	if (xdl_trim_ends(&xe->xdf1, &xe->xdf2) < 0 ||
-	    xdl_cleanup_records(xe, occ) < 0) {
+	    xdl_cleanup_records(xe) < 0) {
 
 		return -1;
 	}
@@ -264,7 +257,7 @@ static int xdl_optimize_ctxs(xdfenv_t *xe, ivec_xdloccurrence_t *occ) {
 extern void rust_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence);
 #else
 #endif
-static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence) {
+static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, bool count_occurrences, u64 flags) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
 	xdl_mphb_init(&mphb, xe->xdf1.record.length + xe->xdf2.record.length, flags);
 
@@ -281,7 +274,7 @@ static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xd
 
 	xe->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
 
-	if (occurrence == NULL)
+	if (!count_occurrences)
 		return;
 
 	/*
@@ -291,24 +284,24 @@ static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xd
 	 */
 	for (usize i = 0; i < xe->xdf1.minimal_perfect_hash.length; i++) {
 		u64 mph = xe->xdf1.minimal_perfect_hash.ptr[i];
-		if (mph == occurrence->length) {
-			xdloccurrence_t occ;
+		if (mph == xe->occurrence.length) {
+			struct xdloccurrence_t occ;
 			occ.file1 = 0;
 			occ.file2 = 0;
-			rust_ivec_push(occurrence, &occ);
+			rust_ivec_push(&xe->occurrence, &occ);
 		}
-		occurrence->ptr[mph].file1 += 1;
+		xe->occurrence.ptr[mph].file1 += 1;
 	}
 
 	for (usize i = 0; i < xe->xdf2.minimal_perfect_hash.length; i++) {
 		u64 mph = xe->xdf2.minimal_perfect_hash.ptr[i];
-		if (mph == occurrence->length) {
-			xdloccurrence_t occ;
+		if (mph == xe->occurrence.length) {
+			struct xdloccurrence_t occ;
 			occ.file1 = 0;
 			occ.file2 = 0;
-			rust_ivec_push(occurrence, &occ);
+			rust_ivec_push(&xe->occurrence, &occ);
 		}
-		occurrence->ptr[mph].file2 += 1;
+		xe->occurrence.ptr[mph].file2 += 1;
 	}
 }
 
@@ -318,17 +311,12 @@ static void c_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xd
 #ifdef WITH_RUST
 extern int rust_xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, ivec_xdloccurrence_t *occ_ptr, u64 flags, xdfenv_t *xe);
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
-	ivec_xdloccurrence_t occurrences;
-	ivec_xdloccurrence_t *occ_ptr;
-	IVEC_INIT(occurrences);
-
-	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		occ_ptr = &occurrences;
-	} else {
-		occ_ptr = NULL;
-	}
-
 	xdfenv_t xe_alt;
+
+	bool count_occurrences = (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0;
+	IVEC_INIT(xe->occurrence);
+	IVEC_INIT(xe_alt.occurrence);
+
 	c_xdl_prepare_ctx(mf1, &xe_alt.xdf1, flags);
 	c_xdl_prepare_ctx(mf2, &xe_alt.xdf2, flags);
 
@@ -337,37 +325,30 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 
 	rust_env_equal(&xe_alt, xe);
 
-	c_xdl_construct_mph_and_occurrences(&xe_alt, flags, occ_ptr);
-	rust_xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
+	c_xdl_construct_mph_and_occurrences(&xe_alt, count_occurrences, flags);
+	rust_xdl_construct_mph_and_occurrences(xe, count_occurrences, flags);
 
 	rust_env_equal(xe, &xe_alt);
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		xdl_optimize_ctxs(xe, &occurrences);
+		xdl_optimize_ctxs(xe);
 	}
 
 	return 0;
 }
 #else
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
-	ivec_xdloccurrence_t occurrences;
-	ivec_xdloccurrence_t *occ_ptr;
-	IVEC_INIT(occurrences);
-
-	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		occ_ptr = &occurrences;
-	} else {
-		occ_ptr = NULL;
-	}
+	bool count_occurrences = (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0;
+	IVEC_INIT(xe->occurrence);
 
 	c_xdl_prepare_ctx(mf1, &xe->xdf1, flags);
 	c_xdl_prepare_ctx(mf2, &xe->xdf2, flags);
 
-	c_xdl_construct_mph_and_occurrences(xe, flags, occ_ptr);
+	c_xdl_construct_mph_and_occurrences(xe, count_occurrences, flags);
 
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		xdl_optimize_ctxs(xe, &occurrences);
+		xdl_optimize_ctxs(xe);
 	}
 
 	return 0;

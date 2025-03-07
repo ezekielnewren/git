@@ -60,7 +60,7 @@ impl Into<u8> for ConsiderLine {
 
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct Occurrence {
 	pub file1: usize,
 	pub file2: usize,
