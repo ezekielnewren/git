@@ -41,7 +41,7 @@ static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 	IVEC_INIT(xdf->minimal_perfect_hash);
 	IVEC_INIT(xdf->record);
 	IVEC_INIT(xdf->rindex);
-	IVEC_INIT(xdf->rchg_vec);
+	IVEC_INIT(xdf->consider);
 
 	rust_ivec_reserve_exact(&xdf->record, mf->size >> 4);
 
@@ -65,13 +65,13 @@ static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 		}
 	}
 
-	xdf->rchg_vec.capacity = xdf->record.length + 2;
-	XDL_CALLOC_ARRAY(xdf->rchg_vec.ptr, xdf->rchg_vec.capacity);
-	xdf->rchg_vec.length = xdf->rchg_vec.capacity;
+	xdf->consider.capacity = xdf->record.length + 2;
+	XDL_CALLOC_ARRAY(xdf->consider.ptr, xdf->consider.capacity);
+	xdf->consider.length = xdf->consider.capacity;
 
 	rust_ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
 
-	xdf->rchg = xdf->rchg_vec.ptr + 1;
+	xdf->rchg = xdf->consider.ptr + 1;
 	xdf->dstart = 0;
 	xdf->dend = xdf->record.length - 1;
 
@@ -81,7 +81,7 @@ static int c_xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, u64 flags) {
 
 static void xdl_free_ctx(xdfile_t *xdf) {
 
-	rust_ivec_free(&xdf->rchg_vec);
+	rust_ivec_free(&xdf->consider);
 	rust_ivec_free(&xdf->minimal_perfect_hash);
 	rust_ivec_free(&xdf->rindex);
 	rust_ivec_free(&xdf->record);
@@ -165,10 +165,10 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 	IVEC_INIT(dis1);
 	IVEC_INIT(dis2);
 
-	dis1.capacity = dis1.length = xe->xdf1.rchg_vec.length;
+	dis1.capacity = dis1.length = xe->xdf1.consider.length;
 	XDL_CALLOC_ARRAY(dis1.ptr, dis1.capacity);
 
-	dis2.capacity = dis2.length = xe->xdf2.rchg_vec.length;
+	dis2.capacity = dis2.length = xe->xdf2.consider.length;
 	XDL_CALLOC_ARRAY(dis2.ptr, dis2.capacity);
 
 	rust_ivec_reserve_exact(&xe->xdf1.rindex, xe->xdf1.record.length);
