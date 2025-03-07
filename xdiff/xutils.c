@@ -407,7 +407,7 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	xdl_file_prepare(&subfile1, xpp->flags, &xdf1);
 	xdl_file_prepare(&subfile2, xpp->flags, &xdf2);
 
-	if (xdl_do_diff(&xdf1, &xdf2, xpp, &env) < 0)
+	if (xdl_do_diff(&xdf1, &xdf2, xpp, 0, &env) < 0)
 		return -1;
 
 	memcpy(diff_env->xdf1->consider.ptr + SENTINEL + line1 - 1, env.xdf1->consider.ptr + SENTINEL, count1);

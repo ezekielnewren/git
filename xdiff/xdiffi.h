@@ -44,7 +44,7 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 		 xdfile_t *xdf2, long off2, long lim2,
 		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv);
 int xdl_do_diff(xdfile_t *xdf1, xdfile_t *xdf2, xpparam_t const *xpp,
-		xdfenv_t *xe);
+		usize mph_size, xdfenv_t *xe);
 int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags);
 int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr);
 void xdl_free_script(xdchange_t *xscr);

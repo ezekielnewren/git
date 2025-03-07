@@ -300,7 +300,7 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	return 0;
 }
 #else
-int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, xdfenv_t *xe) {
+int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, usize mph_size, xdfenv_t *xe) {
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
@@ -315,7 +315,11 @@ int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, xdfenv_t *xe) {
 	xe->xdf1 = xdf1;
 	xe->xdf2 = xdf2;
 
-	xdl_build_mph(xe, flags);
+	if (mph_size == 0) {
+		xdl_build_mph(xe, flags);
+	} else {
+		xe->minimal_perfect_hash_size = mph_size;
+	}
 
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {

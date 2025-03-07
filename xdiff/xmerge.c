@@ -392,7 +392,7 @@ static int xdl_refine_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
 		xdl_file_prepare(&t1, xpp->flags, &xdf1);
 		xdl_file_prepare(&t2, xpp->flags, &xdf2);
 
-		if (xdl_do_diff(&xdf1, &xdf2, xpp, &xe) < 0)
+		if (xdl_do_diff(&xdf1, &xdf2, xpp, 0, &xe) < 0)
 			return -1;
 		if (xdl_change_compact(xe.xdf1, xe.xdf2, xpp->flags) < 0 ||
 		    xdl_change_compact(xe.xdf2, xe.xdf1, xpp->flags) < 0 ||
@@ -703,10 +703,10 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	xdl_file_prepare(mf1, xpp->flags, &side1);
 	xdl_file_prepare(mf2, xpp->flags, &side2);
 
-	if (xdl_do_diff(&base, &side1, xpp, &xe1) < 0)
+	if (xdl_do_diff(&base, &side1, xpp, 0, &xe1) < 0)
 		return -1;
 
-	if (xdl_do_diff(&base_copy, &side2, xpp, &xe2) < 0)
+	if (xdl_do_diff(&base_copy, &side2, xpp, 0, &xe2) < 0)
 		goto free_xe1; /* avoid double free of xe2 */
 
 	if (xdl_change_compact(xe1.xdf1, xe1.xdf2, xpp->flags) < 0 ||
