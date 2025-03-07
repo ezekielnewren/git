@@ -323,12 +323,12 @@ int xdl_env_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, xdfenv_t *xe) {
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
-	xdl_file_init(&xe->left);
-	xe->xdf1 = &xe->left;
+	// xdl_file_init(&xe->left);
+	// xe->xdf1 = &xe->left;
 	xdl_file_prepare(mf1, flags, xe->xdf1);
 
-	xdl_file_init(&xe->right);
-	xe->xdf2 = &xe->right;
+	// xdl_file_init(&xe->right);
+	// xe->xdf2 = &xe->right;
 	xdl_file_prepare(mf2, flags, xe->xdf2);
 
 	c_xdl_construct_mph_and_occurrences(xe, count_occurrences, flags);

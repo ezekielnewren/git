@@ -1040,8 +1040,14 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
 	xdchange_t *xscr;
+	xdfile_t xdf1, xdf2;
 	xdfenv_t xe;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
+
+	xdl_file_init(&xdf1);
+	xdl_file_init(&xdf2);
+	xe.xdf1 = &xdf1;
+	xe.xdf2 = &xdf2;
 
 	if (xdl_do_diff(mf1, mf2, xpp, &xe) < 0) {
 

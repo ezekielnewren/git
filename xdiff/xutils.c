@@ -393,7 +393,13 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	 * ranges of lines instead of the whole files.
 	 */
 	mmfile_t subfile1, subfile2;
+	xdfile_t xdf1, xdf2;
 	xdfenv_t env;
+
+	xdl_file_init(&xdf1);
+	xdl_file_init(&xdf2);
+	env.xdf1 = &xdf1;
+	env.xdf2 = &xdf2;
 
 	subfile1.ptr = (char *) diff_env->xdf1->record.ptr[line1 - 1].ptr;
 	subfile1.size = (char *) diff_env->xdf1->record.ptr[line1 + count1 - 2].ptr +

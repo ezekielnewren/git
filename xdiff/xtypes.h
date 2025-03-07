@@ -62,7 +62,6 @@ struct xdloccurrence_t {
 DEFINE_IVEC_TYPE(struct xdloccurrence_t, xdloccurrence_t);
 
 typedef struct s_xdfenv {
-	xdfile_t left, right;
 	xdfile_t *xdf1, *xdf2;
 	ivec_xdloccurrence_t occurrence;
 	isize delta_start, delta_end;
