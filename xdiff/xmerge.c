@@ -689,7 +689,8 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
 	xdchange_t *xscr1 = NULL, *xscr2 = NULL;
-	struct xd2way a2way, b2way;
+	struct xd3way three_way;
+	xdfile_t base_copy;
 	xdfenv_t xe1, xe2;
 	int status = -1;
 	xpparam_t const *xpp = &xmp->xpp;
@@ -697,14 +698,19 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	result->ptr = NULL;
 	result->size = 0;
 
-	xdl_2way_prepare(orig, mf1, xpp->flags, &a2way);
-	xdl_2way_prepare(orig, mf2, xpp->flags, &b2way);
+	xdl_3way_prepare(orig, mf1, mf2, xpp->flags, &three_way);
 
+	xdl_file_init(&base_copy);
 
-	if (xdl_do_diff(&a2way.xdf1, &a2way.xdf2, xpp, a2way.minimal_perfect_hash_size, &xe1) < 0)
+	rust_ivec_clone(&three_way.base.minimal_perfect_hash, &base_copy.minimal_perfect_hash);
+	rust_ivec_clone(&three_way.base.record, &base_copy.record);
+	rust_ivec_clone(&three_way.base.consider, &base_copy.consider);
+	rust_ivec_clone(&three_way.base.rindex, &base_copy.rindex);
+
+	if (xdl_do_diff(&three_way.base, &three_way.side1, xpp, three_way.minimal_perfect_hash_size, &xe1) < 0)
 		return -1;
 
-	if (xdl_do_diff(&b2way.xdf1, &b2way.xdf2, xpp, b2way.minimal_perfect_hash_size, &xe2) < 0)
+	if (xdl_do_diff(&base_copy, &three_way.side2, xpp, three_way.minimal_perfect_hash_size, &xe2) < 0)
 		goto free_xe1; /* avoid double free of xe2 */
 
 	if (xdl_change_compact(xe1.xdf1, xe1.xdf2, xpp->flags) < 0 ||
@@ -740,9 +746,9 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	xdl_free_script(xscr1);
 	xdl_free_script(xscr2);
 
-	xdl_2way_free(&b2way);
  free_xe1:
-	xdl_2way_free(&a2way);
+	xdl_3way_free(&three_way);
+	xdl_file_free(&base_copy);
 
 	return status;
 }

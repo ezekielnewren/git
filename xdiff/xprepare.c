@@ -28,6 +28,12 @@
 #define XDL_SIMSCAN_WINDOW 100
 
 
+void xdl_file_init(xdfile_t *xdf) {
+	IVEC_INIT(xdf->minimal_perfect_hash);
+	IVEC_INIT(xdf->record);
+	IVEC_INIT(xdf->rindex);
+	IVEC_INIT(xdf->consider);
+}
 
 #ifdef WITH_RUST
 extern void rust_xdl_file_prepare(mmfile_t *mf, xdfile_t *xdf, u64 flags);
@@ -35,10 +41,7 @@ extern void rust_xdl_file_prepare(mmfile_t *mf, xdfile_t *xdf, u64 flags);
 void xdl_file_prepare(mmfile_t *mf, u64 flags, xdfile_t *xdf) {
 	struct xlinereader_t reader;
 
-	IVEC_INIT(xdf->minimal_perfect_hash);
-	IVEC_INIT(xdf->record);
-	IVEC_INIT(xdf->rindex);
-	IVEC_INIT(xdf->consider);
+	xdl_file_init(xdf);
 
 	rust_ivec_reserve_exact(&xdf->record, mf->size >> 4);
 
@@ -80,6 +83,13 @@ void xdl_file_free(xdfile_t *xdf) {
 void xdl_2way_free(struct xd2way *two_way) {
 	rust_ivec_free(&two_way->xdf1);
 	rust_ivec_free(&two_way->xdf2);
+}
+
+
+void xdl_3way_free(struct xd3way *three_way) {
+	rust_ivec_free(&three_way->base);
+	rust_ivec_free(&three_way->side1);
+	rust_ivec_free(&three_way->side2);
 }
 
 

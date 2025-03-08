@@ -23,7 +23,7 @@
 #if !defined(XPREPARE_H)
 #define XPREPARE_H
 
-
+void xdl_file_init(xdfile_t *xdf);
 void xdl_file_prepare(mmfile_t *mf, u64 flags, xdfile_t *xdf);
 void xdl_file_free(xdfile_t *xdf);
 
