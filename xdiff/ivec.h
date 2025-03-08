@@ -44,6 +44,7 @@ void  rust_ivec_resize(void* self, usize new_length, void* default_value);
 void  rust_ivec_push(void* self, void* value);
 bool  rust_ivec_equal(void* self, void* other);
 void rust_ivec_clone(void* self, void* dest);
+void rust_ivec_move(void* self, void* dest);
 void  rust_ivec_free(void* self);
 
 #endif //IVEC_H

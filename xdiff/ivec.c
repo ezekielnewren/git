@@ -102,6 +102,28 @@ void rust_ivec_clone(void* self, void* dest) {
 	memcpy(other->ptr, this->ptr, this->length * this->element_size);
 }
 
+/*
+ * dest MUST already be initialized, this function will destroy anything
+ * that already exists in dest
+ */
+void rust_ivec_move(void* self, void* dest) {
+	rawivec_t *this = self;
+	rawivec_t *other = dest;
+	if (this->element_size != other->element_size) {
+		BUG("both ivec instances must have the same element_size");
+	}
+
+	rust_ivec_free(other);
+	other->ptr = this->ptr;
+	this->ptr = NULL;
+
+	other->length = this->length;
+	this->length = 0;
+
+	other->capacity = this->capacity;
+	this->capacity = 0;
+}
+
 
 void rust_ivec_free(void* self) {
 	rawivec_t *this = self;
