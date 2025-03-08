@@ -325,7 +325,8 @@ int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, usize mph_size, x
 	xe->xdf1 = xdf1;
 	xe->xdf2 = xdf2;
 
-	if (mph_size == 0) {
+	if ((xdf1->record.length > 0 || xdf2->record.length > 0) && mph_size == 0) {
+		BUG("mph should already be built");
 		xdl_build_mph(xe, flags);
 	} else {
 		xe->minimal_perfect_hash_size = mph_size;
