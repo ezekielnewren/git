@@ -702,12 +702,10 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 
 	xdl_file_init(&base_copy);
 
-	// rust_ivec_clone(&three_way.base.minimal_perfect_hash, &base_copy.minimal_perfect_hash);
 	base_copy.minimal_perfect_hash.ptr = three_way.base.minimal_perfect_hash.ptr;
 	base_copy.minimal_perfect_hash.length = three_way.base.minimal_perfect_hash.length;
 	base_copy.minimal_perfect_hash.capacity = three_way.base.minimal_perfect_hash.capacity;
 
-	// rust_ivec_clone(&three_way.base.record, &base_copy.record);
 	base_copy.record.ptr = three_way.base.record.ptr;
 	base_copy.record.length = three_way.base.record.length;
 	base_copy.record.capacity = three_way.base.record.capacity;
@@ -758,7 +756,6 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	xdl_3way_free(&three_way);
 	rust_ivec_free(&base_copy.consider);
 	rust_ivec_free(&base_copy.rindex);
-	// xdl_file_free(&base_copy);
 
 	return status;
 }

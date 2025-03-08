@@ -257,38 +257,10 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 
 static int xdl_optimize_ctxs(xdfenv_t *xe) {
 	xdl_trim_ends(xe);
-
-	if (xdl_cleanup_records(xe) < 0) {
-
-		return -1;
-	}
+	xdl_cleanup_records(xe);
 
 	return 0;
 }
-
-#ifdef WITH_RUST
-extern void rust_xdl_construct_mph_and_occurrences(xdfenv_t *xe, u64 flags, ivec_xdloccurrence_t *occurrence);
-#else
-#endif
-static void xdl_build_mph(xdfenv_t *xe, u64 flags) {
-	struct xdl_minimal_perfect_hash_builder_t mphb;
-	xdl_mphb_init(&mphb, xe->xdf1->record.length + xe->xdf2->record.length, flags);
-
-
-	for (usize i = 0; i < xe->xdf1->record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf1->record.ptr[i]);
-		xe->xdf1->minimal_perfect_hash.ptr[xe->xdf1->minimal_perfect_hash.length++] = mph;
-	}
-
-	for (usize i = 0; i < xe->xdf2->record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &xe->xdf2->record.ptr[i]);
-		xe->xdf2->minimal_perfect_hash.ptr[xe->xdf2->minimal_perfect_hash.length++] = mph;
-	}
-
-	xe->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
-}
-
-
 
 
 #ifdef WITH_RUST
@@ -314,23 +286,13 @@ int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, usize mph_size, x
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
-	// xdl_file_init(&xe->left);
-	// xe->xdf1 = &xe->left;
-	// xdl_file_prepare(mf1, flags, xe->xdf1);
-
-	// xdl_file_init(&xe->right);
-	// xe->xdf2 = &xe->right;
-	// xdl_file_prepare(mf2, flags, xe->xdf2);
-
 	xe->xdf1 = xdf1;
 	xe->xdf2 = xdf2;
 
 	if ((xdf1->record.length > 0 || xdf2->record.length > 0) && mph_size == 0) {
 		BUG("mph should already be built");
-		xdl_build_mph(xe, flags);
-	} else {
-		xe->minimal_perfect_hash_size = mph_size;
 	}
+	xe->minimal_perfect_hash_size = mph_size;
 
 
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
@@ -341,24 +303,26 @@ int xdl_env_prepare(xdfile_t *xdf1, xdfile_t *xdf2, u64 flags, usize mph_size, x
 }
 #endif
 
+static void mph_ingest(struct xdl_minimal_perfect_hash_builder_t *mphb, ivec_xrecord_t *record, ivec_u64 *mph) {
+	for (usize i = 0; i < record->length; i++) {
+		u64 v = xdl_mphb_hash(mphb, &record->ptr[i]);
+		mph->ptr[mph->length++] = v;
+	}
+}
+
 int xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way) {
 	struct xdl_minimal_perfect_hash_builder_t mphb;
+	usize max_unique_size = 0;
 
 	xdl_file_prepare(mf1, flags, &two_way->xdf1);
 	xdl_file_prepare(mf2, flags, &two_way->xdf2);
 
+	max_unique_size += two_way->xdf1.record.length;
+	max_unique_size += two_way->xdf2.record.length;
+	xdl_mphb_init(&mphb, max_unique_size, flags);
 
-	xdl_mphb_init(&mphb, two_way->xdf1.record.length + two_way->xdf2.record.length, flags);
-	for (usize i = 0; i < two_way->xdf1.record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &two_way->xdf1.record.ptr[i]);
-		two_way->xdf1.minimal_perfect_hash.ptr[two_way->xdf1.minimal_perfect_hash.length++] = mph;
-	}
-
-	for (usize i = 0; i < two_way->xdf2.record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &two_way->xdf2.record.ptr[i]);
-		two_way->xdf2.minimal_perfect_hash.ptr[two_way->xdf2.minimal_perfect_hash.length++] = mph;
-	}
-
+	mph_ingest(&mphb, &two_way->xdf1.record, &two_way->xdf1.minimal_perfect_hash);
+	mph_ingest(&mphb, &two_way->xdf2.record, &two_way->xdf2.minimal_perfect_hash);
 	two_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
 
 	return 0;
@@ -377,21 +341,9 @@ int xdl_3way_prepare(mmfile_t *mf_base, mmfile_t *mf_side1, mmfile_t *mf_side2, 
 	max_unique_size += three_way->side2.record.length;
 	xdl_mphb_init(&mphb, max_unique_size, flags);
 
-	for (usize i = 0; i < three_way->base.record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &three_way->base.record.ptr[i]);
-		three_way->base.minimal_perfect_hash.ptr[three_way->base.minimal_perfect_hash.length++] = mph;
-	}
-
-	for (usize i = 0; i < three_way->side1.record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &three_way->side1.record.ptr[i]);
-		three_way->side1.minimal_perfect_hash.ptr[three_way->side1.minimal_perfect_hash.length++] = mph;
-	}
-
-	for (usize i = 0; i < three_way->side2.record.length; i++) {
-		u64 mph = xdl_mphb_hash(&mphb, &three_way->side2.record.ptr[i]);
-		three_way->side2.minimal_perfect_hash.ptr[three_way->side2.minimal_perfect_hash.length++] = mph;
-	}
-
+	mph_ingest(&mphb, &three_way->base.record, &three_way->base.minimal_perfect_hash);
+	mph_ingest(&mphb, &three_way->side1.record, &three_way->side1.minimal_perfect_hash);
+	mph_ingest(&mphb, &three_way->side2.record, &three_way->side2.minimal_perfect_hash);
 	three_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
 
 	return 0;
