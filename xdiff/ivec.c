@@ -91,16 +91,15 @@ bool rust_ivec_equal(void* self, void* other) {
  */
 void rust_ivec_clone(void* self, void* dest) {
 	rawivec_t *this = self;
-	if (this->element_size != ((rawivec_t *)dest)->element_size) {
+	rawivec_t *other = dest;
+	if (this->element_size != other->element_size) {
 		BUG("both ivec instances must have the same element_size");
 	}
 
-	rust_ivec_free(dest);
-	rust_ivec_reserve_exact(dest, this->length);
-	for (usize i = 0; i < this->length; i++) {
-		void* v = (u8 *) this->ptr + i * this->element_size;
-		rust_ivec_push(dest, v);
-	}
+	rust_ivec_free(other);
+	other->capacity = other->length = this->length;
+	rust_ivec_reserve_exact(other, other->capacity);
+	memcpy(other->ptr, this->ptr, this->length * this->element_size);
 }
 
 
