@@ -691,11 +691,6 @@ bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, 
 	}
 }
 
-bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs, u64 flags) {
-	return xdl_line_equal(lhs->ptr, lhs->size_no_eol,
-		rhs->ptr, rhs->size_no_eol, flags);
-}
-
 
 void* xdl_alloc_grow_helper(void *p, long nr, long *alloc, size_t size)
 {

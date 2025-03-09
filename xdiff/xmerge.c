@@ -47,6 +47,12 @@ typedef struct s_xdmerge {
 	long chg0;
 } xdmerge_t;
 
+static bool xdl_record_equal(xrecord_t *lhs, xrecord_t *rhs, u64 flags) {
+	return xdl_line_equal(lhs->ptr, lhs->size_no_eol,
+		rhs->ptr, rhs->size_no_eol, flags);
+}
+
+
 static int xdl_append_merge(xdmerge_t **merge, int mode,
 			    long i0, long chg0,
 			    long i1, long chg1,
@@ -101,8 +107,7 @@ static int xdl_merge_cmp_lines(xdfenv_t *xe1, int i1, xdfenv_t *xe2, int i2,
 	xrecord_t *rec2 = &xe2->xdf2.record->ptr[i2];
 
 	for (i = 0; i < line_count; i++) {
-		int result = xdl_recmatch((const char *) rec1[i].ptr, rec1[i].size_with_eol,
-			(const char *) rec2[i].ptr, rec2[i].size_with_eol, flags);
+		bool result = xdl_record_equal(&rec1[i], &rec2[i], flags);
 		if (!result)
 			return -1;
 	}
@@ -322,11 +327,6 @@ static int xdl_fill_merge_buffer(xdfenv_t *xe1, const char *name1,
 	return size;
 }
 
-static int recmatch(xrecord_t *rec1, xrecord_t *rec2, unsigned long flags)
-{
-	return xdl_recmatch((const char *) rec1->ptr, rec1->size_with_eol,
-			    (const char *) rec2->ptr, rec2->size_with_eol, flags);
-}
 
 /*
  * Remove any common lines from the beginning and end of the conflicted region.
@@ -341,14 +341,14 @@ static void xdl_refine_zdiff3_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t 
 			continue;
 
 		while(m->chg1 && m->chg2 &&
-		      recmatch(&rec1[m->i1], &rec2[m->i2], xpp->flags)) {
+		      xdl_record_equal(&rec1[m->i1], &rec2[m->i2], xpp->flags)) {
 			m->chg1--;
 			m->chg2--;
 			m->i1++;
 			m->i2++;
 		}
 		while (m->chg1 && m->chg2 &&
-		       recmatch(&rec1[m->i1 + m->chg1 - 1],
+		       xdl_record_equal(&rec1[m->i1 + m->chg1 - 1],
 				&rec2[m->i2 + m->chg2 - 1], xpp->flags)) {
 			m->chg1--;
 			m->chg2--;
