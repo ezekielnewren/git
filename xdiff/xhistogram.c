@@ -275,15 +275,9 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 				}
 				result = 0;
 			} else {
-				struct xrange_t r1 = {
-					.start = range1.start,
-					.end = lcs.range1.start,
-				};
-				struct xrange_t r2 = {
-					.start = range2.start,
-					.end = lcs.range2.start,
-				};
-				result = histogram_diff(xpp, env, r1, r2);
+				result = histogram_diff(xpp, env,
+					(struct xrange_t){ range1.start, lcs.range1.start },
+					(struct xrange_t){ range2.start, lcs.range2.start });
 				if (result)
 					return result;
 				/*
