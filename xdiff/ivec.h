@@ -20,6 +20,22 @@ typedef struct { \
 
 #define IVEC_INIT(variable) rust_ivec_init(&(variable), sizeof(*(variable).ptr))
 
+#ifdef DEBUG
+#define IVEC_AT(ivec, index) \
+	if ((ivec).ptr == NULL) \
+		BUG("ivec: ptr is null"); \
+	if ((ivec).length > (ivec).capacity) \
+		BUG("ivec: length > capacity"); \
+	if (!(0 <= (index) && (index) < (ivec).length)) \
+		BUG("ivec: index out of bounds"); \
+	if (sizeof(*((ivec).ptr) != (ivec).element_size) \
+		BUG("ivec: element_size is incorrect"); \
+	(ivec).ptr[index]
+#else
+#define IVEC_AT(ivec, index) \
+	(ivec).ptr[index]
+#endif
+
 DEFINE_IVEC_TYPE(u8, u8);
 DEFINE_IVEC_TYPE(u16, u16);
 DEFINE_IVEC_TYPE(u32, u32);
