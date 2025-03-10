@@ -52,8 +52,13 @@ struct xdfile {
 	struct ivec_xrecord record;
 };
 
+DEFINE_IVEC_TYPE(struct xrecord*, xrecord_ptr);
+
 struct xd_file_context {
-	chastore_t rcha;
+	struct ivec_u64 *minimal_perfect_hash;
+	struct ivec_xrecord *record;
+	struct xdfile file_storage;
+	struct ivec_xrecord_ptr record_ptr;
 	long nrec;
 	long dstart, dend;
 	struct xrecord **recs;
