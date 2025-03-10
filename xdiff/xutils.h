@@ -39,7 +39,7 @@ unsigned int xdl_hashbits(unsigned int size);
 int xdl_num_out(char *out, long val);
 int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 		      const char *func, long funclen, xdemitcb_t *ecb);
-int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
+int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 		       int line1, int count1, int line2, int count2);
 
 /* Do not call this function, use XDL_ALLOC_GROW instead */
