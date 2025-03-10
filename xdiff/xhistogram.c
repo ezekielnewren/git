@@ -201,7 +201,6 @@ static i32 find_lcs(xdfenv_t *env,
 	i32 ret = -1;
 	struct histindex index;
 	usize table_size = env->xdf1.record->length;
-	usize default_value = 0;
 	memset(&index, 0, sizeof(index));
 
 	IVEC_INIT(index.record_storage);
@@ -209,9 +208,9 @@ static i32 find_lcs(xdfenv_t *env,
 	IVEC_INIT(index.line_map);
 	IVEC_INIT(index.next_ptrs);
 
-	rust_ivec_resize(&index.record_chain, env->minimal_perfect_hash_size, &default_value);
-	rust_ivec_resize(&index.line_map, table_size, &default_value);
-	rust_ivec_resize(&index.next_ptrs, table_size, &default_value);
+	rust_ivec_zero(&index.record_chain, env->minimal_perfect_hash_size);
+	rust_ivec_zero(&index.line_map, table_size);
+	rust_ivec_zero(&index.next_ptrs, table_size);
 
 	index.ptr_shift = start1;
 
