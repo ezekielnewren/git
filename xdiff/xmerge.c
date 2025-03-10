@@ -97,8 +97,8 @@ static int xdl_merge_cmp_lines(xdfenv_t *xe1, int i1, xdfenv_t *xe2, int i2,
 		int line_count, long flags)
 {
 	int i;
-	struct xrecord **rec1 = xe1->xdf2.recs + i1;
-	struct xrecord **rec2 = xe2->xdf2.recs + i2;
+	struct xrecord **rec1 = xe1->rhs.recs + i1;
+	struct xrecord **rec2 = xe2->rhs.recs + i2;
 
 	for (i = 0; i < line_count; i++) {
 		int result = xdl_recmatch(rec1[i]->ptr, rec1[i]->size,
@@ -114,7 +114,7 @@ static int xdl_recs_copy_0(int use_orig, xdfenv_t *xe, int i, int count, int nee
 	struct xrecord **recs;
 	int size = 0;
 
-	recs = (use_orig ? xe->xdf1.recs : xe->xdf2.recs) + i;
+	recs = (use_orig ? xe->lhs.recs : xe->rhs.recs) + i;
 
 	if (count < 1)
 		return 0;
@@ -154,28 +154,28 @@ static int xdl_orig_copy(xdfenv_t *xe, int i, int count, int needs_cr, int add_n
  * has no eol, the preceding line, if any), 0 if it ends in LF-only, and
  * -1 if the line ending cannot be determined.
  */
-static int is_eol_crlf(xdfile_t *file, int i)
+static int is_eol_crlf(struct xd_file_context *ctx, int i)
 {
 	long size;
 
-	if (i < file->nrec - 1)
+	if (i < ctx->nrec - 1)
 		/* All lines before the last *must* end in LF */
-		return (size = file->recs[i]->size) > 1 &&
-			file->recs[i]->ptr[size - 2] == '\r';
-	if (!file->nrec)
+		return (size = ctx->recs[i]->size) > 1 &&
+			ctx->recs[i]->ptr[size - 2] == '\r';
+	if (!ctx->nrec)
 		/* Cannot determine eol style from empty file */
 		return -1;
-	if ((size = file->recs[i]->size) &&
-			file->recs[i]->ptr[size - 1] == '\n')
+	if ((size = ctx->recs[i]->size) &&
+			ctx->recs[i]->ptr[size - 1] == '\n')
 		/* Last line; ends in LF; Is it CR/LF? */
 		return size > 1 &&
-			file->recs[i]->ptr[size - 2] == '\r';
+			ctx->recs[i]->ptr[size - 2] == '\r';
 	if (!i)
 		/* The only line has no eol */
 		return -1;
 	/* Determine eol from second-to-last line */
-	return (size = file->recs[i - 1]->size) > 1 &&
-		file->recs[i - 1]->ptr[size - 2] == '\r';
+	return (size = ctx->recs[i - 1]->size) > 1 &&
+		ctx->recs[i - 1]->ptr[size - 2] == '\r';
 }
 
 static int is_cr_needed(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m)
@@ -183,12 +183,12 @@ static int is_cr_needed(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m)
 	int needs_cr;
 
 	/* Match post-images' preceding, or first, lines' end-of-line style */
-	needs_cr = is_eol_crlf(&xe1->xdf2, m->i1 ? m->i1 - 1 : 0);
+	needs_cr = is_eol_crlf(&xe1->rhs, m->i1 ? m->i1 - 1 : 0);
 	if (needs_cr)
-		needs_cr = is_eol_crlf(&xe2->xdf2, m->i2 ? m->i2 - 1 : 0);
+		needs_cr = is_eol_crlf(&xe2->rhs, m->i2 ? m->i2 - 1 : 0);
 	/* Look at pre-image's first line, unless we already settled on LF */
 	if (needs_cr)
-		needs_cr = is_eol_crlf(&xe1->xdf1, 0);
+		needs_cr = is_eol_crlf(&xe1->lhs, 0);
 	/* If still undecided, use LF-only */
 	return needs_cr < 0 ? 0 : needs_cr;
 }
@@ -317,7 +317,7 @@ static int xdl_fill_merge_buffer(xdfenv_t *xe1, const char *name1,
 			continue;
 		i = m->i1 + m->chg1;
 	}
-	size += xdl_recs_copy(xe1, i, xe1->xdf2.nrec - i, 0, 0,
+	size += xdl_recs_copy(xe1, i, xe1->rhs.nrec - i, 0, 0,
 			      dest ? dest + size : NULL);
 	return size;
 }
@@ -334,7 +334,7 @@ static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long fl
 static void xdl_refine_zdiff3_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
 		xpparam_t const *xpp)
 {
-	struct xrecord **rec1 = xe1->xdf2.recs, **rec2 = xe2->xdf2.recs;
+	struct xrecord **rec1 = xe1->rhs.recs, **rec2 = xe2->rhs.recs;
 	for (; m; m = m->next) {
 		/* let's handle just the conflicts */
 		if (m->mode)
@@ -381,16 +381,16 @@ static int xdl_refine_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
 		 * This probably does not work outside git, since
 		 * we have a very simple mmfile structure.
 		 */
-		t1.ptr = (char *)xe1->xdf2.recs[m->i1]->ptr;
-		t1.size = xe1->xdf2.recs[m->i1 + m->chg1 - 1]->ptr
-			+ xe1->xdf2.recs[m->i1 + m->chg1 - 1]->size - t1.ptr;
-		t2.ptr = (char *)xe2->xdf2.recs[m->i2]->ptr;
-		t2.size = xe2->xdf2.recs[m->i2 + m->chg2 - 1]->ptr
-			+ xe2->xdf2.recs[m->i2 + m->chg2 - 1]->size - t2.ptr;
+		t1.ptr = (char *)xe1->rhs.recs[m->i1]->ptr;
+		t1.size = xe1->rhs.recs[m->i1 + m->chg1 - 1]->ptr
+			+ xe1->rhs.recs[m->i1 + m->chg1 - 1]->size - t1.ptr;
+		t2.ptr = (char *)xe2->rhs.recs[m->i2]->ptr;
+		t2.size = xe2->rhs.recs[m->i2 + m->chg2 - 1]->ptr
+			+ xe2->rhs.recs[m->i2 + m->chg2 - 1]->size - t2.ptr;
 		if (xdl_do_diff(&t1, &t2, xpp, &xe) < 0)
 			return -1;
-		if (xdl_change_compact(&xe.xdf1, &xe.xdf2, xpp->flags) < 0 ||
-		    xdl_change_compact(&xe.xdf2, &xe.xdf1, xpp->flags) < 0 ||
+		if (xdl_change_compact(&xe.lhs, &xe.rhs, xpp->flags) < 0 ||
+		    xdl_change_compact(&xe.rhs, &xe.lhs, xpp->flags) < 0 ||
 		    xdl_build_script(&xe, &xscr) < 0) {
 			xdl_free_env(&xe);
 			return -1;
@@ -440,8 +440,8 @@ static int line_contains_alnum(const char *ptr, long size)
 static int lines_contain_alnum(xdfenv_t *xe, int i, int chg)
 {
 	for (; chg; chg--, i++)
-		if (line_contains_alnum(xe->xdf2.recs[i]->ptr,
-				xe->xdf2.recs[i]->size))
+		if (line_contains_alnum(xe->rhs.recs[i]->ptr,
+				xe->rhs.recs[i]->size))
 			return 1;
 	return 0;
 }
@@ -622,7 +622,7 @@ static int xdl_do_merge(xdfenv_t *xe1, xdchange_t *xscr1,
 			changes = c;
 		i0 = xscr1->i1;
 		i1 = xscr1->i2;
-		i2 = xscr1->i1 + xe2->xdf2.nrec - xe2->xdf1.nrec;
+		i2 = xscr1->i1 + xe2->rhs.nrec - xe2->lhs.nrec;
 		chg0 = xscr1->chg1;
 		chg1 = xscr1->chg2;
 		chg2 = xscr1->chg1;
@@ -637,7 +637,7 @@ static int xdl_do_merge(xdfenv_t *xe1, xdchange_t *xscr1,
 		if (!changes)
 			changes = c;
 		i0 = xscr2->i1;
-		i1 = xscr2->i1 + xe1->xdf2.nrec - xe1->xdf1.nrec;
+		i1 = xscr2->i1 + xe1->rhs.nrec - xe1->lhs.nrec;
 		i2 = xscr2->i2;
 		chg0 = xscr2->chg1;
 		chg1 = xscr2->chg1;
@@ -698,13 +698,13 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	if (xdl_do_diff(orig, mf2, xpp, &xe2) < 0)
 		goto free_xe1; /* avoid double free of xe2 */
 
-	if (xdl_change_compact(&xe1.xdf1, &xe1.xdf2, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe1.xdf2, &xe1.xdf1, xpp->flags) < 0 ||
+	if (xdl_change_compact(&xe1.lhs, &xe1.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&xe1.rhs, &xe1.lhs, xpp->flags) < 0 ||
 	    xdl_build_script(&xe1, &xscr1) < 0)
 		goto out;
 
-	if (xdl_change_compact(&xe2.xdf1, &xe2.xdf2, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe2.xdf2, &xe2.xdf1, xpp->flags) < 0 ||
+	if (xdl_change_compact(&xe2.lhs, &xe2.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&xe2.rhs, &xe2.lhs, xpp->flags) < 0 ||
 	    xdl_build_script(&xe2, &xscr2) < 0)
 		goto out;
 
