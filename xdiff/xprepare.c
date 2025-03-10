@@ -45,7 +45,8 @@ void xdl_file_prepare(mmfile_t *mf, u64 flags, struct xdline_t *file) {
 		xrecord_t *rec;
 		if (file->record.length >= file->record.capacity)
 			rust_ivec_reserve(&file->record, 1);
-		rec = &file->record.ptr[file->record.length++];
+		// rec = &file->record.ptr[file->record.length++];
+		rec = &IVEC_AT(file->record, file->record.length++);
 		if (!xdl_linereader_next(&reader, &rec->ptr, &rec->size_no_eol, &rec->size_with_eol)) {
 			file->record.length--;
 			break;
@@ -159,19 +160,19 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 
 
 	for (usize i = 0; i < xe->xdf1.minimal_perfect_hash->length; i++) {
-		u64 mph = xe->xdf1.minimal_perfect_hash->ptr[i];
+		u64 mph = IVEC_AT(*xe->xdf1.minimal_perfect_hash, i);
 		occurrence.ptr[mph].file1 += 1;
 	}
 
 	for (usize i = 0; i < xe->xdf2.minimal_perfect_hash->length; i++) {
-		u64 mph = xe->xdf2.minimal_perfect_hash->ptr[i];
+		u64 mph = IVEC_AT(*xe->xdf2.minimal_perfect_hash, i);
 		occurrence.ptr[mph].file2 += 1;
 	}
 
 	if ((mlim = xdl_bogosqrt(xe->xdf1.record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->delta_start; i < end1; i++) {
-		u64 mph = xe->xdf1.minimal_perfect_hash->ptr[i];
+		u64 mph = IVEC_AT(*xe->xdf1.minimal_perfect_hash, i);
 		nm = occurrence.ptr[mph].file2;
 		dis1.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
@@ -179,7 +180,7 @@ static int xdl_cleanup_records(xdfenv_t *xe) {
 	if ((mlim = xdl_bogosqrt(xe->xdf2.record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->delta_start; i < end2; i++) {
-		u64 mph = xe->xdf2.minimal_perfect_hash->ptr[i];
+		u64 mph = IVEC_AT(*xe->xdf2.minimal_perfect_hash, i);
 		nm = occurrence.ptr[mph].file1;
 		dis2.ptr[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
@@ -214,8 +215,8 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 	usize lim = XDL_MIN(xe->xdf1.record->length, xe->xdf2.record->length);
 
 	for (usize i = 0; i < lim; i++) {
-		u64 mph1 = xe->xdf1.minimal_perfect_hash->ptr[i];
-		u64 mph2 = xe->xdf2.minimal_perfect_hash->ptr[i];
+		u64 mph1 = IVEC_AT(*xe->xdf1.minimal_perfect_hash, i);
+		u64 mph2 = IVEC_AT(*xe->xdf2.minimal_perfect_hash, i);
 		if (mph1 != mph2) {
 			xe->delta_start = i;
 			break;
@@ -223,8 +224,8 @@ static void xdl_trim_ends(xdfenv_t *xe) {
 	}
 
 	for (usize i = 0; i < lim; i++) {
-		u64 mph1 = xe->xdf1.minimal_perfect_hash->ptr[xe->xdf1.minimal_perfect_hash->length - 1 - i];
-		u64 mph2 = xe->xdf2.minimal_perfect_hash->ptr[xe->xdf2.minimal_perfect_hash->length - 1 - i];
+		u64 mph1 = IVEC_AT(*xe->xdf1.minimal_perfect_hash, xe->xdf1.minimal_perfect_hash->length - 1 - i);
+		u64 mph2 = IVEC_AT(*xe->xdf2.minimal_perfect_hash, xe->xdf2.minimal_perfect_hash->length - 1 - i);
 		if (mph1 != mph2) {
 			xe->delta_end = i;
 			break;
