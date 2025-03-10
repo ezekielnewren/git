@@ -133,11 +133,9 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	long bsize;
 	unsigned long hav;
 	char const *blk, *cur, *top, *prev;
-	unsigned long *ha;
 	char *rchg;
 	long *rindex;
 
-	ha = NULL;
 	rindex = NULL;
 	rchg = NULL;
 
@@ -159,9 +157,11 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			ivec_push(&ctx->file_storage.record, &rec_new);
 		}
 	}
+	ivec_shrink_to_fit(&ctx->file_storage.record);
 
+	ivec_reserve_exact(&ctx->record_ptr, ctx->file_storage.record.length);
 	for (usize i = 0; i < ctx->file_storage.record.length; i++) {
-		struct xrecord *rec = &IVEC_AT(ctx->file_storage.record, i);
+		struct xrecord *rec = &ctx->file_storage.record.ptr[i];
 		ivec_push(&ctx->record_ptr, &rec);
 	}
 
@@ -172,8 +172,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF)) {
 		if (!XDL_ALLOC_ARRAY(rindex, ctx->record->length + 1))
 			goto abort;
-		if (!XDL_ALLOC_ARRAY(ha, ctx->record->length + 1))
-			goto abort;
 	}
 
 	ctx->nrec = ctx->record->length;
@@ -181,7 +179,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	ctx->rchg = rchg + 1;
 	ctx->rindex = rindex;
 	ctx->nreff = 0;
-	ctx->ha = ha;
 	ctx->dstart = 0;
 	ctx->dend = ctx->record->length - 1;
 
@@ -190,7 +187,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 abort:
 	xdl_free(rindex);
 	xdl_free(rchg);
-	xdl_free(ha);
 	ivec_free(&ctx->file_storage.minimal_perfect_hash);
 	ivec_free(&ctx->file_storage.record);
 	ivec_free(&ctx->record_ptr);
@@ -201,7 +197,6 @@ abort:
 static void xdl_free_ctx(struct xd_file_context *ctx) {
 	xdl_free(ctx->rindex);
 	xdl_free(ctx->rchg - 1);
-	xdl_free(ctx->ha);
 	ivec_free(&ctx->file_storage.minimal_perfect_hash);
 	ivec_free(&ctx->file_storage.record);
 	ivec_free(&ctx->record_ptr);
@@ -310,7 +305,6 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 		if (dis1[i] == 1 ||
 		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, lhs->dstart, lhs->dend))) {
 			lhs->rindex[nreff] = i;
-			lhs->ha[nreff] = (*recs)->ha;
 			nreff++;
 		} else
 			lhs->rchg[i] = 1;
@@ -322,7 +316,6 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 		if (dis2[i] == 1 ||
 		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, xdf2->dstart, xdf2->dend))) {
 			xdf2->rindex[nreff] = i;
-			xdf2->ha[nreff] = (*recs)->ha;
 			nreff++;
 		} else
 			xdf2->rchg[i] = 1;
