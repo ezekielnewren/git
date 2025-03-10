@@ -18,6 +18,22 @@ void rust_ivec_init(void* self, usize element_size) {
 	this->element_size = element_size;
 }
 
+/*
+ * MUST CALL IVEC_INIT() FIRST!!!
+ * This function will free the ivec, set self.capacity and self.length
+ * to the specified capacity, and then calloc self.capacity number of
+ * elements.
+ */
+void rust_ivec_zero(void* self, usize capacity) {
+	rawivec_t *this = self;
+	if (this->ptr) {
+		free(this->ptr);
+		this->ptr = NULL;
+	}
+	this->capacity = this->length = capacity;
+	this->ptr = xcalloc(this->capacity, this->element_size);
+}
+
 void rust_ivec_reserve_exact(void* self, usize additional) {
 	rawivec_t *this = self;
 	usize new_capacity = this->capacity + additional;
@@ -91,5 +107,5 @@ void rust_ivec_free(void* self) {
 	free(this->ptr);
 	this->capacity = 0;
 	this->length = 0;
-	// don't modify self->element_size
+	/* don't modify self->element_size */
 }

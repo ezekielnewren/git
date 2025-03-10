@@ -36,13 +36,14 @@ DEFINE_IVEC_TYPE(f64, f64);
 DEFINE_IVEC_TYPE(usize, usize);
 DEFINE_IVEC_TYPE(isize, isize);
 
-void  rust_ivec_init(void* self, usize element_size);
-void  rust_ivec_reserve_exact(void* self, usize additional);
-void  rust_ivec_reserve(void* self, usize additional);
-void  rust_ivec_shrink_to_fit(void* self);
-void  rust_ivec_resize(void* self, usize new_length, void* default_value);
-void  rust_ivec_push(void* self, void* value);
-bool  rust_ivec_equal(void* self, void* other);
-void  rust_ivec_free(void* self);
+void rust_ivec_init(void* self, usize element_size);
+void rust_ivec_zero(void* self, usize capacity);
+void rust_ivec_reserve_exact(void* self, usize additional);
+void rust_ivec_reserve(void* self, usize additional);
+void rust_ivec_shrink_to_fit(void* self);
+void rust_ivec_resize(void* self, usize new_length, void* default_value);
+void rust_ivec_push(void* self, void* value);
+bool rust_ivec_equal(void* self, void* other);
+void rust_ivec_free(void* self);
 
 #endif //IVEC_H
