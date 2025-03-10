@@ -26,6 +26,9 @@
 #include "../rust/header/types.h"
 #include "ivec.h"
 
+struct xrange_t {
+	usize start, end;
+};
 
 typedef struct {
 	u8 const* ptr;

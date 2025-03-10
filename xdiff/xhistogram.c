@@ -22,8 +22,8 @@ struct histindex {
 };
 
 struct region {
-	usize begin1, end1;
-	usize begin2, end2;
+	struct xrange_t range1;
+	struct xrange_t range2;
 };
 
 static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
@@ -32,14 +32,14 @@ static bool mph_equal_by_line_number(xdfenv_t *env, usize lhs, usize rhs) {
 	return mph1 == mph2;
 }
 
-static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end1) {
+static i32 scanA(struct histindex *index, xdfenv_t *env, struct xrange_t range1) {
 	usize tbl_idx;
 	usize chain_len;
 	usize rec_cur_idx, rec_new_idx;
 	struct record *rec_cur;
 	struct record rec_new;
 
-	for (usize i = end1; i > start1; i -= 1) {
+	for (usize i = range1.end; i > range1.start; i -= 1) {
 		bool continue_scan = false;
 		usize ptr = i - 1;
 		tbl_idx = env->xdf1.minimal_perfect_hash->ptr[ptr - LINE_SHIFT];
@@ -92,7 +92,7 @@ static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end
 }
 
 static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs, usize b_ptr,
-	usize start1, usize end1, usize start2, usize end2)
+	struct xrange_t range1, struct xrange_t range2)
 {
 	struct record *rec_cur;
 	usize b_next = b_ptr + 1;
@@ -122,7 +122,7 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 			be = bs;
 			rc = rec_cur->cnt;
 
-			while (start1 < as && start2 < bs
+			while (range1.start < as && range2.start < bs
 				&& mph_equal_by_line_number(env, as - 1, bs - 1)) {
 				as--;
 				bs--;
@@ -133,7 +133,7 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
-			while (ae + 1 < end1 && be + 1 < end2
+			while (ae + 1 < range1.end && be + 1 < range2.end
 				&& mph_equal_by_line_number(env, ae + 1, be + 1)) {
 				ae++;
 				be++;
@@ -147,11 +147,11 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 
 			if (b_next <= be)
 				b_next = be + 1;
-			if (lcs->end1 - lcs->begin1 < ae - as || rc < index->cnt) {
-				lcs->begin1 = as;
-				lcs->begin2 = bs;
-				lcs->end1 = ae;
-				lcs->end2 = be;
+			if (lcs->range1.end - lcs->range1.start < ae - as || rc < index->cnt) {
+				lcs->range1.start = as;
+				lcs->range2.start = bs;
+				lcs->range1.end = ae;
+				lcs->range2.end = be;
 				index->cnt = rc;
 			}
 
@@ -196,7 +196,7 @@ static inline void free_index(struct histindex *index) {
 
 static i32 find_lcs(xdfenv_t *env,
 		    struct region *lcs,
-		    usize start1, usize end1, usize start2, usize end2)
+		    struct xrange_t range1, struct xrange_t range2)
 {
 	i32 ret = -1;
 	struct histindex index;
@@ -212,17 +212,17 @@ static i32 find_lcs(xdfenv_t *env,
 	rust_ivec_zero(&index.line_map, table_size);
 	rust_ivec_zero(&index.next_ptrs, table_size);
 
-	index.ptr_shift = start1;
+	index.ptr_shift = range1.start;
 
-	if (scanA(&index, env, start1, end1)) {
+	if (scanA(&index, env, range1)) {
 		free_index(&index);
 		return ret;
 	}
 
 	index.cnt = MAX_CHAIN_LENGTH + 1;
 
-	for (usize b_ptr = start2; b_ptr + 1 <= end2; )
-		b_ptr = try_lcs(&index, env, lcs, b_ptr, start1, end1, start2, end2);
+	for (usize b_ptr = range2.start; b_ptr + 1 <= range2.end; )
+		b_ptr = try_lcs(&index, env, lcs, b_ptr, range1, range2);
 
 	if (index.has_common && MAX_CHAIN_LENGTH < index.cnt)
 		ret = 1;
@@ -234,7 +234,7 @@ static i32 find_lcs(xdfenv_t *env,
 }
 
 static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
-	usize start1, usize end1, usize start2, usize end2)
+	struct xrange_t range1, struct xrange_t range2)
 {
 	struct region lcs;
 	i32 lcs_found;
@@ -243,51 +243,57 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 	while (true) {
 		result = -1;
 
-		if (start1 >= end1 && start2 >= end2)
+		if (range1.start >= range1.end && range2.start >= range2.end)
 			return 0;
 
-		if (start1 == end1) {
-			for (; start2 < end2; start2 += 1) {
-				env->xdf2.consider.ptr[SENTINEL + start2 - 1] = YES;
+		if (range1.start == range1.end) {
+			for (; range2.start < range2.end; range2.start += 1) {
+				env->xdf2.consider.ptr[SENTINEL + range2.start - 1] = YES;
 			}
 			return 0;
 		}
-		if (start2 == end2) {
-			for (; start1 < end1; start1 += 1) {
-				env->xdf1.consider.ptr[SENTINEL + start1 - 1] = YES;
+		if (range2.start == range2.end) {
+			for (; range1.start < range1.end; range1.start += 1) {
+				env->xdf1.consider.ptr[SENTINEL + range1.start - 1] = YES;
 			}
 			return 0;
 		}
 
 		memset(&lcs, 0, sizeof(lcs));
-		lcs_found = find_lcs(env, &lcs, start1, end1, start2, end2);
+		lcs_found = find_lcs(env, &lcs, range1, range2);
 		if (lcs_found < 0)
 			return result;
 		else if (lcs_found)
-			result = fall_back_to_classic_diff(xpp, env, start1, end1 - start1, start2, end2 - start1);
+			result = fall_back_to_classic_diff(xpp, env, range1.start, range1.end - range1.start, range2.start, range2.end - range1.start);
 		else {
-			if (lcs.begin1 == 0 && lcs.begin2 == 0) {
-				for (; start1 < end1; start1 += 1) {
-					env->xdf1.consider.ptr[SENTINEL + start1 - 1] = YES;
+			if (lcs.range1.start == 0 && lcs.range2.start == 0) {
+				for (; range1.start < range1.end; range1.start += 1) {
+					env->xdf1.consider.ptr[SENTINEL + range1.start - 1] = YES;
 				}
-				for (; start2 < end2; start2 += 1) {
-					env->xdf2.consider.ptr[SENTINEL + start2 - 1] = YES;
+				for (; range2.start < range2.end; range2.start += 1) {
+					env->xdf2.consider.ptr[SENTINEL + range2.start - 1] = YES;
 				}
 				result = 0;
 			} else {
-				result = histogram_diff(xpp, env,
-							start1, lcs.begin1,
-							start2, lcs.begin2);
+				struct xrange_t r1 = {
+					.start = range1.start,
+					.end = lcs.range1.start,
+				};
+				struct xrange_t r2 = {
+					.start = range2.start,
+					.end = lcs.range2.start,
+				};
+				result = histogram_diff(xpp, env, r1, r2);
 				if (result)
 					return result;
 				/*
 				 * result = histogram_diff(xpp, env,
-				 *            lcs.end1 + 1, end1,
-				 *            lcs.end2 + 1, end2);
+				 *            lcs.range1.end + 1, range1.end,
+				 *            lcs.range2.end + 1, range2.end);
 				 * but let's optimize tail recursion ourself:
 				*/
-				start1 = lcs.end1 + 1;
-				start2 = lcs.end2 + 1;
+				range1.start = lcs.range1.end + 1;
+				range2.start = lcs.range2.end + 1;
 
 				continue;
 			}
@@ -299,10 +305,15 @@ static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
 
 
 int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env) {
-	isize end1 = env->xdf1.record->length;
-	isize end2 = env->xdf2.record->length;
+	struct xrange_t range1 = {
+		.start = LINE_SHIFT + env->delta_start,
+		.end = LINE_SHIFT + env->xdf1.record->length - env->delta_end,
+	};
 
-	return histogram_diff(xpp, env,
-		env->delta_start + 1, end1 + LINE_SHIFT,
-		env->delta_start + 1, end2 + LINE_SHIFT);
+	struct xrange_t range2 = {
+		.start = LINE_SHIFT + env->delta_start,
+		.end = LINE_SHIFT + env->xdf2.record->length - env->delta_end,
+	};
+
+	return histogram_diff(xpp, env, range1, range2);
 }
