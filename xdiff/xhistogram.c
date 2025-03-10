@@ -97,7 +97,8 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 	struct record *rec_cur;
 	usize b_next = b_ptr + 1;
 	usize tbl_idx = env->xdf2.minimal_perfect_hash->ptr[b_ptr - LINE_SHIFT];
-	usize as, ae, bs, be, np, rc;
+	struct xrange_t rangeA, rangeB;
+	usize np, rc;
 	bool should_break;
 
 	for (usize rec_cur_idx = index->record_chain.ptr[tbl_idx];
@@ -109,56 +110,56 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 			continue;
 		}
 
-		as = rec_cur->ptr;
-		if (!mph_equal_by_line_number(env, as, b_ptr))
+		rangeA.start = rec_cur->ptr;
+		if (!mph_equal_by_line_number(env, rangeA.start, b_ptr))
 			continue;
 
 		index->has_common = true;
 		for (;;) {
 			should_break = false;
-			np = index->next_ptrs.ptr[as - index->ptr_shift];
-			bs = b_ptr;
-			ae = as;
-			be = bs;
+			np = index->next_ptrs.ptr[rangeA.start - index->ptr_shift];
+			rangeB.start = b_ptr;
+			rangeA.end = rangeA.start;
+			rangeB.end = rangeB.start;
 			rc = rec_cur->cnt;
 
-			while (range1.start < as && range2.start < bs
-				&& mph_equal_by_line_number(env, as - 1, bs - 1)) {
-				as--;
-				bs--;
+			while (range1.start < rangeA.start && range2.start < rangeB.start
+				&& mph_equal_by_line_number(env, rangeA.start - 1, rangeB.start - 1)) {
+				rangeA.start--;
+				rangeB.start--;
 				if (1 < rc) {
-					usize rec_t_idx = index->line_map.ptr[as - index->ptr_shift];
+					usize rec_t_idx = index->line_map.ptr[rangeA.start - index->ptr_shift];
 					struct record *rec_t = &index->record_storage.ptr[rec_t_idx];
 					usize cnt = rec_t->cnt;
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
-			while (ae + 1 < range1.end && be + 1 < range2.end
-				&& mph_equal_by_line_number(env, ae + 1, be + 1)) {
-				ae++;
-				be++;
+			while (rangeA.end + 1 < range1.end && rangeB.end + 1 < range2.end
+				&& mph_equal_by_line_number(env, rangeA.end + 1, rangeB.end + 1)) {
+				rangeA.end++;
+				rangeB.end++;
 				if (1 < rc) {
-					usize rec_t_idx = index->line_map.ptr[ae - index->ptr_shift];
+					usize rec_t_idx = index->line_map.ptr[rangeA.end - index->ptr_shift];
 					struct record *rec_t = &index->record_storage.ptr[rec_t_idx];
 					usize cnt = rec_t->cnt;
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
 
-			if (b_next <= be)
-				b_next = be + 1;
-			if (lcs->range1.end - lcs->range1.start < ae - as || rc < index->cnt) {
-				lcs->range1.start = as;
-				lcs->range2.start = bs;
-				lcs->range1.end = ae;
-				lcs->range2.end = be;
+			if (b_next <= rangeB.end)
+				b_next = rangeB.end + 1;
+			if (lcs->range1.end - lcs->range1.start < rangeA.end - rangeA.start || rc < index->cnt) {
+				lcs->range1.start = rangeA.start;
+				lcs->range2.start = rangeB.start;
+				lcs->range1.end = rangeA.end;
+				lcs->range2.end = rangeB.end;
 				index->cnt = rc;
 			}
 
 			if (np == 0)
 				break;
 
-			while (np <= ae) {
+			while (np <= rangeA.end) {
 				np = index->next_ptrs.ptr[np - index->ptr_shift];
 				if (np == 0) {
 					should_break = 1;
@@ -169,7 +170,7 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 			if (should_break)
 				break;
 
-			as = np;
+			rangeA.start = np;
 		}
 	}
 	return b_next;
