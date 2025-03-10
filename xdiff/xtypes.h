@@ -58,9 +58,9 @@ struct xd_file_context {
 	unsigned long *ha;
 };
 
-typedef struct s_xdfenv {
+struct xdpair {
 	struct xd_file_context lhs, rhs;
-} xdfenv_t;
+};
 
 
 

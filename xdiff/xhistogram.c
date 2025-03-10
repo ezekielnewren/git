@@ -68,7 +68,7 @@ struct histindex {
 	unsigned int cnt,
 		     has_common;
 
-	xdfenv_t *env;
+	struct xdpair *env;
 	xpparam_t const *xpp;
 };
 
@@ -226,7 +226,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 	return b_next;
 }
 
-static int fall_back_to_classic_diff(xpparam_t const *xpp, xdfenv_t *env,
+static int fall_back_to_classic_diff(xpparam_t const *xpp, struct xdpair *pair,
 		int line1, int count1, int line2, int count2)
 {
 	xpparam_t xpparam;
@@ -234,7 +234,7 @@ static int fall_back_to_classic_diff(xpparam_t const *xpp, xdfenv_t *env,
 	memset(&xpparam, 0, sizeof(xpparam));
 	xpparam.flags = xpp->flags & ~XDF_DIFF_ALGORITHM_MASK;
 
-	return xdl_fall_back_diff(env, &xpparam,
+	return xdl_fall_back_diff(pair, &xpparam,
 				  line1, count1, line2, count2);
 }
 
@@ -246,7 +246,7 @@ static inline void free_index(struct histindex *index)
 	xdl_cha_free(&index->rcha);
 }
 
-static int find_lcs(xpparam_t const *xpp, xdfenv_t *env,
+static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 		    struct region *lcs,
 		    int line1, int count1, int line2, int count2)
 {
@@ -256,7 +256,7 @@ static int find_lcs(xpparam_t const *xpp, xdfenv_t *env,
 
 	memset(&index, 0, sizeof(index));
 
-	index.env = env;
+	index.env = pair;
 	index.xpp = xpp;
 
 	index.records = NULL;
@@ -301,7 +301,7 @@ cleanup:
 	return ret;
 }
 
-static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
+static int histogram_diff(xpparam_t const *xpp, struct xdpair *pair,
 	int line1, int count1, int line2, int count2)
 {
 	struct region lcs;
@@ -318,29 +318,29 @@ redo:
 
 	if (!count1) {
 		while(count2--)
-			env->rhs.rchg[line2++ - 1] = 1;
+			pair->rhs.rchg[line2++ - 1] = 1;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			env->lhs.rchg[line1++ - 1] = 1;
+			pair->lhs.rchg[line1++ - 1] = 1;
 		return 0;
 	}
 
 	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(xpp, env, &lcs, line1, count1, line2, count2);
+	lcs_found = find_lcs(xpp, pair, &lcs, line1, count1, line2, count2);
 	if (lcs_found < 0)
 		goto out;
 	else if (lcs_found)
-		result = fall_back_to_classic_diff(xpp, env, line1, count1, line2, count2);
+		result = fall_back_to_classic_diff(xpp, pair, line1, count1, line2, count2);
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
-				env->lhs.rchg[line1++ - 1] = 1;
+				pair->lhs.rchg[line1++ - 1] = 1;
 			while (count2--)
-				env->rhs.rchg[line2++ - 1] = 1;
+				pair->rhs.rchg[line2++ - 1] = 1;
 			result = 0;
 		} else {
-			result = histogram_diff(xpp, env,
+			result = histogram_diff(xpp, pair,
 						line1, lcs.begin1 - line1,
 						line2, lcs.begin2 - line2);
 			if (result)
@@ -362,9 +362,9 @@ out:
 	return result;
 }
 
-int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env)
+int xdl_do_histogram_diff(xpparam_t const *xpp, struct xdpair *pair)
 {
-	return histogram_diff(xpp, env,
-		env->lhs.dstart + 1, env->lhs.dend - env->lhs.dstart + 1,
-		env->rhs.dstart + 1, env->rhs.dend - env->rhs.dstart + 1);
+	return histogram_diff(xpp, pair,
+		pair->lhs.dstart + 1, pair->lhs.dend - pair->lhs.dstart + 1,
+		pair->rhs.dstart + 1, pair->rhs.dend - pair->rhs.dstart + 1);
 }
