@@ -21,8 +21,7 @@
  */
 
 #include "xinclude.h"
-
-#include <rust/header/types.h>
+#include "ivec.h"
 
 #define XDL_KPDIS_RUN 4
 #define XDL_MAX_EQLIMIT 1024
@@ -131,72 +130,70 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 
 static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			   struct xd_file_context *ctx) {
-	long nrec, bsize;
+	long bsize;
 	unsigned long hav;
 	char const *blk, *cur, *top, *prev;
-	struct xrecord *crec;
-	struct xrecord **recs;
 	unsigned long *ha;
 	char *rchg;
 	long *rindex;
-	isize narec;
 
 	ha = NULL;
 	rindex = NULL;
 	rchg = NULL;
-	recs = NULL;
-	narec = 4;
 
-	if (xdl_cha_init(&ctx->rcha, sizeof(struct xrecord), narec / 4 + 1) < 0)
-		goto abort;
-	if (!XDL_ALLOC_ARRAY(recs, narec))
-		goto abort;
+	IVEC_INIT(ctx->file_storage.minimal_perfect_hash);
+	IVEC_INIT(ctx->file_storage.record);
+	ctx->minimal_perfect_hash = &ctx->file_storage.minimal_perfect_hash;
+	ctx->record = &ctx->file_storage.record;
+	IVEC_INIT(ctx->record_ptr);
 
 
-	nrec = 0;
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
 		for (top = blk + bsize; cur < top; ) {
+			struct xrecord rec_new;
 			prev = cur;
 			hav = xdl_hash_record(&cur, top, xpp->flags);
-			if (XDL_ALLOC_GROW(recs, nrec + 1, narec))
-				goto abort;
-			if (!(crec = xdl_cha_alloc(&ctx->rcha)))
-				goto abort;
-			crec->ptr = prev;
-			crec->size = (long) (cur - prev);
-			crec->ha = hav;
-			recs[nrec++] = crec;
+			rec_new.ptr = prev;
+			rec_new.size = (long) (cur - prev);
+			rec_new.ha = hav;
+			ivec_push(&ctx->file_storage.record, &rec_new);
 		}
 	}
 
-	if (!XDL_CALLOC_ARRAY(rchg, nrec + 2))
+	for (usize i = 0; i < ctx->file_storage.record.length; i++) {
+		struct xrecord *rec = &ctx->file_storage.record.ptr[i];
+		ivec_push(&ctx->record_ptr, &rec);
+	}
+
+	if (!XDL_CALLOC_ARRAY(rchg, ctx->record->length + 2))
 		goto abort;
 
 	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF)) {
-		if (!XDL_ALLOC_ARRAY(rindex, nrec + 1))
+		if (!XDL_ALLOC_ARRAY(rindex, ctx->record->length + 1))
 			goto abort;
-		if (!XDL_ALLOC_ARRAY(ha, nrec + 1))
+		if (!XDL_ALLOC_ARRAY(ha, ctx->record->length + 1))
 			goto abort;
 	}
 
-	ctx->nrec = nrec;
-	ctx->recs = recs;
+	ctx->nrec = ctx->record->length;
+	ctx->recs = ctx->record_ptr.ptr;
 	ctx->rchg = rchg + 1;
 	ctx->rindex = rindex;
 	ctx->nreff = 0;
 	ctx->ha = ha;
 	ctx->dstart = 0;
-	ctx->dend = nrec - 1;
+	ctx->dend = ctx->record->length - 1;
 
 	return 0;
 
 abort:
-	xdl_free(ha);
 	xdl_free(rindex);
 	xdl_free(rchg);
-	xdl_free(recs);
-	xdl_cha_free(&ctx->rcha);
+	xdl_free(ha);
+	ivec_free(&ctx->file_storage.minimal_perfect_hash);
+	ivec_free(&ctx->file_storage.record);
+	ivec_free(&ctx->record_ptr);
 	return -1;
 }
 
@@ -205,8 +202,9 @@ static void xdl_free_ctx(struct xd_file_context *ctx) {
 	xdl_free(ctx->rindex);
 	xdl_free(ctx->rchg - 1);
 	xdl_free(ctx->ha);
-	xdl_free(ctx->recs);
-	xdl_cha_free(&ctx->rcha);
+	ivec_free(&ctx->file_storage.minimal_perfect_hash);
+	ivec_free(&ctx->file_storage.record);
+	ivec_free(&ctx->record_ptr);
 }
 
 
