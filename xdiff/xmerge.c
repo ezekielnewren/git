@@ -97,8 +97,8 @@ static int xdl_merge_cmp_lines(xdfenv_t *xe1, int i1, xdfenv_t *xe2, int i2,
 		int line_count, long flags)
 {
 	int i;
-	xrecord_t **rec1 = xe1->xdf2.recs + i1;
-	xrecord_t **rec2 = xe2->xdf2.recs + i2;
+	struct xrecord **rec1 = xe1->xdf2.recs + i1;
+	struct xrecord **rec2 = xe2->xdf2.recs + i2;
 
 	for (i = 0; i < line_count; i++) {
 		int result = xdl_recmatch(rec1[i]->ptr, rec1[i]->size,
@@ -111,7 +111,7 @@ static int xdl_merge_cmp_lines(xdfenv_t *xe1, int i1, xdfenv_t *xe2, int i2,
 
 static int xdl_recs_copy_0(int use_orig, xdfenv_t *xe, int i, int count, int needs_cr, int add_nl, char *dest)
 {
-	xrecord_t **recs;
+	struct xrecord **recs;
 	int size = 0;
 
 	recs = (use_orig ? xe->xdf1.recs : xe->xdf2.recs) + i;
@@ -322,7 +322,7 @@ static int xdl_fill_merge_buffer(xdfenv_t *xe1, const char *name1,
 	return size;
 }
 
-static int recmatch(xrecord_t *rec1, xrecord_t *rec2, unsigned long flags)
+static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long flags)
 {
 	return xdl_recmatch(rec1->ptr, rec1->size,
 			    rec2->ptr, rec2->size, flags);
@@ -334,7 +334,7 @@ static int recmatch(xrecord_t *rec1, xrecord_t *rec2, unsigned long flags)
 static void xdl_refine_zdiff3_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
 		xpparam_t const *xpp)
 {
-	xrecord_t **rec1 = xe1->xdf2.recs, **rec2 = xe2->xdf2.recs;
+	struct xrecord **rec1 = xe1->xdf2.recs, **rec2 = xe2->xdf2.recs;
 	for (; m; m = m->next) {
 		/* let's handle just the conflicts */
 		if (m->mode)

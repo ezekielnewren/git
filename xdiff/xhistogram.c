@@ -88,7 +88,7 @@ struct region {
 #define REC(env, s, l) \
 	(env->xdf##s.recs[l - 1])
 
-static int cmp_recs(xrecord_t *r1, xrecord_t *r2)
+static int cmp_recs(struct xrecord *r1, struct xrecord *r2)
 {
 	return r1->ha == r2->ha;
 

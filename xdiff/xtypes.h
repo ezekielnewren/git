@@ -38,20 +38,20 @@ typedef struct s_chastore {
 	long scurr;
 } chastore_t;
 
-typedef struct s_xrecord {
-	struct s_xrecord *next;
+struct xrecord {
+	struct xrecord *next;
 	char const *ptr;
 	long size;
 	unsigned long ha;
-} xrecord_t;
+};
 
 typedef struct s_xdfile {
 	chastore_t rcha;
 	long nrec;
 	unsigned int hbits;
-	xrecord_t **rhash;
+	struct xrecord **rhash;
 	long dstart, dend;
-	xrecord_t **recs;
+	struct xrecord **recs;
 	char *rchg;
 	long *rindex;
 	long nreff;

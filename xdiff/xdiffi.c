@@ -391,7 +391,7 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 }
 
 
-static int recs_match(xrecord_t *rec1, xrecord_t *rec2)
+static int recs_match(struct xrecord *rec1, struct xrecord *rec2)
 {
 	return (rec1->ha == rec2->ha);
 }
@@ -409,7 +409,7 @@ static int recs_match(xrecord_t *rec1, xrecord_t *rec2)
  * columns. Return -1 if line is empty or contains only whitespace. Clamp the
  * output value at MAX_INDENT.
  */
-static int get_indent(xrecord_t *rec)
+static int get_indent(struct xrecord *rec)
 {
 	long i;
 	int ret = 0;
@@ -996,7 +996,7 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
 
 	for (xch = xscr; xch; xch = xch->next) {
 		int ignore = 1;
-		xrecord_t **rec;
+		struct xrecord **rec;
 		long i;
 
 		rec = &xe->xdf1.recs[xch->i1];
@@ -1011,7 +1011,7 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
 	}
 }
 
-static int record_matches_regex(xrecord_t *rec, xpparam_t const *xpp) {
+static int record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
 	regmatch_t regmatch;
 	size_t i;
 
@@ -1029,7 +1029,7 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
 	xdchange_t *xch;
 
 	for (xch = xscr; xch; xch = xch->next) {
-		xrecord_t **rec;
+		struct xrecord **rec;
 		int ignore = 1;
 		long i;
 
