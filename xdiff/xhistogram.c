@@ -46,7 +46,7 @@ static i32 scanA(struct histindex *index, xdfenv_t *env, usize start1, usize end
 		rec_cur_idx = index->record_chain.ptr[tbl_idx];
 
 		chain_len = 0;
-		while (rec_cur_idx != INVALID_INDEX) {
+		while (rec_cur_idx != 0) {
 			u64 mph1, mph2;
 			rec_cur = &index->record_storage.ptr[rec_cur_idx];
 			mph1 = env->xdf1.minimal_perfect_hash->ptr[rec_cur->ptr - LINE_SHIFT];
@@ -101,7 +101,7 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 	bool should_break;
 
 	for (usize rec_cur_idx = index->record_chain.ptr[tbl_idx];
-		rec_cur_idx != INVALID_INDEX; rec_cur_idx = rec_cur->next) {
+		rec_cur_idx != 0; rec_cur_idx = rec_cur->next) {
 		rec_cur = &index->record_storage.ptr[rec_cur_idx];
 		if (rec_cur->cnt > index->cnt) {
 			if (!index->has_common)
@@ -155,12 +155,12 @@ static usize try_lcs(struct histindex *index, xdfenv_t *env, struct region *lcs,
 				index->cnt = rc;
 			}
 
-			if (np == 0 || np == INVALID_INDEX)
+			if (np == 0)
 				break;
 
 			while (np <= ae) {
 				np = index->next_ptrs.ptr[np - index->ptr_shift];
-				if (np == 0 || np == INVALID_INDEX) {
+				if (np == 0) {
 					should_break = 1;
 					break;
 				}
@@ -201,7 +201,7 @@ static i32 find_lcs(xdfenv_t *env,
 	i32 ret = -1;
 	struct histindex index;
 	usize table_size = env->xdf1.record->length;
-	usize default_value = INVALID_INDEX;
+	usize default_value = 0;
 	memset(&index, 0, sizeof(index));
 
 	IVEC_INIT(index.record_storage);
