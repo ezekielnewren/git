@@ -132,7 +132,7 @@ struct func_line {
 	char buf[80];
 };
 
-static long get_func_line(xdfenv_t *xe, xdemitconf_t const *xecfg,
+static long get_func_line(struct xdpair *pair, xdemitconf_t const *xecfg,
 			  struct func_line *func_line, long start, long limit)
 {
 	long l, size, step = (start > limit) ? -1 : 1;
@@ -141,8 +141,8 @@ static long get_func_line(xdfenv_t *xe, xdemitconf_t const *xecfg,
 	buf = func_line ? func_line->buf : dummy;
 	size = func_line ? sizeof(func_line->buf) : sizeof(dummy);
 
-	for (l = start; l != limit && 0 <= l && l < xe->lhs.nrec; l += step) {
-		long len = match_func_rec(&xe->lhs, xecfg, l, buf, size);
+	for (l = start; l != limit && 0 <= l && l < pair->lhs.nrec; l += step) {
+		long len = match_func_rec(&pair->lhs, xecfg, l, buf, size);
 		if (len >= 0) {
 			if (func_line)
 				func_line->len = len;
@@ -164,7 +164,7 @@ static int is_empty_rec(struct xd_file_context *ctx, long ri)
 	return !len;
 }
 
-int xdl_emit_diff(xdfenv_t *xe, xdchange_t *xscr, xdemitcb_t *ecb,
+int xdl_emit_diff(struct xdpair *pair, xdchange_t *xscr, xdemitcb_t *ecb,
 		  xdemitconf_t const *xecfg) {
 	long s1, s2, e1, e2, lctx;
 	xdchange_t *xch, *xche;
@@ -185,15 +185,15 @@ pre_context_calculation:
 			long fs1, i1 = xch->i1;
 
 			/* Appended chunk? */
-			if (i1 >= xe->lhs.nrec) {
+			if (i1 >= pair->lhs.nrec) {
 				long i2 = xch->i2;
 
 				/*
 				 * We don't need additional context if
 				 * a whole function was added.
 				 */
-				while (i2 < xe->rhs.nrec) {
-					if (is_func_rec(&xe->rhs, xecfg, i2))
+				while (i2 < pair->rhs.nrec) {
+					if (is_func_rec(&pair->rhs, xecfg, i2))
 						goto post_context_calculation;
 					i2++;
 				}
@@ -202,12 +202,12 @@ pre_context_calculation:
 				 * Otherwise get more context from the
 				 * pre-image.
 				 */
-				i1 = xe->lhs.nrec - 1;
+				i1 = pair->lhs.nrec - 1;
 			}
 
-			fs1 = get_func_line(xe, xecfg, NULL, i1, -1);
-			while (fs1 > 0 && !is_empty_rec(&xe->lhs, fs1 - 1) &&
-			       !is_func_rec(&xe->lhs, xecfg, fs1 - 1))
+			fs1 = get_func_line(pair, xecfg, NULL, i1, -1);
+			while (fs1 > 0 && !is_empty_rec(&pair->lhs, fs1 - 1) &&
+			       !is_func_rec(&pair->lhs, xecfg, fs1 - 1))
 				fs1--;
 			if (fs1 < 0)
 				fs1 = 0;
@@ -234,22 +234,22 @@ pre_context_calculation:
 
  post_context_calculation:
 		lctx = xecfg->ctxlen;
-		lctx = XDL_MIN(lctx, xe->lhs.nrec - (xche->i1 + xche->chg1));
-		lctx = XDL_MIN(lctx, xe->rhs.nrec - (xche->i2 + xche->chg2));
+		lctx = XDL_MIN(lctx, pair->lhs.nrec - (xche->i1 + xche->chg1));
+		lctx = XDL_MIN(lctx, pair->rhs.nrec - (xche->i2 + xche->chg2));
 
 		e1 = xche->i1 + xche->chg1 + lctx;
 		e2 = xche->i2 + xche->chg2 + lctx;
 
 		if (xecfg->flags & XDL_EMIT_FUNCCONTEXT) {
-			long fe1 = get_func_line(xe, xecfg, NULL,
+			long fe1 = get_func_line(pair, xecfg, NULL,
 						 xche->i1 + xche->chg1,
-						 xe->lhs.nrec);
-			while (fe1 > 0 && is_empty_rec(&xe->lhs, fe1 - 1))
+						 pair->lhs.nrec);
+			while (fe1 > 0 && is_empty_rec(&pair->lhs, fe1 - 1))
 				fe1--;
 			if (fe1 < 0)
-				fe1 = xe->lhs.nrec;
+				fe1 = pair->lhs.nrec;
 			if (fe1 > e1) {
-				e2 = XDL_MIN(e2 + (fe1 - e1), xe->rhs.nrec);
+				e2 = XDL_MIN(e2 + (fe1 - e1), pair->rhs.nrec);
 				e1 = fe1;
 			}
 
@@ -260,9 +260,9 @@ pre_context_calculation:
 			 */
 			if (xche->next) {
 				long l = XDL_MIN(xche->next->i1,
-						 xe->lhs.nrec - 1);
+						 pair->lhs.nrec - 1);
 				if (l - xecfg->ctxlen <= e1 ||
-				    get_func_line(xe, xecfg, NULL, l, e1) < 0) {
+				    get_func_line(pair, xecfg, NULL, l, e1) < 0) {
 					xche = xche->next;
 					goto post_context_calculation;
 				}
@@ -274,7 +274,7 @@ pre_context_calculation:
 		 */
 
 		if (xecfg->flags & XDL_EMIT_FUNCNAMES) {
-			get_func_line(xe, xecfg, &func_line,
+			get_func_line(pair, xecfg, &func_line,
 				      s1 - 1, funclineprev);
 			funclineprev = s1 - 1;
 		}
@@ -287,7 +287,7 @@ pre_context_calculation:
 		 * Emit pre-context.
 		 */
 		for (; s2 < xch->i2; s2++)
-			if (xdl_emit_record(&xe->rhs, s2, " ", ecb) < 0)
+			if (xdl_emit_record(&pair->rhs, s2, " ", ecb) < 0)
 				return -1;
 
 		for (s1 = xch->i1, s2 = xch->i2;; xch = xch->next) {
@@ -295,21 +295,21 @@ pre_context_calculation:
 			 * Merge previous with current change atom.
 			 */
 			for (; s1 < xch->i1 && s2 < xch->i2; s1++, s2++)
-				if (xdl_emit_record(&xe->rhs, s2, " ", ecb) < 0)
+				if (xdl_emit_record(&pair->rhs, s2, " ", ecb) < 0)
 					return -1;
 
 			/*
 			 * Removes lines from the first file.
 			 */
 			for (s1 = xch->i1; s1 < xch->i1 + xch->chg1; s1++)
-				if (xdl_emit_record(&xe->lhs, s1, "-", ecb) < 0)
+				if (xdl_emit_record(&pair->lhs, s1, "-", ecb) < 0)
 					return -1;
 
 			/*
 			 * Adds lines from the second file.
 			 */
 			for (s2 = xch->i2; s2 < xch->i2 + xch->chg2; s2++)
-				if (xdl_emit_record(&xe->rhs, s2, "+", ecb) < 0)
+				if (xdl_emit_record(&pair->rhs, s2, "+", ecb) < 0)
 					return -1;
 
 			if (xch == xche)
@@ -322,7 +322,7 @@ pre_context_calculation:
 		 * Emit post-context.
 		 */
 		for (s2 = xche->i2 + xche->chg2; s2 < e2; s2++)
-			if (xdl_emit_record(&xe->rhs, s2, " ", ecb) < 0)
+			if (xdl_emit_record(&pair->rhs, s2, " ", ecb) < 0)
 				return -1;
 	}
 

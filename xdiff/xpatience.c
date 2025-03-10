@@ -69,7 +69,7 @@ struct hashmap {
 	} *entries, *first, *last;
 	/* were common records found? */
 	unsigned long has_matches;
-	xdfenv_t *env;
+	struct xdpair *pair;
 	xpparam_t const *xpp;
 };
 
@@ -88,7 +88,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 			  int pass)
 {
 	struct xrecord **records = pass == 1 ?
-		map->env->lhs.recs : map->env->rhs.recs;
+		map->pair->lhs.recs : map->pair->rhs.recs;
 	struct xrecord *record = records[line - 1];
 	/*
 	 * After xdl_prepare_env() (or more precisely, due to
@@ -120,7 +120,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 		return;
 	map->entries[index].line1 = line;
 	map->entries[index].hash = record->ha;
-	map->entries[index].anchor = is_anchor(xpp, map->env->lhs.recs[line - 1]->ptr);
+	map->entries[index].anchor = is_anchor(xpp, map->pair->lhs.recs[line - 1]->ptr);
 	if (!map->first)
 		map->first = map->entries + index;
 	if (map->last) {
@@ -138,12 +138,12 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
  *
  * It is assumed that env has been prepared using xdl_prepare().
  */
-static int fill_hashmap(xpparam_t const *xpp, xdfenv_t *env,
+static int fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 		struct hashmap *result,
 		int line1, int count1, int line2, int count2)
 {
 	result->xpp = xpp;
-	result->env = env;
+	result->pair = pair;
 
 	/* We know exactly how large we want the hash map */
 	result->alloc = count1 * 2;
@@ -245,12 +245,12 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 
 static int match(struct hashmap *map, int line1, int line2)
 {
-	struct xrecord *record1 = map->env->lhs.recs[line1 - 1];
-	struct xrecord *record2 = map->env->rhs.recs[line2 - 1];
+	struct xrecord *record1 = map->pair->lhs.recs[line1 - 1];
+	struct xrecord *record2 = map->pair->rhs.recs[line2 - 1];
 	return record1->ha == record2->ha;
 }
 
-static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
+static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 		int line1, int count1, int line2, int count2);
 
 static int walk_common_sequence(struct hashmap *map, struct entry *first,
@@ -281,7 +281,7 @@ static int walk_common_sequence(struct hashmap *map, struct entry *first,
 
 		/* Recurse */
 		if (next1 > line1 || next2 > line2) {
-			if (patience_diff(map->xpp, map->env,
+			if (patience_diff(map->xpp, map->pair,
 					line1, next1 - line1,
 					line2, next2 - line2))
 				return -1;
@@ -310,7 +310,7 @@ static int fall_back_to_classic_diff(struct hashmap *map,
 	memset(&xpp, 0, sizeof(xpp));
 	xpp.flags = map->xpp->flags & ~XDF_DIFF_ALGORITHM_MASK;
 
-	return xdl_fall_back_diff(map->env, &xpp,
+	return xdl_fall_back_diff(map->pair, &xpp,
 				  line1, count1, line2, count2);
 }
 
@@ -320,7 +320,7 @@ static int fall_back_to_classic_diff(struct hashmap *map,
  *
  * This function assumes that env was prepared with xdl_prepare_env().
  */
-static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
+static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 		int line1, int count1, int line2, int count2)
 {
 	struct hashmap map;
@@ -330,25 +330,25 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 	/* trivial case: one side is empty */
 	if (!count1) {
 		while(count2--)
-			env->rhs.rchg[line2++ - 1] = 1;
+			pair->rhs.rchg[line2++ - 1] = 1;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			env->lhs.rchg[line1++ - 1] = 1;
+			pair->lhs.rchg[line1++ - 1] = 1;
 		return 0;
 	}
 
 	memset(&map, 0, sizeof(map));
-	if (fill_hashmap(xpp, env, &map,
+	if (fill_hashmap(xpp, pair, &map,
 			line1, count1, line2, count2))
 		return -1;
 
 	/* are there any matching lines at all? */
 	if (!map.has_matches) {
 		while(count1--)
-			env->lhs.rchg[line1++ - 1] = 1;
+			pair->lhs.rchg[line1++ - 1] = 1;
 		while(count2--)
-			env->rhs.rchg[line2++ - 1] = 1;
+			pair->rhs.rchg[line2++ - 1] = 1;
 		xdl_free(map.entries);
 		return 0;
 	}
@@ -367,7 +367,7 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 	return result;
 }
 
-int xdl_do_patience_diff(xpparam_t const *xpp, xdfenv_t *env)
+int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair)
 {
-	return patience_diff(xpp, env, 1, env->lhs.nrec, 1, env->rhs.nrec);
+	return patience_diff(xpp, pair, 1, pair->lhs.nrec, 1, pair->rhs.nrec);
 }

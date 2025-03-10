@@ -311,23 +311,23 @@ int xdl_recs_cmp(diffdata_t *dd1, long off1, long lim1,
 
 
 int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		xdfenv_t *xe) {
+		struct xdpair *pair) {
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
 	xdalgoenv_t xenv;
 	diffdata_t dd1, dd2;
 	int res;
 
-	if (xdl_prepare_env(mf1, mf2, xpp, xe) < 0)
+	if (xdl_prepare_env(mf1, mf2, xpp, pair) < 0)
 		return -1;
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
-		res = xdl_do_patience_diff(xpp, xe);
+		res = xdl_do_patience_diff(xpp, pair);
 		goto out;
 	}
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
-		res = xdl_do_histogram_diff(xpp, xe);
+		res = xdl_do_histogram_diff(xpp, pair);
 		goto out;
 	}
 
@@ -337,16 +337,16 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = xe->lhs.nreff + xe->rhs.nreff + 3;
+	ndiags = pair->lhs.nreff + pair->rhs.nreff + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
-		xdl_free_env(xe);
+		xdl_free_env(pair);
 		return -1;
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += xe->rhs.nreff + 1;
-	kvdb += xe->rhs.nreff + 1;
+	kvdf += pair->rhs.nreff + 1;
+	kvdb += pair->rhs.nreff + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -354,14 +354,14 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.snake_cnt = XDL_SNAKE_CNT;
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
-	dd1.nrec = xe->lhs.nreff;
-	dd1.ha = xe->lhs.ha;
-	dd1.rchg = xe->lhs.rchg;
-	dd1.rindex = xe->lhs.rindex;
-	dd2.nrec = xe->rhs.nreff;
-	dd2.ha = xe->rhs.ha;
-	dd2.rchg = xe->rhs.rchg;
-	dd2.rindex = xe->rhs.rindex;
+	dd1.nrec = pair->lhs.nreff;
+	dd1.ha = pair->lhs.ha;
+	dd1.rchg = pair->lhs.rchg;
+	dd1.rindex = pair->lhs.rindex;
+	dd2.nrec = pair->rhs.nreff;
+	dd2.ha = pair->rhs.ha;
+	dd2.rchg = pair->rhs.rchg;
+	dd2.rindex = pair->rhs.rindex;
 
 	res = xdl_recs_cmp(&dd1, 0, dd1.nrec, &dd2, 0, dd2.nrec,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
@@ -369,7 +369,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xdl_free(kvd);
  out:
 	if (res < 0)
-		xdl_free_env(xe);
+		xdl_free_env(pair);
 
 	return res;
 }
@@ -939,15 +939,15 @@ int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 }
 
 
-int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
+int xdl_build_script(struct xdpair *pair, xdchange_t **xscr) {
 	xdchange_t *cscr = NULL, *xch;
-	char *rchg1 = xe->lhs.rchg, *rchg2 = xe->rhs.rchg;
+	char *rchg1 = pair->lhs.rchg, *rchg2 = pair->rhs.rchg;
 	long i1, i2, l1, l2;
 
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
-	for (i1 = xe->lhs.nrec, i2 = xe->rhs.nrec; i1 >= 0 || i2 >= 0; i1--, i2--)
+	for (i1 = pair->lhs.nrec, i2 = pair->rhs.nrec; i1 >= 0 || i2 >= 0; i1--, i2--)
 		if (rchg1[i1 - 1] || rchg2[i2 - 1]) {
 			for (l1 = i1; rchg1[i1 - 1]; i1--);
 			for (l2 = i2; rchg2[i2 - 1]; i2--);
@@ -974,7 +974,7 @@ void xdl_free_script(xdchange_t *xscr) {
 	}
 }
 
-static int xdl_call_hunk_func(xdfenv_t *xe UNUSED, xdchange_t *xscr, xdemitcb_t *ecb,
+static int xdl_call_hunk_func(struct xdpair *pair UNUSED, xdchange_t *xscr, xdemitcb_t *ecb,
 			      xdemitconf_t const *xecfg)
 {
 	xdchange_t *xch, *xche;
@@ -991,7 +991,7 @@ static int xdl_call_hunk_func(xdfenv_t *xe UNUSED, xdchange_t *xscr, xdemitcb_t 
 	return 0;
 }
 
-static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
+static void xdl_mark_ignorable_lines(xdchange_t *xscr, struct xdpair *pair, long flags)
 {
 	xdchange_t *xch;
 
@@ -1000,11 +1000,11 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
 		struct xrecord **rec;
 		long i;
 
-		rec = &xe->lhs.recs[xch->i1];
+		rec = &pair->lhs.recs[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
 			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
 
-		rec = &xe->rhs.recs[xch->i2];
+		rec = &pair->rhs.recs[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
 			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
 
@@ -1024,7 +1024,7 @@ static int record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
 	return 0;
 }
 
-static void xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
+static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair,
 				     xpparam_t const *xpp)
 {
 	xdchange_t *xch;
@@ -1040,11 +1040,11 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
 		if (xch->ignore)
 			continue;
 
-		rec = &xe->lhs.recs[xch->i1];
+		rec = &pair->lhs.recs[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
 			ignore = record_matches_regex(rec[i], xpp);
 
-		rec = &xe->rhs.recs[xch->i2];
+		rec = &pair->rhs.recs[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
 			ignore = record_matches_regex(rec[i], xpp);
 
@@ -1055,36 +1055,36 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
 	xdchange_t *xscr;
-	xdfenv_t xe;
+	struct xdpair pair;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 
-	if (xdl_do_diff(mf1, mf2, xpp, &xe) < 0) {
+	if (xdl_do_diff(mf1, mf2, xpp, &pair) < 0) {
 
 		return -1;
 	}
-	if (xdl_change_compact(&xe.lhs, &xe.rhs, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe.rhs, &xe.lhs, xpp->flags) < 0 ||
-	    xdl_build_script(&xe, &xscr) < 0) {
+	if (xdl_change_compact(&pair.lhs, &pair.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&pair.rhs, &pair.lhs, xpp->flags) < 0 ||
+	    xdl_build_script(&pair, &xscr) < 0) {
 
-		xdl_free_env(&xe);
+		xdl_free_env(&pair);
 		return -1;
 	}
 	if (xscr) {
 		if (xpp->flags & XDF_IGNORE_BLANK_LINES)
-			xdl_mark_ignorable_lines(xscr, &xe, xpp->flags);
+			xdl_mark_ignorable_lines(xscr, &pair, xpp->flags);
 
 		if (xpp->ignore_regex)
-			xdl_mark_ignorable_regex(xscr, &xe, xpp);
+			xdl_mark_ignorable_regex(xscr, &pair, xpp);
 
-		if (ef(&xe, xscr, ecb, xecfg) < 0) {
+		if (ef(&pair, xscr, ecb, xecfg) < 0) {
 
 			xdl_free_script(xscr);
-			xdl_free_env(&xe);
+			xdl_free_env(&pair);
 			return -1;
 		}
 		xdl_free_script(xscr);
 	}
-	xdl_free_env(&xe);
+	xdl_free_env(&pair);
 
 	return 0;
 }

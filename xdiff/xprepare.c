@@ -243,7 +243,7 @@ static void xdl_free_ctx(struct xd_file_context *ctx) {
 
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		    xdfenv_t *xe) {
+		    struct xdpair *pair) {
 	long enl1, enl2, sample;
 	xdlclassifier_t cf;
 
@@ -265,24 +265,24 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	if (xdl_init_classifier(&cf, enl1 + enl2 + 1, xpp->flags) < 0)
 		return -1;
 
-	if (xdl_prepare_ctx(1, mf1, enl1, xpp, &cf, &xe->lhs) < 0) {
+	if (xdl_prepare_ctx(1, mf1, enl1, xpp, &cf, &pair->lhs) < 0) {
 
 		xdl_free_classifier(&cf);
 		return -1;
 	}
-	if (xdl_prepare_ctx(2, mf2, enl2, xpp, &cf, &xe->rhs) < 0) {
+	if (xdl_prepare_ctx(2, mf2, enl2, xpp, &cf, &pair->rhs) < 0) {
 
-		xdl_free_ctx(&xe->lhs);
+		xdl_free_ctx(&pair->lhs);
 		xdl_free_classifier(&cf);
 		return -1;
 	}
 
 	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
-	    xdl_optimize_ctxs(&cf, &xe->lhs, &xe->rhs) < 0) {
+	    xdl_optimize_ctxs(&cf, &pair->lhs, &pair->rhs) < 0) {
 
-		xdl_free_ctx(&xe->rhs);
-		xdl_free_ctx(&xe->lhs);
+		xdl_free_ctx(&pair->rhs);
+		xdl_free_ctx(&pair->lhs);
 		xdl_free_classifier(&cf);
 		return -1;
 	}
@@ -293,10 +293,10 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 }
 
 
-void xdl_free_env(xdfenv_t *xe) {
+void xdl_free_env(struct xdpair *pair) {
 
-	xdl_free_ctx(&xe->rhs);
-	xdl_free_ctx(&xe->lhs);
+	xdl_free_ctx(&pair->rhs);
+	xdl_free_ctx(&pair->lhs);
 }
 
 

@@ -402,7 +402,7 @@ int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 	return 0;
 }
 
-int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
+int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 		int line1, int count1, int line2, int count2)
 {
 	/*
@@ -414,21 +414,21 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	 * ranges of lines instead of the whole files.
 	 */
 	mmfile_t subfile1, subfile2;
-	xdfenv_t env;
+	struct xdpair tmp_pair;
 
-	subfile1.ptr = (char *)diff_env->lhs.recs[line1 - 1]->ptr;
-	subfile1.size = diff_env->lhs.recs[line1 + count1 - 2]->ptr +
-		diff_env->lhs.recs[line1 + count1 - 2]->size - subfile1.ptr;
-	subfile2.ptr = (char *)diff_env->rhs.recs[line2 - 1]->ptr;
-	subfile2.size = diff_env->rhs.recs[line2 + count2 - 2]->ptr +
-		diff_env->rhs.recs[line2 + count2 - 2]->size - subfile2.ptr;
-	if (xdl_do_diff(&subfile1, &subfile2, xpp, &env) < 0)
+	subfile1.ptr = (char *)pair->lhs.recs[line1 - 1]->ptr;
+	subfile1.size = pair->lhs.recs[line1 + count1 - 2]->ptr +
+		pair->lhs.recs[line1 + count1 - 2]->size - subfile1.ptr;
+	subfile2.ptr = (char *)pair->rhs.recs[line2 - 1]->ptr;
+	subfile2.size = pair->rhs.recs[line2 + count2 - 2]->ptr +
+		pair->rhs.recs[line2 + count2 - 2]->size - subfile2.ptr;
+	if (xdl_do_diff(&subfile1, &subfile2, xpp, &tmp_pair) < 0)
 		return -1;
 
-	memcpy(diff_env->lhs.rchg + line1 - 1, env.lhs.rchg, count1);
-	memcpy(diff_env->rhs.rchg + line2 - 1, env.rhs.rchg, count2);
+	memcpy(pair->lhs.rchg + line1 - 1, tmp_pair.lhs.rchg, count1);
+	memcpy(pair->rhs.rchg + line2 - 1, tmp_pair.rhs.rchg, count2);
 
-	xdl_free_env(&env);
+	xdl_free_env(&tmp_pair);
 
 	return 0;
 }
