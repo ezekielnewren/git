@@ -492,6 +492,7 @@ libgit_sources = [
   'ws.c',
   'wt-status.c',
   'xdiff-interface.c',
+  'xdiff/ivec.c',
   'xdiff/xdiffi.c',
   'xdiff/xemit.c',
   'xdiff/xhistogram.c',
