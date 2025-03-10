@@ -48,8 +48,6 @@ struct xrecord {
 struct xd_file_context {
 	chastore_t rcha;
 	long nrec;
-	unsigned int hbits;
-	struct xrecord **rhash;
 	long dstart, dend;
 	struct xrecord **recs;
 	char *rchg;
