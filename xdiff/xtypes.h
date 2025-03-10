@@ -45,7 +45,7 @@ struct xrecord {
 	unsigned long ha;
 };
 
-typedef struct s_xdfile {
+struct xd_file_context {
 	chastore_t rcha;
 	long nrec;
 	unsigned int hbits;
@@ -56,10 +56,10 @@ typedef struct s_xdfile {
 	long *rindex;
 	long nreff;
 	unsigned long *ha;
-} xdfile_t;
+};
 
 typedef struct s_xdfenv {
-	xdfile_t xdf1, xdf2;
+	struct xd_file_context lhs, rhs;
 } xdfenv_t;
 
 

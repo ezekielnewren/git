@@ -58,12 +58,12 @@ static void xdl_free_classifier(xdlclassifier_t *cf);
 static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, struct xrecord **rhash,
 			       unsigned int hbits, struct xrecord *rec);
 static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_t const *xpp,
-			   xdlclassifier_t *cf, xdfile_t *xdf);
-static void xdl_free_ctx(xdfile_t *xdf);
+			   xdlclassifier_t *cf, struct xd_file_context *ctx);
+static void xdl_free_ctx(struct xd_file_context *ctx);
 static int xdl_clean_mmatch(char const *dis, long i, long s, long e);
-static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2);
-static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2);
-static int xdl_optimize_ctxs(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2);
+static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs);
+static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs);
+static int xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs);
 
 
 
@@ -150,7 +150,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf, struct xr
 
 
 static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_t const *xpp,
-			   xdlclassifier_t *cf, xdfile_t *xdf) {
+			   xdlclassifier_t *cf, struct xd_file_context *ctx) {
 	unsigned int hbits;
 	long nrec, hsize, bsize;
 	unsigned long hav;
@@ -168,7 +168,7 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 	rhash = NULL;
 	recs = NULL;
 
-	if (xdl_cha_init(&xdf->rcha, sizeof(struct xrecord), narec / 4 + 1) < 0)
+	if (xdl_cha_init(&ctx->rcha, sizeof(struct xrecord), narec / 4 + 1) < 0)
 		goto abort;
 	if (!XDL_ALLOC_ARRAY(recs, narec))
 		goto abort;
@@ -185,7 +185,7 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 			hav = xdl_hash_record(&cur, top, xpp->flags);
 			if (XDL_ALLOC_GROW(recs, nrec + 1, narec))
 				goto abort;
-			if (!(crec = xdl_cha_alloc(&xdf->rcha)))
+			if (!(crec = xdl_cha_alloc(&ctx->rcha)))
 				goto abort;
 			crec->ptr = prev;
 			crec->size = (long) (cur - prev);
@@ -207,16 +207,16 @@ static int xdl_prepare_ctx(unsigned int pass, mmfile_t *mf, long narec, xpparam_
 			goto abort;
 	}
 
-	xdf->nrec = nrec;
-	xdf->recs = recs;
-	xdf->hbits = hbits;
-	xdf->rhash = rhash;
-	xdf->rchg = rchg + 1;
-	xdf->rindex = rindex;
-	xdf->nreff = 0;
-	xdf->ha = ha;
-	xdf->dstart = 0;
-	xdf->dend = nrec - 1;
+	ctx->nrec = nrec;
+	ctx->recs = recs;
+	ctx->hbits = hbits;
+	ctx->rhash = rhash;
+	ctx->rchg = rchg + 1;
+	ctx->rindex = rindex;
+	ctx->nreff = 0;
+	ctx->ha = ha;
+	ctx->dstart = 0;
+	ctx->dend = nrec - 1;
 
 	return 0;
 
@@ -226,19 +226,19 @@ abort:
 	xdl_free(rchg);
 	xdl_free(rhash);
 	xdl_free(recs);
-	xdl_cha_free(&xdf->rcha);
+	xdl_cha_free(&ctx->rcha);
 	return -1;
 }
 
 
-static void xdl_free_ctx(xdfile_t *xdf) {
+static void xdl_free_ctx(struct xd_file_context *ctx) {
 
-	xdl_free(xdf->rhash);
-	xdl_free(xdf->rindex);
-	xdl_free(xdf->rchg - 1);
-	xdl_free(xdf->ha);
-	xdl_free(xdf->recs);
-	xdl_cha_free(&xdf->rcha);
+	xdl_free(ctx->rhash);
+	xdl_free(ctx->rindex);
+	xdl_free(ctx->rchg - 1);
+	xdl_free(ctx->ha);
+	xdl_free(ctx->recs);
+	xdl_cha_free(&ctx->rcha);
 }
 
 
@@ -265,24 +265,24 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	if (xdl_init_classifier(&cf, enl1 + enl2 + 1, xpp->flags) < 0)
 		return -1;
 
-	if (xdl_prepare_ctx(1, mf1, enl1, xpp, &cf, &xe->xdf1) < 0) {
+	if (xdl_prepare_ctx(1, mf1, enl1, xpp, &cf, &xe->lhs) < 0) {
 
 		xdl_free_classifier(&cf);
 		return -1;
 	}
-	if (xdl_prepare_ctx(2, mf2, enl2, xpp, &cf, &xe->xdf2) < 0) {
+	if (xdl_prepare_ctx(2, mf2, enl2, xpp, &cf, &xe->rhs) < 0) {
 
-		xdl_free_ctx(&xe->xdf1);
+		xdl_free_ctx(&xe->lhs);
 		xdl_free_classifier(&cf);
 		return -1;
 	}
 
 	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
-	    xdl_optimize_ctxs(&cf, &xe->xdf1, &xe->xdf2) < 0) {
+	    xdl_optimize_ctxs(&cf, &xe->lhs, &xe->rhs) < 0) {
 
-		xdl_free_ctx(&xe->xdf2);
-		xdl_free_ctx(&xe->xdf1);
+		xdl_free_ctx(&xe->rhs);
+		xdl_free_ctx(&xe->lhs);
 		xdl_free_classifier(&cf);
 		return -1;
 	}
@@ -295,8 +295,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 void xdl_free_env(xdfenv_t *xe) {
 
-	xdl_free_ctx(&xe->xdf2);
-	xdl_free_ctx(&xe->xdf1);
+	xdl_free_ctx(&xe->rhs);
+	xdl_free_ctx(&xe->lhs);
 }
 
 
@@ -363,20 +363,20 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2) {
+static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *xdf2) {
 	long i, nm, nreff, mlim;
 	struct xrecord **recs;
 	xdlclass_t *rcrec;
 	char *dis, *dis1, *dis2;
 
-	if (!XDL_CALLOC_ARRAY(dis, xdf1->nrec + xdf2->nrec + 2))
+	if (!XDL_CALLOC_ARRAY(dis, lhs->nrec + xdf2->nrec + 2))
 		return -1;
 	dis1 = dis;
-	dis2 = dis1 + xdf1->nrec + 1;
+	dis2 = dis1 + lhs->nrec + 1;
 
-	if ((mlim = xdl_bogosqrt(xdf1->nrec)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(lhs->nrec)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xdf1->dstart, recs = &xdf1->recs[xdf1->dstart]; i <= xdf1->dend; i++, recs++) {
+	for (i = lhs->dstart, recs = &lhs->recs[lhs->dstart]; i <= lhs->dend; i++, recs++) {
 		rcrec = cf->rcrecs[(*recs)->ha];
 		nm = rcrec ? rcrec->len2 : 0;
 		dis1[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
@@ -390,17 +390,17 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 		dis2[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	for (nreff = 0, i = xdf1->dstart, recs = &xdf1->recs[xdf1->dstart];
-	     i <= xdf1->dend; i++, recs++) {
+	for (nreff = 0, i = lhs->dstart, recs = &lhs->recs[lhs->dstart];
+	     i <= lhs->dend; i++, recs++) {
 		if (dis1[i] == 1 ||
-		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, xdf1->dstart, xdf1->dend))) {
-			xdf1->rindex[nreff] = i;
-			xdf1->ha[nreff] = (*recs)->ha;
+		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, lhs->dstart, lhs->dend))) {
+			lhs->rindex[nreff] = i;
+			lhs->ha[nreff] = (*recs)->ha;
 			nreff++;
 		} else
-			xdf1->rchg[i] = 1;
+			lhs->rchg[i] = 1;
 	}
-	xdf1->nreff = nreff;
+	lhs->nreff = nreff;
 
 	for (nreff = 0, i = xdf2->dstart, recs = &xdf2->recs[xdf2->dstart];
 	     i <= xdf2->dend; i++, recs++) {
@@ -423,36 +423,36 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xd
 /*
  * Early trim initial and terminal matching records.
  */
-static int xdl_trim_ends(xdfile_t *xdf1, xdfile_t *xdf2) {
+static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs) {
 	long i, lim;
 	struct xrecord **recs1, **recs2;
 
-	recs1 = xdf1->recs;
-	recs2 = xdf2->recs;
-	for (i = 0, lim = XDL_MIN(xdf1->nrec, xdf2->nrec); i < lim;
+	recs1 = lhs->recs;
+	recs2 = rhs->recs;
+	for (i = 0, lim = XDL_MIN(lhs->nrec, rhs->nrec); i < lim;
 	     i++, recs1++, recs2++)
 		if ((*recs1)->ha != (*recs2)->ha)
 			break;
 
-	xdf1->dstart = xdf2->dstart = i;
+	lhs->dstart = rhs->dstart = i;
 
-	recs1 = xdf1->recs + xdf1->nrec - 1;
-	recs2 = xdf2->recs + xdf2->nrec - 1;
+	recs1 = lhs->recs + lhs->nrec - 1;
+	recs2 = rhs->recs + rhs->nrec - 1;
 	for (lim -= i, i = 0; i < lim; i++, recs1--, recs2--)
 		if ((*recs1)->ha != (*recs2)->ha)
 			break;
 
-	xdf1->dend = xdf1->nrec - i - 1;
-	xdf2->dend = xdf2->nrec - i - 1;
+	lhs->dend = lhs->nrec - i - 1;
+	rhs->dend = rhs->nrec - i - 1;
 
 	return 0;
 }
 
 
-static int xdl_optimize_ctxs(xdlclassifier_t *cf, xdfile_t *xdf1, xdfile_t *xdf2) {
+static int xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
 
-	if (xdl_trim_ends(xdf1, xdf2) < 0 ||
-	    xdl_cleanup_records(cf, xdf1, xdf2) < 0) {
+	if (xdl_trim_ends(lhs, rhs) < 0 ||
+	    xdl_cleanup_records(cf, lhs, rhs) < 0) {
 
 		return -1;
 	}

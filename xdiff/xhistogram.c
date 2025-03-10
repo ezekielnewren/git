@@ -86,7 +86,7 @@ struct region {
 	((LINE_MAP(index, ptr))->cnt)
 
 #define REC(env, s, l) \
-	(env->xdf##s.recs[l - 1])
+	(env->s.recs[l - 1])
 
 static int cmp_recs(struct xrecord *r1, struct xrecord *r2)
 {
@@ -107,13 +107,13 @@ static int scanA(struct histindex *index, int line1, int count1)
 	struct record **rec_chain, *rec;
 
 	for (ptr = LINE_END(1); (unsigned int)line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(index, 1, ptr);
+		tbl_idx = TABLE_HASH(index, lhs, ptr);
 		rec_chain = index->records + tbl_idx;
 		rec = *rec_chain;
 
 		chain_len = 0;
 		while (rec) {
-			if (CMP(index, 1, rec->ptr, 1, ptr)) {
+			if (CMP(index, lhs, rec->ptr, lhs, ptr)) {
 				/*
 				 * ptr is identical to another element. Insert
 				 * it onto the front of the existing element
@@ -157,19 +157,19 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
-	struct record *rec = index->records[TABLE_HASH(index, 2, b_ptr)];
+	struct record *rec = index->records[TABLE_HASH(index, rhs, b_ptr)];
 	unsigned int as, ae, bs, be, np, rc;
 	int should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
 			if (!index->has_common)
-				index->has_common = CMP(index, 1, rec->ptr, 2, b_ptr);
+				index->has_common = CMP(index, lhs, rec->ptr, rhs, b_ptr);
 			continue;
 		}
 
 		as = rec->ptr;
-		if (!CMP(index, 1, as, 2, b_ptr))
+		if (!CMP(index, lhs, as, rhs, b_ptr))
 			continue;
 
 		index->has_common = 1;
@@ -182,14 +182,14 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 			rc = rec->cnt;
 
 			while ((unsigned int)line1 < as && (unsigned int)line2 < bs
-				&& CMP(index, 1, as - 1, 2, bs - 1)) {
+				&& CMP(index, lhs, as - 1, rhs, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc)
 					rc = XDL_MIN(rc, CNT(index, as));
 			}
 			while (ae < (unsigned int)LINE_END(1) && be < (unsigned int)LINE_END(2)
-				&& CMP(index, 1, ae + 1, 2, be + 1)) {
+				&& CMP(index, lhs, ae + 1, rhs, be + 1)) {
 				ae++;
 				be++;
 				if (1 < rc)
@@ -318,11 +318,11 @@ redo:
 
 	if (!count1) {
 		while(count2--)
-			env->xdf2.rchg[line2++ - 1] = 1;
+			env->rhs.rchg[line2++ - 1] = 1;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			env->xdf1.rchg[line1++ - 1] = 1;
+			env->lhs.rchg[line1++ - 1] = 1;
 		return 0;
 	}
 
@@ -335,9 +335,9 @@ redo:
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
-				env->xdf1.rchg[line1++ - 1] = 1;
+				env->lhs.rchg[line1++ - 1] = 1;
 			while (count2--)
-				env->xdf2.rchg[line2++ - 1] = 1;
+				env->rhs.rchg[line2++ - 1] = 1;
 			result = 0;
 		} else {
 			result = histogram_diff(xpp, env,
@@ -365,6 +365,6 @@ out:
 int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env)
 {
 	return histogram_diff(xpp, env,
-		env->xdf1.dstart + 1, env->xdf1.dend - env->xdf1.dstart + 1,
-		env->xdf2.dstart + 1, env->xdf2.dend - env->xdf2.dstart + 1);
+		env->lhs.dstart + 1, env->lhs.dend - env->lhs.dstart + 1,
+		env->rhs.dstart + 1, env->rhs.dend - env->rhs.dstart + 1);
 }
