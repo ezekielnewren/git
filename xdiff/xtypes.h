@@ -65,7 +65,6 @@ struct xd_file_context {
 	char *rchg;
 	long *rindex;
 	long nreff;
-	unsigned long *ha;
 };
 
 struct xdpair {
