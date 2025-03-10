@@ -337,7 +337,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = xe->xdf1.nreff + xe->xdf2.nreff + 3;
+	ndiags = xe->lhs.nreff + xe->rhs.nreff + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
 		xdl_free_env(xe);
@@ -345,8 +345,8 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += xe->xdf2.nreff + 1;
-	kvdb += xe->xdf2.nreff + 1;
+	kvdf += xe->rhs.nreff + 1;
+	kvdb += xe->rhs.nreff + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -354,14 +354,14 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.snake_cnt = XDL_SNAKE_CNT;
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
-	dd1.nrec = xe->xdf1.nreff;
-	dd1.ha = xe->xdf1.ha;
-	dd1.rchg = xe->xdf1.rchg;
-	dd1.rindex = xe->xdf1.rindex;
-	dd2.nrec = xe->xdf2.nreff;
-	dd2.ha = xe->xdf2.ha;
-	dd2.rchg = xe->xdf2.rchg;
-	dd2.rindex = xe->xdf2.rindex;
+	dd1.nrec = xe->lhs.nreff;
+	dd1.ha = xe->lhs.ha;
+	dd1.rchg = xe->lhs.rchg;
+	dd1.rindex = xe->lhs.rindex;
+	dd2.nrec = xe->rhs.nreff;
+	dd2.ha = xe->rhs.ha;
+	dd2.rchg = xe->rhs.rchg;
+	dd2.rindex = xe->rhs.rindex;
 
 	res = xdl_recs_cmp(&dd1, 0, dd1.nrec, &dd2, 0, dd2.nrec,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
@@ -488,23 +488,23 @@ struct split_score {
 /*
  * Fill m with information about a hypothetical split of xdf above line split.
  */
-static void measure_split(const xdfile_t *xdf, long split,
+static void measure_split(const struct xd_file_context *ctx, long split,
 			  struct split_measurement *m)
 {
 	long i;
 
-	if (split >= xdf->nrec) {
+	if (split >= ctx->nrec) {
 		m->end_of_file = 1;
 		m->indent = -1;
 	} else {
 		m->end_of_file = 0;
-		m->indent = get_indent(xdf->recs[split]);
+		m->indent = get_indent(ctx->recs[split]);
 	}
 
 	m->pre_blank = 0;
 	m->pre_indent = -1;
 	for (i = split - 1; i >= 0; i--) {
-		m->pre_indent = get_indent(xdf->recs[i]);
+		m->pre_indent = get_indent(ctx->recs[i]);
 		if (m->pre_indent != -1)
 			break;
 		m->pre_blank += 1;
@@ -516,8 +516,8 @@ static void measure_split(const xdfile_t *xdf, long split,
 
 	m->post_blank = 0;
 	m->post_indent = -1;
-	for (i = split + 1; i < xdf->nrec; i++) {
-		m->post_indent = get_indent(xdf->recs[i]);
+	for (i = split + 1; i < ctx->nrec; i++) {
+		m->post_indent = get_indent(ctx->recs[i]);
 		if (m->post_indent != -1)
 			break;
 		m->post_blank += 1;
@@ -714,10 +714,10 @@ struct xdlgroup {
 /*
  * Initialize g to point at the first group in xdf.
  */
-static void group_init(xdfile_t *xdf, struct xdlgroup *g)
+static void group_init(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	g->start = g->end = 0;
-	while (xdf->rchg[g->end])
+	while (ctx->rchg[g->end])
 		g->end++;
 }
 
@@ -725,13 +725,13 @@ static void group_init(xdfile_t *xdf, struct xdlgroup *g)
  * Move g to describe the next (possibly empty) group in xdf and return 0. If g
  * is already at the end of the file, do nothing and return -1.
  */
-static inline int group_next(xdfile_t *xdf, struct xdlgroup *g)
+static inline int group_next(struct xd_file_context *ctx, struct xdlgroup *g)
 {
-	if (g->end == xdf->nrec)
+	if (g->end == ctx->nrec)
 		return -1;
 
 	g->start = g->end + 1;
-	for (g->end = g->start; xdf->rchg[g->end]; g->end++)
+	for (g->end = g->start; ctx->rchg[g->end]; g->end++)
 		;
 
 	return 0;
@@ -741,13 +741,13 @@ static inline int group_next(xdfile_t *xdf, struct xdlgroup *g)
  * Move g to describe the previous (possibly empty) group in xdf and return 0.
  * If g is already at the beginning of the file, do nothing and return -1.
  */
-static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
+static inline int group_previous(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	if (g->start == 0)
 		return -1;
 
 	g->end = g->start - 1;
-	for (g->start = g->end; xdf->rchg[g->start - 1]; g->start--)
+	for (g->start = g->end; ctx->rchg[g->start - 1]; g->start--)
 		;
 
 	return 0;
@@ -758,14 +758,14 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
  * following group, expand this group to include it. Return 0 on success or -1
  * if g cannot be slid down.
  */
-static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
+static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 {
-	if (g->end < xdf->nrec &&
-	    recs_match(xdf->recs[g->start], xdf->recs[g->end])) {
-		xdf->rchg[g->start++] = 0;
-		xdf->rchg[g->end++] = 1;
+	if (g->end < ctx->nrec &&
+	    recs_match(ctx->recs[g->start], ctx->recs[g->end])) {
+		ctx->rchg[g->start++] = 0;
+		ctx->rchg[g->end++] = 1;
 
-		while (xdf->rchg[g->end])
+		while (ctx->rchg[g->end])
 			g->end++;
 
 		return 0;
@@ -779,14 +779,14 @@ static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
  * into a previous group, expand this group to include it. Return 0 on success
  * or -1 if g cannot be slid up.
  */
-static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g)
+static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	if (g->start > 0 &&
-	    recs_match(xdf->recs[g->start - 1], xdf->recs[g->end - 1])) {
-		xdf->rchg[--g->start] = 1;
-		xdf->rchg[--g->end] = 0;
+	    recs_match(ctx->recs[g->start - 1], ctx->recs[g->end - 1])) {
+		ctx->rchg[--g->start] = 1;
+		ctx->rchg[--g->end] = 0;
 
-		while (xdf->rchg[g->start - 1])
+		while (ctx->rchg[g->start - 1])
 			g->start--;
 
 		return 0;
@@ -800,13 +800,13 @@ static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g)
  * This also helps in finding joinable change groups and reducing the diff
  * size.
  */
-int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
+int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, long flags) {
 	struct xdlgroup g, go;
 	long earliest_end, end_matching_other;
 	long groupsize;
 
-	group_init(xdf, &g);
-	group_init(xdfo, &go);
+	group_init(ctx, &g);
+	group_init(ctx_out, &go);
 
 	while (1) {
 		/*
@@ -832,8 +832,8 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			end_matching_other = -1;
 
 			/* Shift the group backward as much as possible: */
-			while (!group_slide_up(xdf, &g))
-				if (group_previous(xdfo, &go))
+			while (!group_slide_up(ctx, &g))
+				if (group_previous(ctx_out, &go))
 					BUG("group sync broken sliding up");
 
 			/*
@@ -847,9 +847,9 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 			/* Now shift the group forward as far as possible: */
 			while (1) {
-				if (group_slide_down(xdf, &g))
+				if (group_slide_down(ctx, &g))
 					break;
-				if (group_next(xdfo, &go))
+				if (group_next(ctx_out, &go))
 					BUG("group sync broken sliding down");
 
 				if (go.end > go.start)
@@ -874,9 +874,9 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			 * other file that it can align with.
 			 */
 			while (go.end == go.start) {
-				if (group_slide_up(xdf, &g))
+				if (group_slide_up(ctx, &g))
 					BUG("match disappeared");
-				if (group_previous(xdfo, &go))
+				if (group_previous(ctx_out, &go))
 					BUG("group sync broken sliding to match");
 			}
 		} else if (flags & XDF_INDENT_HEURISTIC) {
@@ -904,9 +904,9 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 				struct split_measurement m;
 				struct split_score score = {0, 0};
 
-				measure_split(xdf, shift, &m);
+				measure_split(ctx, shift, &m);
 				score_add_split(&m, &score);
-				measure_split(xdf, shift - groupsize, &m);
+				measure_split(ctx, shift - groupsize, &m);
 				score_add_split(&m, &score);
 				if (best_shift == -1 ||
 				    score_cmp(&score, &best_score) <= 0) {
@@ -917,22 +917,22 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			}
 
 			while (g.end > best_shift) {
-				if (group_slide_up(xdf, &g))
+				if (group_slide_up(ctx, &g))
 					BUG("best shift unreached");
-				if (group_previous(xdfo, &go))
+				if (group_previous(ctx_out, &go))
 					BUG("group sync broken sliding to blank line");
 			}
 		}
 
 	next:
 		/* Move past the just-processed group: */
-		if (group_next(xdf, &g))
+		if (group_next(ctx, &g))
 			break;
-		if (group_next(xdfo, &go))
+		if (group_next(ctx_out, &go))
 			BUG("group sync broken moving to next group");
 	}
 
-	if (!group_next(xdfo, &go))
+	if (!group_next(ctx_out, &go))
 		BUG("group sync broken at end of file");
 
 	return 0;
@@ -941,13 +941,13 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
 	xdchange_t *cscr = NULL, *xch;
-	char *rchg1 = xe->xdf1.rchg, *rchg2 = xe->xdf2.rchg;
+	char *rchg1 = xe->lhs.rchg, *rchg2 = xe->rhs.rchg;
 	long i1, i2, l1, l2;
 
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
-	for (i1 = xe->xdf1.nrec, i2 = xe->xdf2.nrec; i1 >= 0 || i2 >= 0; i1--, i2--)
+	for (i1 = xe->lhs.nrec, i2 = xe->rhs.nrec; i1 >= 0 || i2 >= 0; i1--, i2--)
 		if (rchg1[i1 - 1] || rchg2[i2 - 1]) {
 			for (l1 = i1; rchg1[i1 - 1]; i1--);
 			for (l2 = i2; rchg2[i2 - 1]; i2--);
@@ -1000,11 +1000,11 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
 		struct xrecord **rec;
 		long i;
 
-		rec = &xe->xdf1.recs[xch->i1];
+		rec = &xe->lhs.recs[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
 			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
 
-		rec = &xe->xdf2.recs[xch->i2];
+		rec = &xe->rhs.recs[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
 			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
 
@@ -1040,11 +1040,11 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
 		if (xch->ignore)
 			continue;
 
-		rec = &xe->xdf1.recs[xch->i1];
+		rec = &xe->lhs.recs[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
 			ignore = record_matches_regex(rec[i], xpp);
 
-		rec = &xe->xdf2.recs[xch->i2];
+		rec = &xe->rhs.recs[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
 			ignore = record_matches_regex(rec[i], xpp);
 
@@ -1062,8 +1062,8 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 		return -1;
 	}
-	if (xdl_change_compact(&xe.xdf1, &xe.xdf2, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe.xdf2, &xe.xdf1, xpp->flags) < 0 ||
+	if (xdl_change_compact(&xe.lhs, &xe.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&xe.rhs, &xe.lhs, xpp->flags) < 0 ||
 	    xdl_build_script(&xe, &xscr) < 0) {
 
 		xdl_free_env(&xe);
