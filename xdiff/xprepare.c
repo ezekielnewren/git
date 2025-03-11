@@ -134,18 +134,10 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	unsigned long hav;
 	char const *blk, *cur, *top, *prev;
 	char *rchg;
-	long *rindex;
 
-	rindex = NULL;
 	rchg = NULL;
 
-	IVEC_INIT(ctx->file_storage.minimal_perfect_hash);
 	IVEC_INIT(ctx->file_storage.record);
-	ctx->minimal_perfect_hash = &ctx->file_storage.minimal_perfect_hash;
-	ctx->record = &ctx->file_storage.record;
-	IVEC_INIT(ctx->record_ptr);
-
-
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
 		for (top = blk + bsize; cur < top; ) {
 			struct xrecord rec_new;
@@ -158,7 +150,13 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 		}
 	}
 	ivec_shrink_to_fit(&ctx->file_storage.record);
+	ctx->record = &ctx->file_storage.record;
 
+	IVEC_INIT(ctx->file_storage.minimal_perfect_hash);
+	ctx->minimal_perfect_hash = &ctx->file_storage.minimal_perfect_hash;
+	ivec_reserve_exact(&ctx->file_storage.minimal_perfect_hash, ctx->file_storage.record.length);
+
+	IVEC_INIT(ctx->record_ptr);
 	ivec_reserve_exact(&ctx->record_ptr, ctx->file_storage.record.length);
 	for (usize i = 0; i < ctx->file_storage.record.length; i++) {
 		struct xrecord *rec = &ctx->file_storage.record.ptr[i];
@@ -168,24 +166,17 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	if (!XDL_CALLOC_ARRAY(rchg, ctx->record->length + 2))
 		goto abort;
 
-	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
-	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF)) {
-		if (!XDL_ALLOC_ARRAY(rindex, ctx->record->length + 1))
-			goto abort;
-	}
+	IVEC_INIT(ctx->rindex);
 
 	ctx->nrec = ctx->record->length;
 	ctx->recs = ctx->record_ptr.ptr;
 	ctx->rchg = rchg + 1;
-	ctx->rindex = rindex;
-	ctx->nreff = 0;
 	ctx->dstart = 0;
 	ctx->dend = ctx->record->length - 1;
 
 	return 0;
 
 abort:
-	xdl_free(rindex);
 	xdl_free(rchg);
 	ivec_free(&ctx->file_storage.minimal_perfect_hash);
 	ivec_free(&ctx->file_storage.record);
@@ -195,11 +186,11 @@ abort:
 
 
 static void xdl_free_ctx(struct xd_file_context *ctx) {
-	xdl_free(ctx->rindex);
 	xdl_free(ctx->rchg - 1);
 	ivec_free(&ctx->file_storage.minimal_perfect_hash);
 	ivec_free(&ctx->file_storage.record);
 	ivec_free(&ctx->record_ptr);
+	ivec_free(&ctx->rindex);
 }
 
 
@@ -273,13 +264,13 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *xdf2) {
-	long i, nm, nreff, mlim;
+static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
+	long i, nm, mlim;
 	struct xrecord **recs;
 	xdlclass_t *rcrec;
 	char *dis, *dis1, *dis2;
 
-	if (!XDL_CALLOC_ARRAY(dis, lhs->nrec + xdf2->nrec + 2))
+	if (!XDL_CALLOC_ARRAY(dis, lhs->nrec + rhs->nrec + 2))
 		return -1;
 	dis1 = dis;
 	dis2 = dis1 + lhs->nrec + 1;
@@ -292,35 +283,33 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 		dis1[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	if ((mlim = xdl_bogosqrt(xdf2->nrec)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(rhs->nrec)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xdf2->dstart, recs = &xdf2->recs[xdf2->dstart]; i <= xdf2->dend; i++, recs++) {
+	for (i = rhs->dstart, recs = &rhs->recs[rhs->dstart]; i <= rhs->dend; i++, recs++) {
 		rcrec = cf->rcrecs[(*recs)->ha];
 		nm = rcrec ? rcrec->len1 : 0;
 		dis2[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
 	}
 
-	for (nreff = 0, i = lhs->dstart, recs = &lhs->recs[lhs->dstart];
+	for (i = lhs->dstart, recs = &lhs->recs[lhs->dstart];
 	     i <= lhs->dend; i++, recs++) {
 		if (dis1[i] == 1 ||
 		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, lhs->dstart, lhs->dend))) {
-			lhs->rindex[nreff] = i;
-			nreff++;
+			ivec_push(&lhs->rindex, &i);
 		} else
 			lhs->rchg[i] = 1;
 	}
-	lhs->nreff = nreff;
+	ivec_shrink_to_fit(&lhs->rindex);
 
-	for (nreff = 0, i = xdf2->dstart, recs = &xdf2->recs[xdf2->dstart];
-	     i <= xdf2->dend; i++, recs++) {
+	for (i = rhs->dstart, recs = &rhs->recs[rhs->dstart];
+	     i <= rhs->dend; i++, recs++) {
 		if (dis2[i] == 1 ||
-		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, xdf2->dstart, xdf2->dend))) {
-			xdf2->rindex[nreff] = i;
-			nreff++;
+		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, rhs->dstart, rhs->dend))) {
+			ivec_push(&rhs->rindex, &i);
 		} else
-			xdf2->rchg[i] = 1;
+			rhs->rchg[i] = 1;
 	}
-	xdf2->nreff = nreff;
+	ivec_shrink_to_fit(&rhs->rindex);
 
 	xdl_free(dis);
 

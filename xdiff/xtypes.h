@@ -63,8 +63,7 @@ struct xd_file_context {
 	long dstart, dend;
 	struct xrecord **recs;
 	char *rchg;
-	long *rindex;
-	long nreff;
+	struct ivec_usize rindex;
 };
 
 struct xdpair {
