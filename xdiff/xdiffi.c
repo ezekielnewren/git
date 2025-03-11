@@ -34,7 +34,7 @@ typedef struct s_xdpsplit {
 } xdpsplit_t;
 
 static u64 get_mph(struct xd_file_context *ctx, usize index) {
-	return ctx->recs[ctx->rindex.ptr[index]]->ha;
+	return ctx->record->ptr[ctx->rindex.ptr[index]].ha;
 }
 
 /*
@@ -475,23 +475,23 @@ struct split_score {
 /*
  * Fill m with information about a hypothetical split of xdf above line split.
  */
-static void measure_split(const struct xd_file_context *ctx, long split,
+static void measure_split(const struct xd_file_context *ctx, isize split,
 			  struct split_measurement *m)
 {
-	long i;
+	isize i;
 
-	if (split >= ctx->nrec) {
+	if (split >= (isize) ctx->record->length) {
 		m->end_of_file = 1;
 		m->indent = -1;
 	} else {
 		m->end_of_file = 0;
-		m->indent = get_indent(ctx->recs[split]);
+		m->indent = get_indent(&ctx->record->ptr[split]);
 	}
 
 	m->pre_blank = 0;
 	m->pre_indent = -1;
 	for (i = split - 1; i >= 0; i--) {
-		m->pre_indent = get_indent(ctx->recs[i]);
+		m->pre_indent = get_indent(&ctx->record->ptr[i]);
 		if (m->pre_indent != -1)
 			break;
 		m->pre_blank += 1;
@@ -503,8 +503,8 @@ static void measure_split(const struct xd_file_context *ctx, long split,
 
 	m->post_blank = 0;
 	m->post_indent = -1;
-	for (i = split + 1; i < ctx->nrec; i++) {
-		m->post_indent = get_indent(ctx->recs[i]);
+	for (i = split + 1; i < (isize) ctx->record->length; i++) {
+		m->post_indent = get_indent(&ctx->record->ptr[i]);
 		if (m->post_indent != -1)
 			break;
 		m->post_blank += 1;
@@ -714,7 +714,7 @@ static void group_init(struct xd_file_context *ctx, struct xdlgroup *g)
  */
 static inline int group_next(struct xd_file_context *ctx, struct xdlgroup *g)
 {
-	if (g->end == ctx->nrec)
+	if (g->end == (isize) ctx->record->length)
 		return -1;
 
 	g->start = g->end + 1;
@@ -747,8 +747,8 @@ static inline int group_previous(struct xd_file_context *ctx, struct xdlgroup *g
  */
 static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 {
-	if (g->end < ctx->nrec &&
-	    recs_match(ctx->recs[g->start], ctx->recs[g->end])) {
+	if (g->end < (isize) ctx->record->length &&
+	    recs_match(&ctx->record->ptr[g->start], &ctx->record->ptr[g->end])) {
 		ctx->rchg[g->start++] = 0;
 		ctx->rchg[g->end++] = 1;
 
@@ -769,7 +769,7 @@ static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	if (g->start > 0 &&
-	    recs_match(ctx->recs[g->start - 1], ctx->recs[g->end - 1])) {
+	    recs_match(&ctx->record->ptr[g->start - 1], &ctx->record->ptr[g->end - 1])) {
 		ctx->rchg[--g->start] = 1;
 		ctx->rchg[--g->end] = 0;
 
@@ -934,7 +934,7 @@ int xdl_build_script(struct xdpair *pair, xdchange_t **xscr) {
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
-	for (i1 = pair->lhs.nrec, i2 = pair->rhs.nrec; i1 >= 0 || i2 >= 0; i1--, i2--)
+	for (i1 = pair->lhs.record->length, i2 = pair->rhs.record->length; i1 >= 0 || i2 >= 0; i1--, i2--)
 		if (rchg1[i1 - 1] || rchg2[i2 - 1]) {
 			for (l1 = i1; rchg1[i1 - 1]; i1--);
 			for (l2 = i2; rchg2[i2 - 1]; i2--);
@@ -984,16 +984,16 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, struct xdpair *pair, long
 
 	for (xch = xscr; xch; xch = xch->next) {
 		int ignore = 1;
-		struct xrecord **rec;
+		struct xrecord *rec;
 		long i;
 
-		rec = &pair->lhs.recs[xch->i1];
+		rec = &pair->lhs.record->ptr[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
-			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
+			ignore = xdl_blankline(rec[i].ptr, rec[i].size, flags);
 
-		rec = &pair->rhs.recs[xch->i2];
+		rec = &pair->rhs.record->ptr[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
-			ignore = xdl_blankline(rec[i]->ptr, rec[i]->size, flags);
+			ignore = xdl_blankline(rec[i].ptr, rec[i].size, flags);
 
 		xch->ignore = ignore;
 	}
@@ -1017,7 +1017,7 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair
 	xdchange_t *xch;
 
 	for (xch = xscr; xch; xch = xch->next) {
-		struct xrecord **rec;
+		struct xrecord *rec;
 		int ignore = 1;
 		long i;
 
@@ -1027,13 +1027,13 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair
 		if (xch->ignore)
 			continue;
 
-		rec = &pair->lhs.recs[xch->i1];
+		rec = &pair->lhs.record->ptr[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
-			ignore = record_matches_regex(rec[i], xpp);
+			ignore = record_matches_regex(&rec[i], xpp);
 
-		rec = &pair->rhs.recs[xch->i2];
+		rec = &pair->rhs.record->ptr[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
-			ignore = record_matches_regex(rec[i], xpp);
+			ignore = record_matches_regex(&rec[i], xpp);
 
 		xch->ignore = ignore;
 	}

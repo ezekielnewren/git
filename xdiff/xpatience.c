@@ -88,9 +88,9 @@ static int is_anchor(xpparam_t const *xpp, const char *line)
 static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 			  int pass)
 {
-	struct xrecord **records = pass == 1 ?
-		map->pair->lhs.recs : map->pair->rhs.recs;
-	struct xrecord *record = records[line - 1];
+	struct xrecord *records = pass == 1 ?
+		map->pair->lhs.record->ptr : map->pair->rhs.record->ptr;
+	struct xrecord *record = &records[line - 1];
 	/*
 	 * After xdl_prepare_env() (or more precisely, due to
 	 * xdl_classify_record()), the "ha" member of the records (AKA lines)
@@ -121,7 +121,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 		return;
 	map->entries[index].line1 = line;
 	map->entries[index].hash = record->ha;
-	map->entries[index].anchor = is_anchor(xpp, map->pair->lhs.recs[line - 1]->ptr);
+	map->entries[index].anchor = is_anchor(xpp, map->pair->lhs.record->ptr[line - 1].ptr);
 	if (!map->first)
 		map->first = map->entries + index;
 	if (map->last) {
@@ -246,8 +246,8 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 
 static int match(struct hashmap *map, int line1, int line2)
 {
-	struct xrecord *record1 = map->pair->lhs.recs[line1 - 1];
-	struct xrecord *record2 = map->pair->rhs.recs[line2 - 1];
+	struct xrecord *record1 = &map->pair->lhs.record->ptr[line1 - 1];
+	struct xrecord *record2 = &map->pair->rhs.record->ptr[line2 - 1];
 	return record1->ha == record2->ha;
 }
 
@@ -370,5 +370,5 @@ static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 
 int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair)
 {
-	return patience_diff(xpp, pair, 1, pair->lhs.nrec, 1, pair->rhs.nrec);
+	return patience_diff(xpp, pair, 1, pair->lhs.record->length, 1, pair->rhs.record->length);
 }

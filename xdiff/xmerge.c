@@ -47,6 +47,12 @@ typedef struct s_xdmerge {
 	long chg0;
 } xdmerge_t;
 
+static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long flags)
+{
+	return xdl_recmatch(rec1->ptr, rec1->size,
+			    rec2->ptr, rec2->size, flags);
+}
+
 static int xdl_append_merge(xdmerge_t **merge, int mode,
 			    long i0, long chg0,
 			    long i1, long chg1,
@@ -97,12 +103,11 @@ static int xdl_merge_cmp_lines(struct xdpair *pair1, int i1, struct xdpair *pair
 		int line_count, long flags)
 {
 	int i;
-	struct xrecord **rec1 = pair1->rhs.recs + i1;
-	struct xrecord **rec2 = pair2->rhs.recs + i2;
+	struct xrecord *rec1 = &pair1->rhs.record->ptr[i1];
+	struct xrecord *rec2 = &pair2->rhs.record->ptr[i2];
 
 	for (i = 0; i < line_count; i++) {
-		int result = xdl_recmatch(rec1[i]->ptr, rec1[i]->size,
-			rec2[i]->ptr, rec2[i]->size, flags);
+		int result = recmatch(&rec1[i], &rec2[i], flags);
 		if (!result)
 			return -1;
 	}
@@ -111,20 +116,20 @@ static int xdl_merge_cmp_lines(struct xdpair *pair1, int i1, struct xdpair *pair
 
 static int xdl_recs_copy_0(int use_orig, struct xdpair *pair, int i, int count, int needs_cr, int add_nl, char *dest)
 {
-	struct xrecord **recs;
+	struct xrecord *recs;
 	int size = 0;
 
-	recs = (use_orig ? pair->lhs.recs : pair->rhs.recs) + i;
+	recs = (use_orig ? pair->lhs.record->ptr : pair->rhs.record->ptr) + i;
 
 	if (count < 1)
 		return 0;
 
-	for (i = 0; i < count; size += recs[i++]->size)
+	for (i = 0; i < count; size += recs[i++].size)
 		if (dest)
-			memcpy(dest + size, recs[i]->ptr, recs[i]->size);
+			memcpy(dest + size, recs[i].ptr, recs[i].size);
 	if (add_nl) {
-		i = recs[count - 1]->size;
-		if (i == 0 || recs[count - 1]->ptr[i - 1] != '\n') {
+		i = recs[count - 1].size;
+		if (i == 0 || recs[count - 1].ptr[i - 1] != '\n') {
 			if (needs_cr) {
 				if (dest)
 					dest[size] = '\r';
@@ -154,28 +159,28 @@ static int xdl_orig_copy(struct xdpair *pair, int i, int count, int needs_cr, in
  * has no eol, the preceding line, if any), 0 if it ends in LF-only, and
  * -1 if the line ending cannot be determined.
  */
-static int is_eol_crlf(struct xd_file_context *ctx, int i)
+static int is_eol_crlf(struct xd_file_context *ctx, usize i)
 {
 	long size;
 
-	if (i < ctx->nrec - 1)
+	if (i + 1 < ctx->record->length)
 		/* All lines before the last *must* end in LF */
-		return (size = ctx->recs[i]->size) > 1 &&
-			ctx->recs[i]->ptr[size - 2] == '\r';
-	if (!ctx->nrec)
+		return (size = ctx->record->ptr[i].size) > 1 &&
+			ctx->record->ptr[i].ptr[size - 2] == '\r';
+	if (!ctx->record->length)
 		/* Cannot determine eol style from empty file */
 		return -1;
-	if ((size = ctx->recs[i]->size) &&
-			ctx->recs[i]->ptr[size - 1] == '\n')
+	if ((size = ctx->record->ptr[i].size) &&
+			ctx->record->ptr[i].ptr[size - 1] == '\n')
 		/* Last line; ends in LF; Is it CR/LF? */
 		return size > 1 &&
-			ctx->recs[i]->ptr[size - 2] == '\r';
+			ctx->record->ptr[i].ptr[size - 2] == '\r';
 	if (!i)
 		/* The only line has no eol */
 		return -1;
 	/* Determine eol from second-to-last line */
-	return (size = ctx->recs[i - 1]->size) > 1 &&
-		ctx->recs[i - 1]->ptr[size - 2] == '\r';
+	return (size = ctx->record->ptr[i - 1].size) > 1 &&
+		ctx->record->ptr[i - 1].ptr[size - 2] == '\r';
 }
 
 static int is_cr_needed(struct xdpair *pair1, struct xdpair *pair2, xdmerge_t *m)
@@ -317,15 +322,9 @@ static int xdl_fill_merge_buffer(struct xdpair *pair1, const char *name1,
 			continue;
 		i = m->i1 + m->chg1;
 	}
-	size += xdl_recs_copy(pair1, i, pair1->rhs.nrec - i, 0, 0,
+	size += xdl_recs_copy(pair1, i, pair1->rhs.record->length - i, 0, 0,
 			      dest ? dest + size : NULL);
 	return size;
-}
-
-static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long flags)
-{
-	return xdl_recmatch(rec1->ptr, rec1->size,
-			    rec2->ptr, rec2->size, flags);
 }
 
 /*
@@ -334,22 +333,22 @@ static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long fl
 static void xdl_refine_zdiff3_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdmerge_t *m,
 		xpparam_t const *xpp)
 {
-	struct xrecord **rec1 = pair1->rhs.recs, **rec2 = pair2->rhs.recs;
+	struct xrecord *rec1 = pair1->rhs.record->ptr, *rec2 = pair2->rhs.record->ptr;
 	for (; m; m = m->next) {
 		/* let's handle just the conflicts */
 		if (m->mode)
 			continue;
 
 		while(m->chg1 && m->chg2 &&
-		      recmatch(rec1[m->i1], rec2[m->i2], xpp->flags)) {
+		      recmatch(&rec1[m->i1], &rec2[m->i2], xpp->flags)) {
 			m->chg1--;
 			m->chg2--;
 			m->i1++;
 			m->i2++;
 		}
 		while (m->chg1 && m->chg2 &&
-		       recmatch(rec1[m->i1 + m->chg1 - 1],
-				rec2[m->i2 + m->chg2 - 1], xpp->flags)) {
+		       recmatch(&rec1[m->i1 + m->chg1 - 1],
+				&rec2[m->i2 + m->chg2 - 1], xpp->flags)) {
 			m->chg1--;
 			m->chg2--;
 		}
@@ -381,12 +380,12 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		 * This probably does not work outside git, since
 		 * we have a very simple mmfile structure.
 		 */
-		t1.ptr = (char *)pair1->rhs.recs[m->i1]->ptr;
-		t1.size = pair1->rhs.recs[m->i1 + m->chg1 - 1]->ptr
-			+ pair1->rhs.recs[m->i1 + m->chg1 - 1]->size - t1.ptr;
-		t2.ptr = (char *)pair2->rhs.recs[m->i2]->ptr;
-		t2.size = pair2->rhs.recs[m->i2 + m->chg2 - 1]->ptr
-			+ pair2->rhs.recs[m->i2 + m->chg2 - 1]->size - t2.ptr;
+		t1.ptr = (char *)pair1->rhs.record->ptr[m->i1].ptr;
+		t1.size = pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].ptr
+			+ pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].size - t1.ptr;
+		t2.ptr = (char *)pair2->rhs.record->ptr[m->i2].ptr;
+		t2.size = pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
+			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size - t2.ptr;
 		if (xdl_do_diff(&t1, &t2, xpp, &pair) < 0)
 			return -1;
 		if (xdl_change_compact(&pair.lhs, &pair.rhs, xpp->flags) < 0 ||
@@ -440,8 +439,8 @@ static int line_contains_alnum(const char *ptr, long size)
 static int lines_contain_alnum(struct xdpair *pair, int i, int chg)
 {
 	for (; chg; chg--, i++)
-		if (line_contains_alnum(pair->rhs.recs[i]->ptr,
-				pair->rhs.recs[i]->size))
+		if (line_contains_alnum(pair->rhs.record->ptr[i].ptr,
+				pair->rhs.record->ptr[i].size))
 			return 1;
 	return 0;
 }
@@ -622,7 +621,7 @@ static int xdl_do_merge(struct xdpair *pair1, xdchange_t *xscr1,
 			changes = c;
 		i0 = xscr1->i1;
 		i1 = xscr1->i2;
-		i2 = xscr1->i1 + pair2->rhs.nrec - pair2->lhs.nrec;
+		i2 = xscr1->i1 + pair2->rhs.record->length - pair2->lhs.record->length;
 		chg0 = xscr1->chg1;
 		chg1 = xscr1->chg2;
 		chg2 = xscr1->chg1;
@@ -637,7 +636,7 @@ static int xdl_do_merge(struct xdpair *pair1, xdchange_t *xscr1,
 		if (!changes)
 			changes = c;
 		i0 = xscr2->i1;
-		i1 = xscr2->i1 + pair1->rhs.nrec - pair1->lhs.nrec;
+		i1 = xscr2->i1 + pair1->rhs.record->length - pair1->lhs.record->length;
 		i2 = xscr2->i2;
 		chg0 = xscr2->chg1;
 		chg1 = xscr2->chg1;
