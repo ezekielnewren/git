@@ -118,9 +118,9 @@ void *xdl_cha_alloc(chastore_t *cha) {
 	return data;
 }
 
-int xdl_blankline(const char *line, long size, long flags)
+int xdl_blankline(u8 const* line, usize size, long flags)
 {
-	long i;
+	usize i;
 
 	if (!(flags & XDF_WHITESPACE_FLAGS))
 		return (size <= 1);
@@ -396,10 +396,10 @@ int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 	struct xdpair tmp_pair;
 
 	subfile1.ptr = (char *)pair->lhs.record->ptr[line1 - 1].ptr;
-	subfile1.size = pair->lhs.record->ptr[line1 + count1 - 2].ptr +
+	subfile1.size = (char *)pair->lhs.record->ptr[line1 + count1 - 2].ptr +
 		pair->lhs.record->ptr[line1 + count1 - 2].size_with_eol - subfile1.ptr;
 	subfile2.ptr = (char *)pair->rhs.record->ptr[line2 - 1].ptr;
-	subfile2.size = pair->rhs.record->ptr[line2 + count2 - 2].ptr +
+	subfile2.size = (char *)pair->rhs.record->ptr[line2 + count2 - 2].ptr +
 		pair->rhs.record->ptr[line2 + count2 - 2].size_with_eol - subfile2.ptr;
 	if (xdl_do_diff(&subfile1, &subfile2, xpp, &tmp_pair) < 0)
 		return -1;

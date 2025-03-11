@@ -49,8 +49,8 @@ typedef struct s_xdmerge {
 
 static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long flags)
 {
-	return xdl_recmatch(rec1->ptr, rec1->size_with_eol,
-			    rec2->ptr, rec2->size_with_eol, flags);
+	return xdl_recmatch((const char *) rec1->ptr, rec1->size_with_eol,
+			    (const char *) rec2->ptr, rec2->size_with_eol, flags);
 }
 
 static int xdl_append_merge(xdmerge_t **merge, int mode,
@@ -381,10 +381,10 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		 * we have a very simple mmfile structure.
 		 */
 		t1.ptr = (char *)pair1->rhs.record->ptr[m->i1].ptr;
-		t1.size = pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].ptr
+		t1.size = (char *)pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].ptr
 			+ pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].size_with_eol - t1.ptr;
 		t2.ptr = (char *)pair2->rhs.record->ptr[m->i2].ptr;
-		t2.size = pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
+		t2.size = (char *)pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
 			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size_with_eol - t2.ptr;
 		if (xdl_do_diff(&t1, &t2, xpp, &pair) < 0)
 			return -1;
@@ -439,7 +439,7 @@ static int line_contains_alnum(const char *ptr, long size)
 static int lines_contain_alnum(struct xdpair *pair, int i, int chg)
 {
 	for (; chg; chg--, i++)
-		if (line_contains_alnum(pair->rhs.record->ptr[i].ptr,
+		if (line_contains_alnum((const char *) pair->rhs.record->ptr[i].ptr,
 				pair->rhs.record->ptr[i].size_with_eol))
 			return 1;
 	return 0;

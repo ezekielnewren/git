@@ -404,7 +404,7 @@ static int get_indent(struct xrecord *rec)
 	int ret = 0;
 
 	for (i = 0; i < rec->size_with_eol; i++) {
-		char c = rec->ptr[i];
+		u8 c = rec->ptr[i];
 
 		if (!XDL_ISSPACE(c))
 			return ret;
@@ -1004,7 +1004,7 @@ static int record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
 	int i;
 
 	for (i = 0; i < xpp->ignore_regex_nr; i++)
-		if (!regexec_buf(xpp->ignore_regex[i], rec->ptr, rec->size_with_eol, 1,
+		if (!regexec_buf(xpp->ignore_regex[i], (const char *) rec->ptr, rec->size_with_eol, 1,
 				 &regmatch, 0))
 			return 1;
 

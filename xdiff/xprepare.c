@@ -94,12 +94,12 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 	char const *line;
 	xdlclass_t *rcrec;
 
-	line = rec->ptr;
+	line = (const char *) rec->ptr;
 	hi = (long) XDL_HASHLONG(rec->ha, cf->hbits);
 	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
 		if (rcrec->ha == rec->ha &&
 				xdl_recmatch(rcrec->line, rcrec->size,
-					rec->ptr, rec->size_with_eol, cf->flags))
+					(const char *) rec->ptr, rec->size_with_eol, cf->flags))
 			break;
 
 	if (!rcrec) {
@@ -140,7 +140,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			struct xrecord rec_new;
 			prev = cur;
 			hav = xdl_hash_record(&cur, top, xpp->flags);
-			rec_new.ptr = prev;
+			rec_new.ptr = (u8 const*) prev;
 			rec_new.size_with_eol = (long) (cur - prev);
 			rec_new.ha = hav;
 			ivec_push(&ctx->file_storage.record, &rec_new);
