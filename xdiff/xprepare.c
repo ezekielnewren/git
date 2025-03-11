@@ -98,8 +98,8 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 	hi = (long) XDL_HASHLONG(rec->ha, cf->hbits);
 	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
 		if (rcrec->ha == rec->ha &&
-				xdl_recmatch(rcrec->line, rcrec->size,
-					(const char *) rec->ptr, rec->size_with_eol, cf->flags))
+				xdl_line_equal((u8 const *) rcrec->line, rcrec->size,
+					rec->ptr, rec->size_no_eol, cf->flags))
 			break;
 
 	if (!rcrec) {
@@ -112,7 +112,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 				return -1;
 		cf->rcrecs[rcrec->idx] = rcrec;
 		rcrec->line = line;
-		rcrec->size = rec->size_with_eol;
+		rcrec->size = rec->size_no_eol;
 		rcrec->ha = rec->ha;
 		rcrec->len1 = rcrec->len2 = 0;
 		rcrec->next = cf->rchash[hi];
@@ -130,21 +130,21 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 
 static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			   struct xd_file_context *ctx) {
-	long bsize;
-	unsigned long hav;
-	char const *blk, *cur, *top, *prev;
+	struct xlinereader reader;
 
 	IVEC_INIT(ctx->file_storage.record);
-	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
-		for (top = blk + bsize; cur < top; ) {
-			struct xrecord rec_new;
-			prev = cur;
-			hav = xdl_hash_record(&cur, top, xpp->flags);
-			rec_new.ptr = (u8 const*) prev;
-			rec_new.size_with_eol = (long) (cur - prev);
-			rec_new.ha = hav;
-			ivec_push(&ctx->file_storage.record, &rec_new);
+	xdl_linereader_init(&reader, (u8 const *) mf->ptr, mf->size);
+	while (true) {
+		struct xrecord rec_new;
+		if (!xdl_linereader_next(&reader, &rec_new.ptr, &rec_new.size_no_eol, &rec_new.size_with_eol))
+			break;
+		if ((xpp->flags & XDF_IGNORE_CR_AT_EOL) != 0
+			&& rec_new.size_no_eol > 0
+			&& rec_new.ptr[rec_new.size_no_eol - 1] == '\r') {
+			rec_new.size_no_eol--;
 		}
+		rec_new.ha = xdl_line_hash(rec_new.ptr, rec_new.size_no_eol, xpp->flags);
+		ivec_push(&ctx->file_storage.record, &rec_new);
 	}
 	ivec_shrink_to_fit(&ctx->file_storage.record);
 	ctx->record = &ctx->file_storage.record;
