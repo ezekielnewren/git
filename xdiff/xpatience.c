@@ -331,11 +331,11 @@ static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	/* trivial case: one side is empty */
 	if (!count1) {
 		while(count2--)
-			pair->rhs.rchg[line2++ - 1] = 1;
+			pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			pair->lhs.rchg[line1++ - 1] = 1;
+			pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
 		return 0;
 	}
 
@@ -347,9 +347,9 @@ static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	/* are there any matching lines at all? */
 	if (!map.has_matches) {
 		while(count1--)
-			pair->lhs.rchg[line1++ - 1] = 1;
+			pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
 		while(count2--)
-			pair->rhs.rchg[line2++ - 1] = 1;
+			pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
 		xdl_free(map.entries);
 		return 0;
 	}

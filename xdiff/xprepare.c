@@ -159,7 +159,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	IVEC_INIT(ctx->rindex);
 
 	ctx->record->length = ctx->record->length;
-	ctx->rchg = (char *) (ctx->consider.ptr + 1);
 	ctx->dstart = 0;
 	ctx->dend = ctx->record->length - 1;
 
@@ -261,7 +260,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart]; i <= lhs->dend; i++, recs++) {
 		rcrec = cf->rcrecs[recs->ha];
 		nm = rcrec ? rcrec->len2 : 0;
-		dis1[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
+		dis1[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
 	if ((mlim = xdl_bogosqrt(rhs->record->length)) > XDL_MAX_EQLIMIT)
@@ -269,7 +268,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart]; i <= rhs->dend; i++, recs++) {
 		rcrec = cf->rcrecs[recs->ha];
 		nm = rcrec ? rcrec->len1 : 0;
-		dis2[i] = (nm == 0) ? 0: (nm >= mlim) ? 2: 1;
+		dis2[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
 	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart];
@@ -278,7 +277,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, lhs->dstart, lhs->dend))) {
 			ivec_push(&lhs->rindex, &i);
 		} else
-			lhs->rchg[i] = 1;
+			lhs->consider.ptr[SENTINEL + i] = YES;
 	}
 	ivec_shrink_to_fit(&lhs->rindex);
 
@@ -288,7 +287,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, rhs->dstart, rhs->dend))) {
 			ivec_push(&rhs->rindex, &i);
 		} else
-			rhs->rchg[i] = 1;
+			rhs->consider.ptr[SENTINEL + i] = YES;
 	}
 	ivec_shrink_to_fit(&rhs->rindex);
 
