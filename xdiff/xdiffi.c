@@ -274,10 +274,10 @@ int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 	 */
 	if (off1 == lim1) {
 		for (; off2 < lim2; off2++)
-			ctx2->rchg[ctx2->rindex.ptr[off2]] = 1;
+			ctx2->consider.ptr[SENTINEL + ctx2->rindex.ptr[off2]] = YES;
 	} else if (off2 == lim2) {
 		for (; off1 < lim1; off1++)
-			ctx1->rchg[ctx1->rindex.ptr[off1]] = 1;
+			ctx1->consider.ptr[SENTINEL + ctx1->rindex.ptr[off1]] = YES;
 	} else {
 		xdpsplit_t spl;
 		spl.i1 = spl.i2 = 0;
@@ -705,7 +705,7 @@ struct xdlgroup {
 static void group_init(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	g->start = g->end = 0;
-	while (ctx->rchg[g->end])
+	while (ctx->consider.ptr[SENTINEL + g->end])
 		g->end++;
 }
 
@@ -719,7 +719,7 @@ static inline int group_next(struct xd_file_context *ctx, struct xdlgroup *g)
 		return -1;
 
 	g->start = g->end + 1;
-	for (g->end = g->start; ctx->rchg[g->end]; g->end++)
+	for (g->end = g->start; ctx->consider.ptr[SENTINEL + g->end]; g->end++)
 		;
 
 	return 0;
@@ -735,7 +735,7 @@ static inline int group_previous(struct xd_file_context *ctx, struct xdlgroup *g
 		return -1;
 
 	g->end = g->start - 1;
-	for (g->start = g->end; ctx->rchg[g->start - 1]; g->start--)
+	for (g->start = g->end; ctx->consider.ptr[SENTINEL + g->start - 1]; g->start--)
 		;
 
 	return 0;
@@ -750,10 +750,10 @@ static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	if (g->end < ctx->record->length &&
 	    recs_match(&ctx->record->ptr[g->start], &ctx->record->ptr[g->end])) {
-		ctx->rchg[g->start++] = 0;
-		ctx->rchg[g->end++] = 1;
+		ctx->consider.ptr[SENTINEL + g->start++] = NO;
+		ctx->consider.ptr[SENTINEL + g->end++] = YES;
 
-		while (ctx->rchg[g->end])
+		while (ctx->consider.ptr[SENTINEL + g->end])
 			g->end++;
 
 		return 0;
@@ -771,10 +771,10 @@ static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	if (g->start > 0 &&
 	    recs_match(&ctx->record->ptr[g->start - 1], &ctx->record->ptr[g->end - 1])) {
-		ctx->rchg[--g->start] = 1;
-		ctx->rchg[--g->end] = 0;
+		ctx->consider.ptr[SENTINEL + --g->start] = YES;
+		ctx->consider.ptr[SENTINEL + --g->end] = NO;
 
-		while (ctx->rchg[g->start - 1])
+		while (ctx->consider.ptr[SENTINEL + g->start - 1])
 			g->start--;
 
 		return 0;
@@ -929,16 +929,15 @@ int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 
 int xdl_build_script(struct xdpair *pair, xdchange_t **xscr) {
 	xdchange_t *cscr = NULL, *xch;
-	char *rchg1 = pair->lhs.rchg, *rchg2 = pair->rhs.rchg;
 	long i1, i2, l1, l2;
 
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
 	for (i1 = pair->lhs.record->length, i2 = pair->rhs.record->length; i1 >= 0 || i2 >= 0; i1--, i2--)
-		if (rchg1[i1 - 1] || rchg2[i2 - 1]) {
-			for (l1 = i1; rchg1[i1 - 1]; i1--);
-			for (l2 = i2; rchg2[i2 - 1]; i2--);
+		if (pair->lhs.consider.ptr[SENTINEL + i1 - 1] || pair->rhs.consider.ptr[SENTINEL + i2 - 1]) {
+			for (l1 = i1; pair->lhs.consider.ptr[SENTINEL + i1 - 1]; i1--);
+			for (l2 = i2; pair->rhs.consider.ptr[SENTINEL + i2 - 1]; i2--);
 
 			if (!(xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2))) {
 				xdl_free_script(cscr);

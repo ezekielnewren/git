@@ -318,11 +318,11 @@ redo:
 
 	if (!count1) {
 		while(count2--)
-			pair->rhs.rchg[line2++ - 1] = 1;
+			pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			pair->lhs.rchg[line1++ - 1] = 1;
+			pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
 		return 0;
 	}
 
@@ -335,9 +335,9 @@ redo:
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
-				pair->lhs.rchg[line1++ - 1] = 1;
+				pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
 			while (count2--)
-				pair->rhs.rchg[line2++ - 1] = 1;
+				pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
 			result = 0;
 		} else {
 			result = histogram_diff(xpp, pair,
