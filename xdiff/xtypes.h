@@ -58,10 +58,9 @@ struct xd_file_context {
 	struct ivec_xrecord *record;
 	struct xdfile file_storage;
 	struct ivec_xrecord_ptr record_ptr;
-	long nrec;
 	long dstart, dend;
-	struct xrecord **recs;
 	char *rchg;
+	struct ivec_u8 consider;
 	struct ivec_usize rindex;
 };
 
