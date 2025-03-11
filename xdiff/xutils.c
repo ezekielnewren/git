@@ -404,8 +404,8 @@ int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 	if (xdl_do_diff(&subfile1, &subfile2, xpp, &tmp_pair) < 0)
 		return -1;
 
-	memcpy(pair->lhs.rchg + line1 - 1, tmp_pair.lhs.rchg, count1);
-	memcpy(pair->rhs.rchg + line2 - 1, tmp_pair.rhs.rchg, count2);
+	memcpy(pair->lhs.consider.ptr + SENTINEL + line1 - 1, tmp_pair.lhs.consider.ptr + SENTINEL, count1);
+	memcpy(pair->rhs.consider.ptr + SENTINEL + line2 - 1, tmp_pair.rhs.consider.ptr + SENTINEL, count2);
 
 	xdl_free_env(&tmp_pair);
 
