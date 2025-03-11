@@ -86,7 +86,7 @@ struct region {
 	((LINE_MAP(index, ptr))->cnt)
 
 #define REC(env, s, l) \
-	(env->s.recs[l - 1])
+	(&env->s.record->ptr[l - 1])
 
 static int cmp_recs(struct xrecord *r1, struct xrecord *r2)
 {

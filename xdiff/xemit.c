@@ -24,9 +24,9 @@
 
 static long xdl_get_rec(struct xd_file_context *ctx, long ri, char const **rec) {
 
-	*rec = ctx->recs[ri]->ptr;
+	*rec = ctx->record->ptr[ri].ptr;
 
-	return ctx->recs[ri]->size;
+	return ctx->record->ptr[ri].size;
 }
 
 
