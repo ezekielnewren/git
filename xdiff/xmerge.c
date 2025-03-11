@@ -49,8 +49,8 @@ typedef struct s_xdmerge {
 
 static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long flags)
 {
-	return xdl_recmatch(rec1->ptr, rec1->size,
-			    rec2->ptr, rec2->size, flags);
+	return xdl_recmatch(rec1->ptr, rec1->size_with_eol,
+			    rec2->ptr, rec2->size_with_eol, flags);
 }
 
 static int xdl_append_merge(xdmerge_t **merge, int mode,
@@ -124,11 +124,11 @@ static int xdl_recs_copy_0(int use_orig, struct xdpair *pair, int i, int count, 
 	if (count < 1)
 		return 0;
 
-	for (i = 0; i < count; size += recs[i++].size)
+	for (i = 0; i < count; size += recs[i++].size_with_eol)
 		if (dest)
-			memcpy(dest + size, recs[i].ptr, recs[i].size);
+			memcpy(dest + size, recs[i].ptr, recs[i].size_with_eol);
 	if (add_nl) {
-		i = recs[count - 1].size;
+		i = recs[count - 1].size_with_eol;
 		if (i == 0 || recs[count - 1].ptr[i - 1] != '\n') {
 			if (needs_cr) {
 				if (dest)
@@ -165,12 +165,12 @@ static int is_eol_crlf(struct xd_file_context *ctx, int i)
 
 	if (i < ctx->record->length - 1)
 		/* All lines before the last *must* end in LF */
-		return (size = ctx->record->ptr[i].size) > 1 &&
+		return (size = ctx->record->ptr[i].size_with_eol) > 1 &&
 			ctx->record->ptr[i].ptr[size - 2] == '\r';
 	if (!ctx->record->length)
 		/* Cannot determine eol style from empty file */
 		return -1;
-	if ((size = ctx->record->ptr[i].size) &&
+	if ((size = ctx->record->ptr[i].size_with_eol) &&
 			ctx->record->ptr[i].ptr[size - 1] == '\n')
 		/* Last line; ends in LF; Is it CR/LF? */
 		return size > 1 &&
@@ -179,7 +179,7 @@ static int is_eol_crlf(struct xd_file_context *ctx, int i)
 		/* The only line has no eol */
 		return -1;
 	/* Determine eol from second-to-last line */
-	return (size = ctx->record->ptr[i - 1].size) > 1 &&
+	return (size = ctx->record->ptr[i - 1].size_with_eol) > 1 &&
 		ctx->record->ptr[i - 1].ptr[size - 2] == '\r';
 }
 
@@ -382,10 +382,10 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		 */
 		t1.ptr = (char *)pair1->rhs.record->ptr[m->i1].ptr;
 		t1.size = pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].ptr
-			+ pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].size - t1.ptr;
+			+ pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].size_with_eol - t1.ptr;
 		t2.ptr = (char *)pair2->rhs.record->ptr[m->i2].ptr;
 		t2.size = pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
-			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size - t2.ptr;
+			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size_with_eol - t2.ptr;
 		if (xdl_do_diff(&t1, &t2, xpp, &pair) < 0)
 			return -1;
 		if (xdl_change_compact(&pair.lhs, &pair.rhs, xpp->flags) < 0 ||
@@ -440,7 +440,7 @@ static int lines_contain_alnum(struct xdpair *pair, int i, int chg)
 {
 	for (; chg; chg--, i++)
 		if (line_contains_alnum(pair->rhs.record->ptr[i].ptr,
-				pair->rhs.record->ptr[i].size))
+				pair->rhs.record->ptr[i].size_with_eol))
 			return 1;
 	return 0;
 }
