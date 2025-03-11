@@ -128,7 +128,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 }
 
 
-static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
+static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			   struct xd_file_context *ctx) {
 	struct xlinereader reader;
 
@@ -156,8 +156,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	ctx->record->length = ctx->record->length;
 	ctx->dstart = 0;
 	ctx->dend = ctx->record->length - 1;
-
-	return 0;
 }
 
 
@@ -239,14 +237,14 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
+static void xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
 	long i, nm, mlim;
 	struct xrecord *recs;
 	xdlclass_t *rcrec;
 	char *dis, *dis1, *dis2;
 
 	if (!XDL_CALLOC_ARRAY(dis, lhs->record->length + rhs->record->length + 2))
-		return -1;
+		die("calloc failed");
 	dis1 = dis;
 	dis2 = dis1 + lhs->record->length + 1;
 
@@ -287,15 +285,13 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 	ivec_shrink_to_fit(&rhs->rindex);
 
 	xdl_free(dis);
-
-	return 0;
 }
 
 
 /*
  * Early trim initial and terminal matching records.
  */
-static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs) {
+static void xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs) {
 	long i, lim;
 	struct xrecord *recs1, *recs2;
 
@@ -316,20 +312,12 @@ static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rh
 
 	lhs->dend = lhs->record->length - i - 1;
 	rhs->dend = rhs->record->length - i - 1;
-
-	return 0;
 }
 
 
-static int xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
-
-	if (xdl_trim_ends(lhs, rhs) < 0 ||
-	    xdl_cleanup_records(cf, lhs, rhs) < 0) {
-
-		return -1;
-	}
-
-	return 0;
+static void xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
+	xdl_trim_ends(lhs, rhs);
+	xdl_cleanup_records(cf, lhs, rhs);
 }
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
@@ -338,17 +326,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 	memset(&cf, 0, sizeof(cf));
 
-	if (xdl_prepare_ctx(mf1, xpp, &pair->lhs) < 0) {
-
-		xdl_free_classifier(&cf);
-		return -1;
-	}
-	if (xdl_prepare_ctx(mf2, xpp, &pair->rhs) < 0) {
-
-		xdl_free_ctx(&pair->lhs);
-		xdl_free_classifier(&cf);
-		return -1;
-	}
+	xdl_prepare_ctx(mf1, xpp, &pair->lhs);
+	xdl_prepare_ctx(mf2, xpp, &pair->rhs);
 
 	if (xdl_init_classifier(&cf, pair->lhs.record->length + pair->rhs.record->length + 1, xpp->flags) < 0)
 		return -1;
@@ -361,15 +340,9 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		xdl_classify_record(2, &cf, &pair->rhs.record->ptr[i]);
 	}
 
-	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
-	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
-	    xdl_optimize_ctxs(&cf, &pair->lhs, &pair->rhs) < 0) {
-
-		xdl_free_ctx(&pair->rhs);
-		xdl_free_ctx(&pair->lhs);
-		xdl_free_classifier(&cf);
-		return -1;
-	    }
+	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(&cf, &pair->lhs, &pair->rhs);
+	}
 
 	xdl_free_classifier(&cf);
 
