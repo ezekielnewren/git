@@ -23,7 +23,38 @@
 #if !defined(XUTILS_H)
 #define XUTILS_H
 
+struct xdl_mphb_node {
+	u8 const* ptr;
+	usize size_no_eol;
+	u64 line_hash;
+	u64 value;
+	struct xdl_mphb_node *next;
+};
 
+DEFINE_IVEC_TYPE(struct xdl_mphb_node, xdl_mphb_node);
+DEFINE_IVEC_TYPE(struct xdl_mphb_node*, xdl_mphb_node_ptr);
+
+struct xdl_minimal_perfect_hash_builder {
+	struct xdl_mphb_node **head;
+	struct xdl_mphb_node *kv;
+	usize kv_capacity;
+	usize kv_length;
+	u32 hbits;
+	u64 flags;
+};
+
+struct xwhitespaceiter {
+	u8 const* ptr;
+	usize size;
+	usize index;
+	u64 flags;
+};
+
+
+struct xlinereader {
+	u8 const* cur;
+	usize size;
+};
 
 long xdl_bogosqrt(long n);
 int xdl_emit_diffrec(char const *rec, long size, char const *pre, long psize,
@@ -40,6 +71,20 @@ int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 		      const char *func, long funclen, xdemitcb_t *ecb);
 int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 		       int line1, int count1, int line2, int count2);
+
+void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder *mphb, usize size, u64 flags);
+u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder *mphb, struct xrecord *key);
+usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder *mphb);
+usize xdl_strip_eol(u8 const* ptr, usize size, u64 flags);
+void xdl_linereader_init(struct xlinereader *it, u8 const* ptr, usize size);
+bool xdl_linereader_next(struct xlinereader *it, u8 const **cur, usize *no_eol, usize *with_eol);
+void xdl_linereader_assert_done(struct xlinereader *it);
+void xdl_whitespace_iter_init(struct xwhitespaceiter* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
+bool xdl_whitespace_iter_next(struct xwhitespaceiter* it, u8 const** ptr, usize *run_size);
+void xdl_whitespace_iter_assert_done(struct xwhitespaceiter* it);
+u64  xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags);
+bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags);
+
 
 /* Do not call this function, use XDL_ALLOC_GROW instead */
 void* xdl_alloc_grow_helper(void* p, long nr, long* alloc, size_t size);
