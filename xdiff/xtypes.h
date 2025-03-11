@@ -39,7 +39,6 @@ typedef struct s_chastore {
 } chastore_t;
 
 struct xrecord {
-	struct xrecord *next;
 	char const *ptr;
 	long size;
 	unsigned long ha;
