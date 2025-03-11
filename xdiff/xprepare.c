@@ -153,13 +153,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	ctx->minimal_perfect_hash = &ctx->file_storage.minimal_perfect_hash;
 	ivec_reserve_exact(&ctx->file_storage.minimal_perfect_hash, ctx->file_storage.record.length);
 
-	IVEC_INIT(ctx->record_ptr);
-	ivec_reserve_exact(&ctx->record_ptr, ctx->file_storage.record.length);
-	for (usize i = 0; i < ctx->file_storage.record.length; i++) {
-		struct xrecord *rec = &ctx->file_storage.record.ptr[i];
-		ivec_push(&ctx->record_ptr, &rec);
-	}
-
 	IVEC_INIT(ctx->consider);
 	ivec_zero(&ctx->consider, SENTINEL + ctx->record->length + SENTINEL);
 
@@ -177,7 +170,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 static void xdl_free_ctx(struct xd_file_context *ctx) {
 	ivec_free(&ctx->file_storage.minimal_perfect_hash);
 	ivec_free(&ctx->file_storage.record);
-	ivec_free(&ctx->record_ptr);
 	ivec_free(&ctx->consider);
 	ivec_free(&ctx->rindex);
 }
