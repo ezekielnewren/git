@@ -50,7 +50,6 @@ static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 
 	IVEC_INIT(ctx->file_storage.minimal_perfect_hash);
 	ctx->minimal_perfect_hash = &ctx->file_storage.minimal_perfect_hash;
-	ivec_reserve_exact(&ctx->file_storage.minimal_perfect_hash, ctx->file_storage.record.length);
 
 	IVEC_INIT(ctx->consider);
 	ivec_zero(&ctx->consider, SENTINEL + ctx->record->length + SENTINEL);
@@ -247,15 +246,17 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xdl_mphb_init(&mphb, pair->lhs.record->length + pair->rhs.record->length, xpp->flags);
 	for (usize i = 0; i < pair->lhs.record->length; i++) {
 		struct xrecord *rec = &pair->lhs.record->ptr[i];
-		pair->lhs.minimal_perfect_hash->ptr[i] = xdl_mphb_hash(&mphb, rec);
+		u64 mph = xdl_mphb_hash(&mphb, rec);
+		ivec_push(pair->lhs.minimal_perfect_hash, &mph);
 	}
-	pair->lhs.minimal_perfect_hash->length = pair->lhs.record->length;
+	ivec_shrink_to_fit(pair->lhs.minimal_perfect_hash);
 
 	for (usize i = 0; i < pair->rhs.record->length; i++) {
 		struct xrecord *rec = &pair->rhs.record->ptr[i];
-		pair->rhs.minimal_perfect_hash->ptr[i] = xdl_mphb_hash(&mphb, rec);
+		u64 mph = xdl_mphb_hash(&mphb, rec);
+		ivec_push(pair->rhs.minimal_perfect_hash, &mph);
 	}
-	pair->rhs.minimal_perfect_hash->length = pair->rhs.record->length;
+	ivec_shrink_to_fit(pair->rhs.minimal_perfect_hash);
 
 	pair->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
 
