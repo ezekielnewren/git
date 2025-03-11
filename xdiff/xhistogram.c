@@ -362,9 +362,11 @@ out:
 	return result;
 }
 
-int xdl_do_histogram_diff(xpparam_t const *xpp, struct xdpair *pair)
-{
+int xdl_do_histogram_diff(xpparam_t const *xpp, struct xdpair *pair) {
+	usize end1 = pair->lhs.record->length - pair->delta_end;
+	usize end2 = pair->rhs.record->length - pair->delta_end;
+
 	return histogram_diff(xpp, pair,
-		pair->lhs.dstart + 1, pair->lhs.dend - pair->lhs.dstart + 1,
-		pair->rhs.dstart + 1, pair->rhs.dend - pair->rhs.dstart + 1);
+		LINE_SHIFT + pair->delta_start, LINE_SHIFT + (end1 - 1) - pair->delta_start,
+		LINE_SHIFT + pair->delta_start, LINE_SHIFT + (end2 - 1) - pair->delta_start);
 }

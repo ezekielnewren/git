@@ -63,13 +63,13 @@ struct xd_file_context {
 	struct ivec_u64 *minimal_perfect_hash;
 	struct ivec_xrecord *record;
 	struct xdfile file_storage;
-	long dstart, dend;
 	struct ivec_u8 consider;
 	struct ivec_usize rindex;
 };
 
 struct xdpair {
 	struct xd_file_context lhs, rhs;
+	usize delta_start, delta_end;
 	usize minimal_perfect_hash_size;
 };
 
