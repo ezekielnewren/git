@@ -85,20 +85,14 @@ struct region {
 #define CNT(index, ptr) \
 	((LINE_MAP(index, ptr))->cnt)
 
-#define REC(env, s, l) \
-	(&env->s.record->ptr[l - 1])
-
-static int cmp_recs(struct xrecord *r1, struct xrecord *r2)
-{
-	return r1->ha == r2->ha;
-
-}
+#define MPH(env, s, l) \
+	(env->s.minimal_perfect_hash->ptr[l - 1])
 
 #define CMP(i, s1, l1, s2, l2) \
-	(cmp_recs(REC(i->env, s1, l1), REC(i->env, s2, l2)))
+	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
 
 #define TABLE_HASH(index, side, line) \
-	XDL_HASHLONG((REC(index->env, side, line))->ha, index->table_bits)
+	XDL_HASHLONG((MPH(index->env, side, line)), index->table_bits)
 
 static int scanA(struct histindex *index, int line1, int count1)
 {

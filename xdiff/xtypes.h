@@ -49,7 +49,6 @@ struct xrecord {
 	u8 const *ptr;
 	usize size_no_eol;
 	usize size_with_eol;
-	unsigned long ha;
 };
 
 DEFINE_IVEC_TYPE(struct xrecord, xrecord);

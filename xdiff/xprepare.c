@@ -30,8 +30,7 @@
 
 
 
-static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
-			   struct xd_file_context *ctx) {
+static void xdl_prepare_ctx(mmfile_t *mf, struct xd_file_context *ctx) {
 	struct xlinereader reader;
 
 	IVEC_INIT(ctx->file_storage.record);
@@ -40,7 +39,6 @@ static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 		struct xrecord rec_new;
 		if (!xdl_linereader_next(&reader, &rec_new.ptr, &rec_new.size_no_eol, &rec_new.size_with_eol))
 			break;
-		rec_new.ha = xdl_line_hash(rec_new.ptr, rec_new.size_no_eol, xpp->flags);
 		ivec_push(&ctx->file_storage.record, &rec_new);
 	}
 	ivec_shrink_to_fit(&ctx->file_storage.record);
@@ -239,8 +237,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	pair->delta_start = 0;
 	pair->delta_end = 0;
 
-	xdl_prepare_ctx(mf1, xpp, &pair->lhs);
-	xdl_prepare_ctx(mf2, xpp, &pair->rhs);
+	xdl_prepare_ctx(mf1, &pair->lhs);
+	xdl_prepare_ctx(mf2, &pair->rhs);
 
 	xdl_mphb_init(&mphb, pair->lhs.record->length + pair->rhs.record->length, xpp->flags);
 	for (usize i = 0; i < pair->lhs.record->length; i++) {
