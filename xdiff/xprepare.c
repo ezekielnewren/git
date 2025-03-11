@@ -133,9 +133,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	long bsize;
 	unsigned long hav;
 	char const *blk, *cur, *top, *prev;
-	char *rchg;
-
-	rchg = NULL;
 
 	IVEC_INIT(ctx->file_storage.record);
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
@@ -163,33 +160,26 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 		ivec_push(&ctx->record_ptr, &rec);
 	}
 
-	if (!XDL_CALLOC_ARRAY(rchg, ctx->record->length + 2))
-		goto abort;
+	IVEC_INIT(ctx->consider);
+	ivec_zero(&ctx->consider, SENTINEL + ctx->record->length + SENTINEL);
 
 	IVEC_INIT(ctx->rindex);
 
 	ctx->nrec = ctx->record->length;
 	ctx->recs = ctx->record_ptr.ptr;
-	ctx->rchg = rchg + 1;
+	ctx->rchg = (char *) (ctx->consider.ptr + 1);
 	ctx->dstart = 0;
 	ctx->dend = ctx->record->length - 1;
 
 	return 0;
-
-abort:
-	xdl_free(rchg);
-	ivec_free(&ctx->file_storage.minimal_perfect_hash);
-	ivec_free(&ctx->file_storage.record);
-	ivec_free(&ctx->record_ptr);
-	return -1;
 }
 
 
 static void xdl_free_ctx(struct xd_file_context *ctx) {
-	xdl_free(ctx->rchg - 1);
 	ivec_free(&ctx->file_storage.minimal_perfect_hash);
 	ivec_free(&ctx->file_storage.record);
 	ivec_free(&ctx->record_ptr);
+	ivec_free(&ctx->consider);
 	ivec_free(&ctx->rindex);
 }
 
