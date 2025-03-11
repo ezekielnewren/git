@@ -481,7 +481,7 @@ static void measure_split(const struct xd_file_context *ctx, long split,
 {
 	long i;
 
-	if (split >= ctx->nrec) {
+	if (split >= ctx->record->length) {
 		m->end_of_file = 1;
 		m->indent = -1;
 	} else {
@@ -504,7 +504,7 @@ static void measure_split(const struct xd_file_context *ctx, long split,
 
 	m->post_blank = 0;
 	m->post_indent = -1;
-	for (i = split + 1; i < ctx->nrec; i++) {
+	for (i = split + 1; i < ctx->record->length; i++) {
 		m->post_indent = get_indent(ctx->recs[i]);
 		if (m->post_indent != -1)
 			break;
@@ -715,7 +715,7 @@ static void group_init(struct xd_file_context *ctx, struct xdlgroup *g)
  */
 static inline int group_next(struct xd_file_context *ctx, struct xdlgroup *g)
 {
-	if (g->end == ctx->nrec)
+	if (g->end == ctx->record->length)
 		return -1;
 
 	g->start = g->end + 1;
@@ -748,7 +748,7 @@ static inline int group_previous(struct xd_file_context *ctx, struct xdlgroup *g
  */
 static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 {
-	if (g->end < ctx->nrec &&
+	if (g->end < ctx->record->length &&
 	    recs_match(ctx->recs[g->start], ctx->recs[g->end])) {
 		ctx->rchg[g->start++] = 0;
 		ctx->rchg[g->end++] = 1;
@@ -935,7 +935,7 @@ int xdl_build_script(struct xdpair *pair, xdchange_t **xscr) {
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
-	for (i1 = pair->lhs.nrec, i2 = pair->rhs.nrec; i1 >= 0 || i2 >= 0; i1--, i2--)
+	for (i1 = pair->lhs.record->length, i2 = pair->rhs.record->length; i1 >= 0 || i2 >= 0; i1--, i2--)
 		if (rchg1[i1 - 1] || rchg2[i2 - 1]) {
 			for (l1 = i1; rchg1[i1 - 1]; i1--);
 			for (l2 = i2; rchg2[i2 - 1]; i2--);

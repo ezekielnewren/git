@@ -369,5 +369,5 @@ static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 
 int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair)
 {
-	return patience_diff(xpp, pair, 1, pair->lhs.nrec, 1, pair->rhs.nrec);
+	return patience_diff(xpp, pair, 1, pair->lhs.record->length, 1, pair->rhs.record->length);
 }

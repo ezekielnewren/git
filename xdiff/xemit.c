@@ -141,7 +141,7 @@ static long get_func_line(struct xdpair *pair, xdemitconf_t const *xecfg,
 	buf = func_line ? func_line->buf : dummy;
 	size = func_line ? sizeof(func_line->buf) : sizeof(dummy);
 
-	for (l = start; l != limit && 0 <= l && l < pair->lhs.nrec; l += step) {
+	for (l = start; l != limit && 0 <= l && l < pair->lhs.record->length; l += step) {
 		long len = match_func_rec(&pair->lhs, xecfg, l, buf, size);
 		if (len >= 0) {
 			if (func_line)
@@ -185,14 +185,14 @@ pre_context_calculation:
 			long fs1, i1 = xch->i1;
 
 			/* Appended chunk? */
-			if (i1 >= pair->lhs.nrec) {
+			if (i1 >= pair->lhs.record->length) {
 				long i2 = xch->i2;
 
 				/*
 				 * We don't need additional context if
 				 * a whole function was added.
 				 */
-				while (i2 < pair->rhs.nrec) {
+				while (i2 < pair->rhs.record->length) {
 					if (is_func_rec(&pair->rhs, xecfg, i2))
 						goto post_context_calculation;
 					i2++;
@@ -202,7 +202,7 @@ pre_context_calculation:
 				 * Otherwise get more context from the
 				 * pre-image.
 				 */
-				i1 = pair->lhs.nrec - 1;
+				i1 = pair->lhs.record->length - 1;
 			}
 
 			fs1 = get_func_line(pair, xecfg, NULL, i1, -1);
@@ -234,8 +234,8 @@ pre_context_calculation:
 
  post_context_calculation:
 		lctx = xecfg->ctxlen;
-		lctx = XDL_MIN(lctx, pair->lhs.nrec - (xche->i1 + xche->chg1));
-		lctx = XDL_MIN(lctx, pair->rhs.nrec - (xche->i2 + xche->chg2));
+		lctx = XDL_MIN(lctx, pair->lhs.record->length - (xche->i1 + xche->chg1));
+		lctx = XDL_MIN(lctx, pair->rhs.record->length - (xche->i2 + xche->chg2));
 
 		e1 = xche->i1 + xche->chg1 + lctx;
 		e2 = xche->i2 + xche->chg2 + lctx;
@@ -243,13 +243,13 @@ pre_context_calculation:
 		if (xecfg->flags & XDL_EMIT_FUNCCONTEXT) {
 			long fe1 = get_func_line(pair, xecfg, NULL,
 						 xche->i1 + xche->chg1,
-						 pair->lhs.nrec);
+						 pair->lhs.record->length);
 			while (fe1 > 0 && is_empty_rec(&pair->lhs, fe1 - 1))
 				fe1--;
 			if (fe1 < 0)
-				fe1 = pair->lhs.nrec;
+				fe1 = pair->lhs.record->length;
 			if (fe1 > e1) {
-				e2 = XDL_MIN(e2 + (fe1 - e1), pair->rhs.nrec);
+				e2 = XDL_MIN(e2 + (fe1 - e1), pair->rhs.record->length);
 				e1 = fe1;
 			}
 
@@ -260,7 +260,7 @@ pre_context_calculation:
 			 */
 			if (xche->next) {
 				long l = XDL_MIN(xche->next->i1,
-						 pair->lhs.nrec - 1);
+						 pair->lhs.record->length - 1);
 				if (l - xecfg->ctxlen <= e1 ||
 				    get_func_line(pair, xecfg, NULL, l, e1) < 0) {
 					xche = xche->next;

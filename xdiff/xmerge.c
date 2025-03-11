@@ -158,11 +158,11 @@ static int is_eol_crlf(struct xd_file_context *ctx, int i)
 {
 	long size;
 
-	if (i < ctx->nrec - 1)
+	if (i < ctx->record->length - 1)
 		/* All lines before the last *must* end in LF */
 		return (size = ctx->recs[i]->size) > 1 &&
 			ctx->recs[i]->ptr[size - 2] == '\r';
-	if (!ctx->nrec)
+	if (!ctx->record->length)
 		/* Cannot determine eol style from empty file */
 		return -1;
 	if ((size = ctx->recs[i]->size) &&
@@ -317,7 +317,7 @@ static int xdl_fill_merge_buffer(struct xdpair *pair1, const char *name1,
 			continue;
 		i = m->i1 + m->chg1;
 	}
-	size += xdl_recs_copy(pair1, i, pair1->rhs.nrec - i, 0, 0,
+	size += xdl_recs_copy(pair1, i, pair1->rhs.record->length - i, 0, 0,
 			      dest ? dest + size : NULL);
 	return size;
 }
@@ -622,7 +622,7 @@ static int xdl_do_merge(struct xdpair *pair1, xdchange_t *xscr1,
 			changes = c;
 		i0 = xscr1->i1;
 		i1 = xscr1->i2;
-		i2 = xscr1->i1 + pair2->rhs.nrec - pair2->lhs.nrec;
+		i2 = xscr1->i1 + pair2->rhs.record->length - pair2->lhs.record->length;
 		chg0 = xscr1->chg1;
 		chg1 = xscr1->chg2;
 		chg2 = xscr1->chg1;
@@ -637,7 +637,7 @@ static int xdl_do_merge(struct xdpair *pair1, xdchange_t *xscr1,
 		if (!changes)
 			changes = c;
 		i0 = xscr2->i1;
-		i1 = xscr2->i1 + pair1->rhs.nrec - pair1->lhs.nrec;
+		i1 = xscr2->i1 + pair1->rhs.record->length - pair1->lhs.record->length;
 		i2 = xscr2->i2;
 		chg0 = xscr2->chg1;
 		chg1 = xscr2->chg1;
