@@ -34,7 +34,7 @@ typedef struct s_xdpsplit {
 } xdpsplit_t;
 
 static u64 get_mph(struct xd_file_context *ctx, usize index) {
-	return ctx->recs[ctx->rindex[index]]->ha;
+	return ctx->recs[ctx->rindex.ptr[index]]->ha;
 }
 
 /*
@@ -273,10 +273,10 @@ int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 	 */
 	if (off1 == lim1) {
 		for (; off2 < lim2; off2++)
-			ctx2->rchg[ctx2->rindex[off2]] = 1;
+			ctx2->rchg[ctx2->rindex.ptr[off2]] = 1;
 	} else if (off2 == lim2) {
 		for (; off1 < lim1; off1++)
-			ctx1->rchg[ctx1->rindex[off1]] = 1;
+			ctx1->rchg[ctx1->rindex.ptr[off1]] = 1;
 	} else {
 		xdpsplit_t spl;
 		spl.i1 = spl.i2 = 0;
@@ -332,7 +332,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = pair->lhs.nreff + pair->rhs.nreff + 3;
+	ndiags = pair->lhs.rindex.length + pair->rhs.rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
 		xdl_free_env(pair);
@@ -340,8 +340,8 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += pair->rhs.nreff + 1;
-	kvdb += pair->rhs.nreff + 1;
+	kvdf += pair->rhs.rindex.length + 1;
+	kvdb += pair->rhs.rindex.length + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -350,7 +350,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 
-	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.nreff, &pair->rhs, 0, pair->rhs.nreff,
+	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.rindex.length, &pair->rhs, 0, pair->rhs.rindex.length,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 	xdl_free(kvd);
