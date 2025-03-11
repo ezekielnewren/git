@@ -34,7 +34,7 @@ typedef struct s_xdpsplit {
 } xdpsplit_t;
 
 static u64 get_mph(struct xd_file_context *ctx, usize index) {
-	return ctx->record->ptr[ctx->rindex.ptr[index]].ha;
+	return ctx->minimal_perfect_hash->ptr[ctx->rindex.ptr[index]];
 }
 
 /*
@@ -378,11 +378,6 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 	return xch;
 }
 
-
-static int recs_match(struct xrecord *rec1, struct xrecord *rec2)
-{
-	return (rec1->ha == rec2->ha);
-}
 
 /*
  * If a line is indented more than this, get_indent() just returns this value.
@@ -744,10 +739,16 @@ static inline int group_previous(struct xd_file_context *ctx, struct xdlgroup *g
  * following group, expand this group to include it. Return 0 on success or -1
  * if g cannot be slid down.
  */
-static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
-{
-	if (g->end < (isize) ctx->record->length &&
-	    recs_match(&ctx->record->ptr[g->start], &ctx->record->ptr[g->end])) {
+static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g) {
+	u64 mph1, mph2;
+
+	if (g->end >= (isize) ctx->record->length)
+		return -1;
+
+	mph1 = ctx->minimal_perfect_hash->ptr[g->start];
+	mph2 = ctx->minimal_perfect_hash->ptr[g->end];
+
+	if (mph1 == mph2) {
 		ctx->consider.ptr[SENTINEL + g->start++] = NO;
 		ctx->consider.ptr[SENTINEL + g->end++] = YES;
 
@@ -755,9 +756,9 @@ static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 			g->end++;
 
 		return 0;
-	} else {
-		return -1;
 	}
+
+	return -1;
 }
 
 /*
@@ -765,10 +766,16 @@ static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
  * into a previous group, expand this group to include it. Return 0 on success
  * or -1 if g cannot be slid up.
  */
-static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
-{
-	if (g->start > 0 &&
-	    recs_match(&ctx->record->ptr[g->start - 1], &ctx->record->ptr[g->end - 1])) {
+static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g) {
+	u64 mph1, mph2;
+
+	if (g->start <= 0)
+		return -1;
+
+	mph1 = ctx->minimal_perfect_hash->ptr[g->start - 1];
+	mph2 = ctx->minimal_perfect_hash->ptr[g->end - 1];
+
+	if (mph1 == mph2) {
 		ctx->consider.ptr[SENTINEL + --g->start] = YES;
 		ctx->consider.ptr[SENTINEL + --g->end] = NO;
 
@@ -776,9 +783,9 @@ static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
 			g->start--;
 
 		return 0;
-	} else {
-		return -1;
 	}
+
+	return -1;
 }
 
 /*

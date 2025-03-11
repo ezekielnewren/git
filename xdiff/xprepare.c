@@ -28,107 +28,7 @@
 #define XDL_SIMSCAN_WINDOW 100
 
 
-typedef struct s_xdlclass {
-	struct s_xdlclass *next;
-	unsigned long ha;
-	char const *line;
-	long size;
-	long idx;
-	long len1, len2;
-} xdlclass_t;
-
-typedef struct s_xdlclassifier {
-	unsigned int hbits;
-	long hsize;
-	xdlclass_t **rchash;
-	chastore_t ncha;
-	xdlclass_t **rcrecs;
-	long alloc;
-	long count;
-	long flags;
-} xdlclassifier_t;
-
-
-
-static int xdl_init_classifier(xdlclassifier_t *cf, long size, long flags) {
-	cf->flags = flags;
-
-	cf->hbits = xdl_hashbits((unsigned int) size);
-	cf->hsize = 1 << cf->hbits;
-
-	if (xdl_cha_init(&cf->ncha, sizeof(xdlclass_t), size / 4 + 1) < 0) {
-
-		return -1;
-	}
-	if (!XDL_CALLOC_ARRAY(cf->rchash, cf->hsize)) {
-
-		xdl_cha_free(&cf->ncha);
-		return -1;
-	}
-
-	cf->alloc = size;
-	if (!XDL_ALLOC_ARRAY(cf->rcrecs, cf->alloc)) {
-
-		xdl_free(cf->rchash);
-		xdl_cha_free(&cf->ncha);
-		return -1;
-	}
-
-	cf->count = 0;
-
-	return 0;
-}
-
-
-static void xdl_free_classifier(xdlclassifier_t *cf) {
-
-	xdl_free(cf->rcrecs);
-	xdl_free(cf->rchash);
-	xdl_cha_free(&cf->ncha);
-}
-
-
-static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
-			       struct xrecord *rec) {
-	long hi;
-	char const *line;
-	xdlclass_t *rcrec;
-
-	line = (const char *) rec->ptr;
-	hi = (long) XDL_HASHLONG(rec->ha, cf->hbits);
-	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
-		if (rcrec->ha == rec->ha &&
-				xdl_line_equal((u8 const *) rcrec->line, rcrec->size,
-					rec->ptr, rec->size_no_eol, cf->flags))
-			break;
-
-	if (!rcrec) {
-		if (!(rcrec = xdl_cha_alloc(&cf->ncha))) {
-
-			return -1;
-		}
-		rcrec->idx = cf->count++;
-		if (XDL_ALLOC_GROW(cf->rcrecs, cf->count, cf->alloc))
-				return -1;
-		cf->rcrecs[rcrec->idx] = rcrec;
-		rcrec->line = line;
-		rcrec->size = rec->size_no_eol;
-		rcrec->ha = rec->ha;
-		rcrec->len1 = rcrec->len2 = 0;
-		rcrec->next = cf->rchash[hi];
-		cf->rchash[hi] = rcrec;
-	}
-
-	(pass == 1) ? rcrec->len1++ : rcrec->len2++;
-
-	rec->ha = (unsigned long) rcrec->idx;
-
-
-	return 0;
-}
-
-
-static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
+static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			   struct xd_file_context *ctx) {
 	struct xlinereader reader;
 
@@ -143,7 +43,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			&& rec_new.ptr[rec_new.size_no_eol - 1] == '\r') {
 			rec_new.size_no_eol--;
 		}
-		rec_new.ha = xdl_line_hash(rec_new.ptr, rec_new.size_no_eol, xpp->flags);
 		ivec_push(&ctx->file_storage.record, &rec_new);
 	}
 	ivec_shrink_to_fit(&ctx->file_storage.record);
@@ -159,10 +58,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	IVEC_INIT(ctx->rindex);
 
 	ctx->record->length = ctx->record->length;
-	ctx->dstart = 0;
-	ctx->dend = ctx->record->length - 1;
-
-	return 0;
 }
 
 
@@ -218,7 +113,7 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	 */
 	if (rdis0 == 0)
 		return 0;
-	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
+	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < e; r++) {
 		if (!dis[i + r])
 			rdis1++;
 		else if (dis[i + r] == 2)
@@ -244,139 +139,131 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
-	long i, nm, mlim;
-	struct xrecord *recs;
-	xdlclass_t *rcrec;
-	char *dis, *dis1, *dis2;
+static void xdl_cleanup_records(struct xdpair *pair) {
+	long nm, mlim;
+	struct ivec_u8 dis1, dis2;
+	struct ivec_xoccurrence occurrence;
+	usize end1 = pair->lhs.record->length - pair->delta_end;
+	usize end2 = pair->rhs.record->length - pair->delta_end;
 
-	if (!XDL_CALLOC_ARRAY(dis, lhs->record->length + rhs->record->length + 2))
-		return -1;
-	dis1 = dis;
-	dis2 = dis1 + lhs->record->length + 1;
+	IVEC_INIT(dis1);
+	IVEC_INIT(dis2);
+	IVEC_INIT(occurrence);
 
-	if ((mlim = xdl_bogosqrt(lhs->record->length)) > XDL_MAX_EQLIMIT)
+	ivec_zero(&dis1, pair->lhs.record->length + SENTINEL);
+	ivec_zero(&dis2, pair->rhs.record->length + SENTINEL);
+	ivec_zero(&occurrence, pair->minimal_perfect_hash_size);
+
+	for (usize i = 0; i < pair->lhs.minimal_perfect_hash->length; i++) {
+		u64 mph = pair->lhs.minimal_perfect_hash->ptr[i];
+		occurrence.ptr[mph].file1 += 1;
+	}
+
+	for (usize i = 0; i < pair->rhs.minimal_perfect_hash->length; i++) {
+		u64 mph = pair->rhs.minimal_perfect_hash->ptr[i];
+		occurrence.ptr[mph].file2 += 1;
+	}
+
+
+	if ((mlim = xdl_bogosqrt(pair->lhs.record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart]; i <= lhs->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->ha];
-		nm = rcrec ? rcrec->len2 : 0;
-		dis1[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
+	for (usize i = pair->delta_start; i < end1; i++) {
+		u64 mph = pair->lhs.minimal_perfect_hash->ptr[i];
+		nm = occurrence.ptr[mph].file2;
+		dis1.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
-	if ((mlim = xdl_bogosqrt(rhs->record->length)) > XDL_MAX_EQLIMIT)
+	if ((mlim = xdl_bogosqrt(pair->rhs.record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart]; i <= rhs->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->ha];
-		nm = rcrec ? rcrec->len1 : 0;
-		dis2[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
+	for (usize i = pair->delta_start; i < end2; i++) {
+		u64 mph = pair->rhs.minimal_perfect_hash->ptr[i];
+		nm = occurrence.ptr[mph].file1;
+		dis2.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
-	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart];
-	     i <= lhs->dend; i++, recs++) {
-		if (dis1[i] == 1 ||
-		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, lhs->dstart, lhs->dend))) {
-			ivec_push(&lhs->rindex, &i);
+	for (usize i = pair->delta_start; i < end1; i++) {
+		if (dis1.ptr[i] == YES ||
+		    (dis1.ptr[i] == TOO_MANY && !xdl_clean_mmatch((char const *) dis1.ptr, i, pair->delta_start, end1))) {
+			ivec_push(&pair->lhs.rindex, &i);
 		} else
-			lhs->consider.ptr[SENTINEL + i] = YES;
+			pair->lhs.consider.ptr[SENTINEL + i] = YES;
 	}
-	ivec_shrink_to_fit(&lhs->rindex);
+	ivec_shrink_to_fit(&pair->lhs.rindex);
 
-	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart];
-	     i <= rhs->dend; i++, recs++) {
-		if (dis2[i] == 1 ||
-		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, rhs->dstart, rhs->dend))) {
-			ivec_push(&rhs->rindex, &i);
+	for (usize i = pair->delta_start; i < end2; i++) {
+		if (dis2.ptr[i] == YES ||
+		    (dis2.ptr[i] == TOO_MANY && !xdl_clean_mmatch((char const *) dis2.ptr, i, pair->delta_start, end2))) {
+			ivec_push(&pair->rhs.rindex, &i);
 		} else
-			rhs->consider.ptr[SENTINEL + i] = YES;
+			pair->rhs.consider.ptr[SENTINEL + i] = YES;
 	}
-	ivec_shrink_to_fit(&rhs->rindex);
+	ivec_shrink_to_fit(&pair->rhs.rindex);
 
-	xdl_free(dis);
-
-	return 0;
+	ivec_free(&dis1);
+	ivec_free(&dis2);
 }
 
 
 /*
  * Early trim initial and terminal matching records.
  */
-static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs) {
-	long i, lim;
-	struct xrecord *recs1, *recs2;
+static void xdl_trim_ends(struct xdpair *pair) {
+	usize lim = XDL_MIN(pair->lhs.record->length, pair->rhs.record->length);
 
-	recs1 = lhs->record->ptr;
-	recs2 = rhs->record->ptr;
-	for (i = 0, lim = XDL_MIN(lhs->record->length, rhs->record->length); i < lim;
-	     i++, recs1++, recs2++)
-		if (recs1->ha != recs2->ha)
+	for (usize i = 0; i < lim; i++) {
+		u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[i];
+		u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[i];
+		if (mph1 != mph2) {
+			pair->delta_start = i;
 			break;
+		}
+	}
 
-	lhs->dstart = rhs->dstart = i;
-
-	recs1 = lhs->record->ptr + lhs->record->length - 1;
-	recs2 = rhs->record->ptr + rhs->record->length - 1;
-	for (lim -= i, i = 0; i < lim; i++, recs1--, recs2--)
-		if (recs1->ha != recs2->ha)
+	for (usize i = 0; i < lim; i++) {
+		u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[pair->lhs.minimal_perfect_hash->length - 1 - i];
+		u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[pair->rhs.minimal_perfect_hash->length - 1 - i];
+		if (mph1 != mph2) {
+			pair->delta_end = i;
 			break;
-
-	lhs->dend = lhs->record->length - i - 1;
-	rhs->dend = rhs->record->length - i - 1;
-
-	return 0;
+		}
+	}
 }
 
 
-static int xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
-
-	if (xdl_trim_ends(lhs, rhs) < 0 ||
-	    xdl_cleanup_records(cf, lhs, rhs) < 0) {
-
-		return -1;
-	}
-
-	return 0;
+static void xdl_optimize_ctxs(struct xdpair *pair) {
+	xdl_trim_ends(pair);
+	xdl_cleanup_records(pair);
 }
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    struct xdpair *pair) {
-	xdlclassifier_t cf;
+	struct xdl_minimal_perfect_hash_builder mphb;
+	pair->delta_start = 0;
+	pair->delta_end = 0;
 
-	memset(&cf, 0, sizeof(cf));
+	xdl_prepare_ctx(mf1, xpp, &pair->lhs);
+	xdl_prepare_ctx(mf2, xpp, &pair->rhs);
 
-	if (xdl_prepare_ctx(mf1, xpp, &pair->lhs) < 0) {
-
-		xdl_free_classifier(&cf);
-		return -1;
-	}
-	if (xdl_prepare_ctx(mf2, xpp, &pair->rhs) < 0) {
-
-		xdl_free_ctx(&pair->lhs);
-		xdl_free_classifier(&cf);
-		return -1;
-	}
-
-	if (xdl_init_classifier(&cf, pair->lhs.record->length + pair->rhs.record->length + 1, xpp->flags) < 0)
-		return -1;
-
+	xdl_mphb_init(&mphb, pair->lhs.record->length + pair->rhs.record->length, xpp->flags);
 	for (usize i = 0; i < pair->lhs.record->length; i++) {
-		xdl_classify_record(1, &cf, &pair->lhs.record->ptr[i]);
+		struct xrecord *rec = &pair->lhs.record->ptr[i];
+		pair->lhs.minimal_perfect_hash->ptr[i] = xdl_mphb_hash(&mphb, rec);
 	}
+	pair->lhs.minimal_perfect_hash->length = pair->lhs.record->length;
 
 	for (usize i = 0; i < pair->rhs.record->length; i++) {
-		xdl_classify_record(2, &cf, &pair->rhs.record->ptr[i]);
+		struct xrecord *rec = &pair->rhs.record->ptr[i];
+		pair->rhs.minimal_perfect_hash->ptr[i] = xdl_mphb_hash(&mphb, rec);
+	}
+	pair->rhs.minimal_perfect_hash->length = pair->rhs.record->length;
+
+	pair->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
+
+
+	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(pair);
 	}
 
-	if ((XDF_DIFF_ALG(xpp->flags) != XDF_PATIENCE_DIFF) &&
-	    (XDF_DIFF_ALG(xpp->flags) != XDF_HISTOGRAM_DIFF) &&
-	    xdl_optimize_ctxs(&cf, &pair->lhs, &pair->rhs) < 0) {
-
-		xdl_free_ctx(&pair->rhs);
-		xdl_free_ctx(&pair->lhs);
-		xdl_free_classifier(&cf);
-		return -1;
-	    }
-
-	xdl_free_classifier(&cf);
 
 	return 0;
 }

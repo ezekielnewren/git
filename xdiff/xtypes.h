@@ -38,11 +38,17 @@ typedef struct s_chastore {
 	long scurr;
 } chastore_t;
 
+struct xoccurrence {
+	usize file1;
+	usize file2;
+};
+
+DEFINE_IVEC_TYPE(struct xoccurrence, xoccurrence);
+
 struct xrecord {
 	u8 const *ptr;
 	usize size_no_eol;
 	usize size_with_eol;
-	unsigned long ha;
 };
 
 DEFINE_IVEC_TYPE(struct xrecord, xrecord);
@@ -56,13 +62,14 @@ struct xd_file_context {
 	struct ivec_u64 *minimal_perfect_hash;
 	struct ivec_xrecord *record;
 	struct xdfile file_storage;
-	long dstart, dend;
 	struct ivec_u8 consider;
 	struct ivec_usize rindex;
 };
 
 struct xdpair {
 	struct xd_file_context lhs, rhs;
+	usize delta_start, delta_end;
+	usize minimal_perfect_hash_size;
 };
 
 
