@@ -364,7 +364,6 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 {
 	for (; m; m = m->next) {
 		mmfile_t t1, t2;
-		// struct xdpair pair;
 		struct xd2way two_way;
 		xdchange_t *xscr, *x;
 		int i1 = m->i1, i2 = m->i2;
@@ -387,7 +386,10 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		t2.ptr = (char *)pair2->rhs.record->ptr[m->i2].ptr;
 		t2.size = (char *)pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
 			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size_with_eol - t2.ptr;
-		if (xdl_do_diff(&t1, &t2, xpp, &two_way) < 0)
+
+		xdl_2way_prepare(&t1, &t2, xpp->flags, &two_way);
+
+		if (xdl_do_diff(xpp, &two_way) < 0)
 			return -1;
 		if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
 		    xdl_change_compact(&two_way.pair.rhs, &two_way.pair.lhs, xpp->flags) < 0 ||
@@ -689,7 +691,6 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
 	xdchange_t *xscr1 = NULL, *xscr2 = NULL;
-	// struct xdpair pair1, pair2;
 	struct xd2way a2way, b2way;
 	int status = -1;
 	xpparam_t const *xpp = &xmp->xpp;
@@ -697,10 +698,13 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	result->ptr = NULL;
 	result->size = 0;
 
-	if (xdl_do_diff(orig, mf1, xpp, &a2way) < 0)
+	xdl_2way_prepare(orig, mf1, xpp->flags, &a2way);
+	xdl_2way_prepare(orig, mf2, xpp->flags, &b2way);
+
+	if (xdl_do_diff(xpp, &a2way) < 0)
 		return -1;
 
-	if (xdl_do_diff(orig, mf2, xpp, &b2way) < 0)
+	if (xdl_do_diff(xpp, &b2way) < 0)
 		goto free_xe1; /* avoid double free of xe2 */
 
 	if (xdl_change_compact(&a2way.pair.lhs, &a2way.pair.rhs, xpp->flags) < 0 ||

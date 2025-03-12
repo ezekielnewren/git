@@ -306,15 +306,11 @@ int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 }
 
 
-int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		struct xd2way *two_way) {
+int xdl_do_diff(xpparam_t const *xpp, struct xd2way *two_way) {
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
 	xdalgoenv_t xenv;
 	int res;
-
-	xdl_2way_prepare(mf1, mf2, xpp->flags, two_way);
-
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
 		res = xdl_do_patience_diff(xpp, &two_way->pair);
@@ -1046,11 +1042,12 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
 	xdchange_t *xscr;
-	// struct xdpair pair;
 	struct xd2way two_way;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 
-	if (xdl_do_diff(mf1, mf2, xpp, &two_way) < 0) {
+	xdl_2way_prepare(mf1, mf2, xpp->flags, &two_way);
+
+	if (xdl_do_diff(xpp, &two_way) < 0) {
 
 		return -1;
 	}
