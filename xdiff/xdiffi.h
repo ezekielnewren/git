@@ -43,8 +43,7 @@ typedef struct s_xdchange {
 int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 		 struct xd_file_context *ctx2, long off2, long lim2,
 		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv);
-int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		struct xd2way *two_way);
+int xdl_do_diff(xpparam_t const *xpp, struct xd2way *two_way);
 int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, long flags);
 int xdl_build_script(struct xdpair *pair, xdchange_t **xscr);
 void xdl_free_script(xdchange_t *xscr);
