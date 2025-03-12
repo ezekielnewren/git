@@ -308,22 +308,22 @@ int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 
 
 int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		struct xdpair *pair) {
+		struct xd2way *two_way) {
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
 	xdalgoenv_t xenv;
 	int res;
 
-	if (xdl_prepare_env(mf1, mf2, xpp, pair) < 0)
-		return -1;
+	xdl_2way_prepare(mf1, mf2, xpp->flags, two_way);
+
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
-		res = xdl_do_patience_diff(xpp, pair);
+		res = xdl_do_patience_diff(xpp, &two_way->pair);
 		goto out;
 	}
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
-		res = xdl_do_histogram_diff(xpp, pair);
+		res = xdl_do_histogram_diff(xpp, &two_way->pair);
 		goto out;
 	}
 
@@ -333,16 +333,15 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = pair->lhs.rindex.length + pair->rhs.rindex.length + 3;
+	ndiags = two_way->pair.lhs.rindex.length + two_way->pair.rhs.rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
-
-		xdl_free_env(pair);
+		xdl_2way_free(two_way);
 		return -1;
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += pair->rhs.rindex.length + 1;
-	kvdb += pair->rhs.rindex.length + 1;
+	kvdf += two_way->pair.rhs.rindex.length + 1;
+	kvdb += two_way->pair.rhs.rindex.length + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -351,13 +350,13 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 
-	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.rindex.length, &pair->rhs, 0, pair->rhs.rindex.length,
+	res = xdl_recs_cmp(&two_way->pair.lhs, 0, two_way->pair.lhs.rindex.length, &two_way->pair.rhs, 0, two_way->pair.rhs.rindex.length,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 	xdl_free(kvd);
  out:
 	if (res < 0)
-		xdl_free_env(pair);
+		xdl_2way_free(two_way);
 
 	return res;
 }
@@ -1039,36 +1038,40 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
 	xdchange_t *xscr;
-	struct xdpair pair;
+	// struct xdpair pair;
+	struct xd2way two_way;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 
-	if (xdl_do_diff(mf1, mf2, xpp, &pair) < 0) {
+	if (xdl_do_diff(mf1, mf2, xpp, &two_way) < 0) {
 
 		return -1;
 	}
-	if (xdl_change_compact(&pair.lhs, &pair.rhs, xpp->flags) < 0 ||
-	    xdl_change_compact(&pair.rhs, &pair.lhs, xpp->flags) < 0 ||
-	    xdl_build_script(&pair, &xscr) < 0) {
+	if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&two_way.pair.rhs, &two_way.pair.lhs, xpp->flags) < 0 ||
+	    xdl_build_script(&two_way.pair, &xscr) < 0) {
 
-		xdl_free_env(&pair);
+		// xdl_free_env(&pair);
+		xdl_2way_free(&two_way);
 		return -1;
 	}
 	if (xscr) {
 		if (xpp->flags & XDF_IGNORE_BLANK_LINES)
-			xdl_mark_ignorable_lines(xscr, &pair, xpp->flags);
+			xdl_mark_ignorable_lines(xscr, &two_way.pair, xpp->flags);
 
 		if (xpp->ignore_regex)
-			xdl_mark_ignorable_regex(xscr, &pair, xpp);
+			xdl_mark_ignorable_regex(xscr, &two_way.pair, xpp);
 
-		if (ef(&pair, xscr, ecb, xecfg) < 0) {
+		if (ef(&two_way.pair, xscr, ecb, xecfg) < 0) {
 
 			xdl_free_script(xscr);
-			xdl_free_env(&pair);
+			// xdl_free_env(&pair);
+			xdl_2way_free(&two_way);
 			return -1;
 		}
 		xdl_free_script(xscr);
 	}
-	xdl_free_env(&pair);
+	// xdl_free_env(&pair);
+	xdl_2way_free(&two_way);
 
 	return 0;
 }

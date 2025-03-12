@@ -159,11 +159,11 @@ static int xdl_orig_copy(struct xdpair *pair, int i, int count, int needs_cr, in
  * has no eol, the preceding line, if any), 0 if it ends in LF-only, and
  * -1 if the line ending cannot be determined.
  */
-static int is_eol_crlf(struct xd_file_context *ctx, int i)
+static int is_eol_crlf(struct xd_file_context *ctx, usize i)
 {
 	long size;
 
-	if (i < ctx->record->length - 1)
+	if (i + 1 < ctx->record->length)
 		/* All lines before the last *must* end in LF */
 		return (size = ctx->record->ptr[i].size_with_eol) > 1 &&
 			ctx->record->ptr[i].ptr[size - 2] == '\r';
@@ -364,7 +364,8 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 {
 	for (; m; m = m->next) {
 		mmfile_t t1, t2;
-		struct xdpair pair;
+		// struct xdpair pair;
+		struct xd2way two_way;
 		xdchange_t *xscr, *x;
 		int i1 = m->i1, i2 = m->i2;
 
@@ -386,17 +387,19 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		t2.ptr = (char *)pair2->rhs.record->ptr[m->i2].ptr;
 		t2.size = (char *)pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
 			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size_with_eol - t2.ptr;
-		if (xdl_do_diff(&t1, &t2, xpp, &pair) < 0)
+		if (xdl_do_diff(&t1, &t2, xpp, &two_way) < 0)
 			return -1;
-		if (xdl_change_compact(&pair.lhs, &pair.rhs, xpp->flags) < 0 ||
-		    xdl_change_compact(&pair.rhs, &pair.lhs, xpp->flags) < 0 ||
-		    xdl_build_script(&pair, &xscr) < 0) {
-			xdl_free_env(&pair);
+		if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
+		    xdl_change_compact(&two_way.pair.rhs, &two_way.pair.lhs, xpp->flags) < 0 ||
+		    xdl_build_script(&two_way.pair, &xscr) < 0) {
+			xdl_2way_free(&two_way);
+			// xdl_free_env(&pair);
 			return -1;
 		}
 		if (!xscr) {
 			/* If this happens, the changes are identical. */
-			xdl_free_env(&pair);
+			xdl_2way_free(&two_way);
+			// xdl_free_env(&pair);
 			m->mode = 4;
 			continue;
 		}
@@ -408,7 +411,8 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		while (xscr->next) {
 			xdmerge_t *m2 = xdl_malloc(sizeof(xdmerge_t));
 			if (!m2) {
-				xdl_free_env(&pair);
+				xdl_2way_free(&two_way);
+				// xdl_free_env(&pair);
 				xdl_free_script(x);
 				return -1;
 			}
@@ -422,7 +426,8 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 			m->i2 = xscr->i2 + i2;
 			m->chg2 = xscr->chg2;
 		}
-		xdl_free_env(&pair);
+		xdl_2way_free(&two_way);
+		// xdl_free_env(&pair);
 		xdl_free_script(x);
 	}
 	return 0;
@@ -684,27 +689,28 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
 	xdchange_t *xscr1 = NULL, *xscr2 = NULL;
-	struct xdpair pair1, pair2;
+	// struct xdpair pair1, pair2;
+	struct xd2way a2way, b2way;
 	int status = -1;
 	xpparam_t const *xpp = &xmp->xpp;
 
 	result->ptr = NULL;
 	result->size = 0;
 
-	if (xdl_do_diff(orig, mf1, xpp, &pair1) < 0)
+	if (xdl_do_diff(orig, mf1, xpp, &a2way) < 0)
 		return -1;
 
-	if (xdl_do_diff(orig, mf2, xpp, &pair2) < 0)
+	if (xdl_do_diff(orig, mf2, xpp, &b2way) < 0)
 		goto free_xe1; /* avoid double free of xe2 */
 
-	if (xdl_change_compact(&pair1.lhs, &pair1.rhs, xpp->flags) < 0 ||
-	    xdl_change_compact(&pair1.rhs, &pair1.lhs, xpp->flags) < 0 ||
-	    xdl_build_script(&pair1, &xscr1) < 0)
+	if (xdl_change_compact(&a2way.pair.lhs, &a2way.pair.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&a2way.pair.rhs, &a2way.pair.lhs, xpp->flags) < 0 ||
+	    xdl_build_script(&a2way.pair, &xscr1) < 0)
 		goto out;
 
-	if (xdl_change_compact(&pair2.lhs, &pair2.rhs, xpp->flags) < 0 ||
-	    xdl_change_compact(&pair2.rhs, &pair2.lhs, xpp->flags) < 0 ||
-	    xdl_build_script(&pair2, &xscr2) < 0)
+	if (xdl_change_compact(&b2way.pair.lhs, &b2way.pair.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&b2way.pair.rhs, &b2way.pair.lhs, xpp->flags) < 0 ||
+	    xdl_build_script(&b2way.pair, &xscr2) < 0)
 		goto out;
 
 	if (!xscr1) {
@@ -722,17 +728,19 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		memcpy(result->ptr, mf1->ptr, mf1->size);
 		result->size = mf1->size;
 	} else {
-		status = xdl_do_merge(&pair1, xscr1,
-				      &pair2, xscr2,
+		status = xdl_do_merge(&a2way.pair, xscr1,
+				      &b2way.pair, xscr2,
 				      xmp, result);
 	}
  out:
 	xdl_free_script(xscr1);
 	xdl_free_script(xscr2);
 
-	xdl_free_env(&pair2);
+	// xdl_free_env(&pair2);
+	xdl_2way_free(&b2way);
  free_xe1:
-	xdl_free_env(&pair1);
+	// xdl_free_env(&pair1);
+	xdl_2way_free(&a2way);
 
 	return status;
 }
