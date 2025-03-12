@@ -228,6 +228,8 @@ static void xdl_setup_ctx(struct xdfile *file, struct xd_file_context *ctx) {
 }
 
 static void xdl_pair_prepare(struct xdfile *lhs, struct xdfile *rhs, usize mph_size, u64 flags, struct xdpair *pair) {
+	pair->delta_start = 0;
+	pair->delta_end = 0;
 	pair->minimal_perfect_hash_size = mph_size;
 
 	xdl_setup_ctx(lhs, &pair->lhs);
@@ -237,30 +239,6 @@ static void xdl_pair_prepare(struct xdfile *lhs, struct xdfile *rhs, usize mph_s
 	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
 		xdl_optimize_ctxs(pair);
 	}
-}
-
-void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way) {
-	struct xdl_minimal_perfect_hash_builder mphb;
-	usize max_unique_keys = 0;
-	two_way->pair.delta_start = 0;
-	two_way->pair.delta_end = 0;
-
-	xd_trace2_region_enter("xdiff", "xdl_2way_prepare");
-
-	xdl_file_prepare(mf1, &two_way->lhs);
-	xdl_file_prepare(mf2, &two_way->rhs);
-
-	max_unique_keys += two_way->lhs.record.length;
-	max_unique_keys += two_way->rhs.record.length;
-	xdl_mphb_init(&mphb, max_unique_keys, flags);
-
-	xdl_mphb_ingest(&mphb, &two_way->lhs);
-	xdl_mphb_ingest(&mphb, &two_way->rhs);
-	two_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
-
-	xdl_pair_prepare(&two_way->lhs, &two_way->rhs, two_way->minimal_perfect_hash_size, flags, &two_way->pair);
-
-	xd_trace2_region_leave("xdiff", "xdl_2way_prepare");
 }
 
 static void xdl_free_file_context(struct xd_file_context *ctx) {
@@ -275,8 +253,69 @@ static void xdl_free_pair(struct xdpair *pair) {
 	xdl_free_file_context(&pair->rhs);
 }
 
+void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way) {
+	struct xdl_minimal_perfect_hash_builder mphb;
+	usize max_unique_keys = 0;
+
+	xd_trace2_region_enter("xdiff", "xdl_2way_prepare");
+
+	xdl_file_prepare(mf1, &two_way->lhs);
+	xdl_file_prepare(mf2, &two_way->rhs);
+
+	max_unique_keys += two_way->lhs.record.length;
+	max_unique_keys += two_way->rhs.record.length;
+	xdl_mphb_init(&mphb, max_unique_keys, flags);
+
+	xdl_mphb_ingest(&mphb, &two_way->lhs);
+	xdl_mphb_ingest(&mphb, &two_way->rhs);
+	two_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
+
+	xdl_pair_prepare(&two_way->lhs, &two_way->rhs,
+		two_way->minimal_perfect_hash_size, flags, &two_way->pair);
+
+	xd_trace2_region_leave("xdiff", "xdl_2way_prepare");
+}
+
 void xdl_2way_free(struct xd2way *two_way) {
 	xdl_file_free(&two_way->lhs);
 	xdl_file_free(&two_way->rhs);
 	xdl_free_pair(&two_way->pair);
 }
+
+void xdl_3way_prepare(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
+	u64 flags, struct xd3way *three_way) {
+	struct xdl_minimal_perfect_hash_builder mphb;
+	usize max_unique_keys = 0;
+
+	xd_trace2_region_enter("xdiff", "xdl_3way_prepare");
+
+	xdl_file_prepare(orig, &three_way->base);
+	xdl_file_prepare(mf1, &three_way->side1);
+	xdl_file_prepare(mf2, &three_way->side2);
+
+	max_unique_keys += three_way->base.record.length;
+	max_unique_keys += three_way->side1.record.length;
+	max_unique_keys += three_way->side2.record.length;
+	xdl_mphb_init(&mphb, max_unique_keys, flags);
+
+	xdl_mphb_ingest(&mphb, &three_way->base);
+	xdl_mphb_ingest(&mphb, &three_way->side1);
+	xdl_mphb_ingest(&mphb, &three_way->side2);
+	three_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
+
+	xdl_pair_prepare(&three_way->base, &three_way->side1,
+		three_way->minimal_perfect_hash_size, flags, &three_way->pair1);
+	xdl_pair_prepare(&three_way->base, &three_way->side2,
+		three_way->minimal_perfect_hash_size, flags, &three_way->pair2);
+
+	xd_trace2_region_leave("xdiff", "xdl_3way_prepare");
+}
+
+void xdl_3way_free(struct xd3way *three_way) {
+	xdl_file_free(&three_way->base);
+	xdl_file_free(&three_way->side1);
+	xdl_file_free(&three_way->side2);
+	xdl_free_pair(&three_way->pair1);
+	xdl_free_pair(&three_way->pair2);
+}
+
