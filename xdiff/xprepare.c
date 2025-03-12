@@ -32,6 +32,8 @@
 void xdl_file_prepare(mmfile_t *mf, struct xdfile *file) {
 	struct xlinereader reader;
 
+	xd_trace2_region_enter("xdiff", "xdl_file_prepare");
+
 	IVEC_INIT(file->record);
 	IVEC_INIT(file->minimal_perfect_hash);
 
@@ -43,6 +45,8 @@ void xdl_file_prepare(mmfile_t *mf, struct xdfile *file) {
 		ivec_push(&file->record, &rec_new);
 	}
 	ivec_shrink_to_fit(&file->record);
+
+	xd_trace2_region_leave("xdiff", "xdl_file_prepare");
 }
 
 void xdl_file_free(struct  xdfile *file) {
@@ -241,6 +245,8 @@ void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *tw
 	two_way->pair.delta_start = 0;
 	two_way->pair.delta_end = 0;
 
+	xd_trace2_region_enter("xdiff", "xdl_2way_prepare");
+
 	xdl_file_prepare(mf1, &two_way->lhs);
 	xdl_file_prepare(mf2, &two_way->rhs);
 
@@ -253,6 +259,8 @@ void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *tw
 	two_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
 
 	xdl_pair_prepare(&two_way->lhs, &two_way->rhs, two_way->minimal_perfect_hash_size, flags, &two_way->pair);
+
+	xd_trace2_region_leave("xdiff", "xdl_2way_prepare");
 }
 
 static void xdl_free_file_context(struct xd_file_context *ctx) {

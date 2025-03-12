@@ -453,6 +453,8 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder *mphb, struct xrecord 
 }
 
 void xdl_mphb_ingest(struct xdl_minimal_perfect_hash_builder *mphb, struct xdfile *file) {
+	xd_trace2_region_enter("xdiff", "xdl_mphb_ingest");
+
 	if (file->record.length > file->minimal_perfect_hash.capacity) {
 		usize grow = file->record.length - file->minimal_perfect_hash.capacity;
 		ivec_reserve_exact(&file->minimal_perfect_hash, grow);
@@ -463,6 +465,8 @@ void xdl_mphb_ingest(struct xdl_minimal_perfect_hash_builder *mphb, struct xdfil
 	}
 	file->minimal_perfect_hash.length = file->record.length;
 	ivec_shrink_to_fit(&file->minimal_perfect_hash);
+
+	xd_trace2_region_leave("xdiff", "xdl_mphb_ingest");
 }
 
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder *mphb) {
