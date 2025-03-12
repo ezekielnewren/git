@@ -404,7 +404,7 @@ int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 
 	xdl_2way_prepare(&subfile1, &subfile2, xpp->flags, &two_way);
 
-	if (xdl_do_diff(xpp, &two_way) < 0)
+	if (xdl_do_diff(xpp, &two_way.pair) < 0)
 		return -1;
 
 	memcpy(pair->lhs.consider.ptr + SENTINEL + line1 - 1, two_way.pair.lhs.consider.ptr + SENTINEL, count1);

@@ -307,19 +307,19 @@ int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 }
 
 
-int xdl_do_diff(xpparam_t const *xpp, struct xd2way *two_way) {
+int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
 	xdalgoenv_t xenv;
 	int res;
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
-		res = xdl_do_patience_diff(xpp, &two_way->pair);
+		res = xdl_do_patience_diff(xpp, pair);
 		goto out;
 	}
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
-		res = xdl_do_histogram_diff(xpp, &two_way->pair);
+		res = xdl_do_histogram_diff(xpp, pair);
 		goto out;
 	}
 
@@ -329,15 +329,14 @@ int xdl_do_diff(xpparam_t const *xpp, struct xd2way *two_way) {
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = two_way->pair.lhs.rindex.length + two_way->pair.rhs.rindex.length + 3;
+	ndiags = pair->lhs.rindex.length + pair->rhs.rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
-		xdl_2way_free(two_way);
 		return -1;
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += two_way->pair.rhs.rindex.length + 1;
-	kvdb += two_way->pair.rhs.rindex.length + 1;
+	kvdf += pair->rhs.rindex.length + 1;
+	kvdb += pair->rhs.rindex.length + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -346,13 +345,11 @@ int xdl_do_diff(xpparam_t const *xpp, struct xd2way *two_way) {
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 
-	res = xdl_recs_cmp(&two_way->pair.lhs, 0, two_way->pair.lhs.rindex.length, &two_way->pair.rhs, 0, two_way->pair.rhs.rindex.length,
+	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.rindex.length, &pair->rhs, 0, pair->rhs.rindex.length,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 	xdl_free(kvd);
  out:
-	if (res < 0)
-		xdl_2way_free(two_way);
 
 	return res;
 }
@@ -1039,7 +1036,7 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 	xdl_2way_prepare(mf1, mf2, xpp->flags, &two_way);
 
-	if (xdl_do_diff(xpp, &two_way) < 0) {
+	if (xdl_do_diff(xpp, &two_way.pair) < 0) {
 
 		return -1;
 	}
