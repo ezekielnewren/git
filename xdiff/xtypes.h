@@ -63,7 +63,6 @@ struct xd_file_context {
 	struct ivec_xrecord *record;
 	struct ivec_u8 consider;
 	struct ivec_usize rindex;
-	struct xdfile file_storage;
 };
 
 struct xdpair {
