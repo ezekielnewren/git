@@ -29,6 +29,26 @@
 
 
 
+void xdl_file_prepare(mmfile_t *mf, struct xdfile *file) {
+	struct xlinereader reader;
+
+	IVEC_INIT(file->record);
+	IVEC_INIT(file->minimal_perfect_hash);
+
+	xdl_linereader_init(&reader, (u8 const *) mf->ptr, mf->size);
+	while (true) {
+		struct xrecord rec_new;
+		if (!xdl_linereader_next(&reader, &rec_new.ptr, &rec_new.size_no_eol, &rec_new.size_with_eol))
+			break;
+		ivec_push(&file->record, &rec_new);
+	}
+	ivec_shrink_to_fit(&file->record);
+}
+
+void xdl_file_free(struct  xdfile *file) {
+	ivec_free(&file->minimal_perfect_hash);
+	ivec_free(&file->record);
+}
 
 static void xdl_prepare_ctx(mmfile_t *mf, struct xd_file_context *ctx) {
 	struct xlinereader reader;
@@ -263,4 +283,50 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 
 	return 0;
+}
+
+static void xdl_setup_ctx(struct xdfile *file, struct xd_file_context *ctx) {
+	ctx->minimal_perfect_hash = &file->minimal_perfect_hash;
+
+	ctx->record = &file->record;
+
+	IVEC_INIT(ctx->consider);
+	ivec_zero(&ctx->consider, ctx->record->length);
+
+	IVEC_INIT(ctx->rindex);
+}
+
+static void xdl_pair_prepare(struct xdfile *lhs, struct xdfile *rhs, usize mph_size, u64 flags, struct xdpair *pair) {
+	xdl_setup_ctx(lhs, &pair->lhs);
+	xdl_setup_ctx(rhs, &pair->rhs);
+
+	pair->minimal_perfect_hash_size = mph_size;
+
+	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(pair);
+	}
+}
+
+void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way) {
+	struct xdl_minimal_perfect_hash_builder mphb;
+	usize max_unique_keys = 0;
+
+	xdl_file_prepare(mf1, &two_way->lhs);
+	xdl_file_prepare(mf2, &two_way->rhs);
+
+	max_unique_keys += two_way->lhs.record.length;
+	max_unique_keys += two_way->rhs.record.length;
+	xdl_mphb_init(&mphb, max_unique_keys, flags);
+
+	xdl_mphb_ingest(&mphb, &two_way->lhs);
+	xdl_mphb_ingest(&mphb, &two_way->rhs);
+	two_way->minimal_perfect_hash_size = xdl_mphb_finish(&mphb);
+
+	xdl_pair_prepare(&two_way->lhs, &two_way->rhs, two_way->minimal_perfect_hash_size, flags, &two_way->pair);
+}
+
+void xdl_2way_free(struct xd2way *two_way) {
+	xdl_file_free(&two_way->lhs);
+	xdl_file_free(&two_way->rhs);
+	xdl_free_env(&two_way->pair);
 }
