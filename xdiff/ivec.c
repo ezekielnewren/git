@@ -6,6 +6,8 @@
 
 static void ivec_set_capacity(void* self, usize new_capacity) {
 	rawivec_t *this = self;
+	if (this->capacity == new_capacity)
+		return;
 	this->ptr = xrealloc(this->ptr, new_capacity * this->element_size);
 	this->capacity = new_capacity;
 }
