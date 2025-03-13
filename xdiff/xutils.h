@@ -75,7 +75,7 @@ usize xdl_strip_eol(u8 const* ptr, usize size, u64 flags);
 void xdl_whitespace_iter_init(struct xwhitespaceiter* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
 bool xdl_whitespace_iter_next(struct xwhitespaceiter* it, u8 const** ptr, usize *run_size);
 void xdl_whitespace_iter_assert_done(struct xwhitespaceiter* it);
-u64  xdl_line_hash(u8 const* ptr, usize line_size_without_eol, u64 flags);
+extern u64 xdl_line_hash(u8 const* ptr, usize size_no_eol, u64 flags);
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags);
 
 

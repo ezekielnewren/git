@@ -1,5 +1,5 @@
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN};
-use crate::xrecord::xrecord;
+use crate::xtypes::xrecord;
 
 pub(crate) fn XDL_ISSPACE(v: u8) -> bool {
     match v {
@@ -148,13 +148,68 @@ pub fn strip_eol(line: &[u8], flags: u64) -> &[u8] {
 
 
 
+pub fn chunked_iter_equal<'a, T, IT0, IT1>(mut it0: IT0, mut it1: IT1) -> bool
+where
+    T: Eq + 'a,
+    IT0: Iterator<Item = &'a [T]>,
+    IT1: Iterator<Item = &'a [T]>,
+{
+    let mut run_option0: Option<&[T]> = it0.next();
+    let mut run_option1: Option<&[T]> = it1.next();
+    let mut i0 = 0;
+    let mut i1 = 0;
+
+    while let (Some(run0), Some(run1)) = (run_option0, run_option1) {
+        while i0 < run0.len() && i1 < run1.len() {
+            if run0[i0] != run1[i1] {
+                return false;
+            }
+
+            i0 += 1;
+            i1 += 1;
+        }
+
+        if i0 == run0.len() {
+            i0 = 0;
+            run_option0 = it0.next();
+        }
+        if i1 == run1.len() {
+            i1 = 0;
+            run_option1 = it1.next();
+        }
+    }
+
+    while let Some(run0) = run_option0 {
+        if run0.len() == 0 {
+            run_option0 = it0.next();
+        } else {
+            break;
+        }
+    }
+
+    while let Some(run1) = run_option1 {
+        if run1.len() == 0 {
+            run_option1 = it1.next();
+        } else {
+            break;
+        }
+    }
+
+    run_option0.is_none() && run_option1.is_none()
+}
+
+
+
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
     use std::io::Read;
+    use std::iter::Map;
+    use std::slice::Iter;
     use std::path::PathBuf;
     use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE};
-    use crate::xutils::{strip_eol, LineReader, WhitespaceIter};
+    use crate::xutils::{chunked_iter_equal, strip_eol, LineReader, WhitespaceIter};
 
     fn extract_string<'a>(line: &[u8], flags: u64, buffer: &'a mut Vec<u8>) -> &'a str {
         let it;
@@ -170,6 +225,10 @@ mod tests {
             buffer.extend_from_slice(run);
         }
         unsafe { std::str::from_utf8_unchecked(buffer.as_slice()) }
+    }
+
+    fn get_str_it<'a>(vec: &'a Vec<&str>) -> Map<Iter<'a, &'a str>, fn(&'a &str) -> &'a [u8]> {
+        vec.iter().map(|v| (*v).as_bytes())
     }
 
     #[test]
@@ -238,6 +297,50 @@ mod tests {
         for (expected, input, flags) in tv_individual {
             let actual = extract_string(strip_eol(input.as_bytes(), flags), flags, &mut buffer);
             assert_eq!(expected, actual, "input: {:?} flags: 0x{:x}", input, flags);
+        }
+    }
+
+    #[test]
+    fn test_chunked_iter_equal() {
+        let tv_str: Vec<(Vec<&str>, Vec<&str>)> = vec![
+            /* equal cases */
+            (vec!["", "", "abc"],         vec!["", "abc"]),
+            (vec!["c", "", "a"],          vec!["c", "a"]),
+            (vec!["a", "", "b", "", "c"], vec!["a", "b", "c"]),
+            (vec!["", "", "a"],           vec!["a"]),
+            (vec!["", "a"],               vec!["a"]),
+            (vec![""],                    vec![]),
+            (vec!["", ""],                vec![""]),
+            (vec!["a"],                   vec!["", "", "a"]),
+            (vec!["a"],                   vec!["", "a"]),
+            (vec![],                      vec![""]),
+            (vec![""],                    vec!["", ""]),
+            (vec!["hello ", "world"],     vec!["hel", "lo wo", "rld"]),
+            (vec!["hel", "lo wo", "rld"], vec!["hello ", "world"]),
+            (vec!["hello world"],         vec!["hello world"]),
+            (vec!["abc", "def"],          vec!["def", "abc"]),
+            (vec![],                      vec![]),
+
+            /* different cases */
+            (vec!["abc"],       vec![]),
+            (vec!["", "", ""],  vec!["", "a"]),
+            (vec!["", "a"],     vec!["b", ""]),
+            (vec!["abc"],       vec!["abc", "de"]),
+            (vec!["abc", "de"], vec!["abc"]),
+            (vec![],            vec!["a"]),
+            (vec!["a"],         vec![]),
+            (vec!["abc", "kj"], vec!["abc", "de"]),
+        ];
+
+        for (lhs, rhs) in tv_str.iter() {
+            let a: Vec<u8> = get_str_it(lhs).flatten().copied().collect();
+            let b: Vec<u8> = get_str_it(rhs).flatten().copied().collect();
+            let expected = a.as_slice() == b.as_slice();
+
+            let it0 = get_str_it(lhs);
+            let it1 = get_str_it(rhs);
+            let actual = chunked_iter_equal(it0, it1);
+            assert_eq!(expected, actual);
         }
     }
 
