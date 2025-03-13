@@ -1,0 +1,17 @@
+diff --git a/salutations.c b/salutations.c
+--- a/salutations.c
++++ b/salutations.c
+@@ -1,9 +1,9 @@
+-void bye(void)
++void hello(void)
+ {
+-    printf("goodbye\n");
++    printf("hello\n");
+ }
+
+-void hello(void)
++void bye(void)
+ {
+-    printf("hello\n");
++    printf("goodbye\n");
+ }
