@@ -253,12 +253,16 @@ static void xdl_free_pair(struct xdpair *pair) {
 	xdl_free_file_context(&pair->rhs);
 }
 
+#ifdef WITH_RUST
+extern void xdl_hash_records(struct xdfile *file, u64 flags);
+#else
 static void xdl_hash_records(struct xdfile *file, u64 flags) {
 	for (usize i = 0; i < file->record.length; i++) {
 		struct xrecord *rec = &file->record.ptr[i];
 		rec->line_hash = xdl_line_hash(rec->ptr, rec->size_no_eol, flags);
 	}
 }
+#endif
 
 void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way) {
 	struct xdl_minimal_perfect_hash_builder mphb;
