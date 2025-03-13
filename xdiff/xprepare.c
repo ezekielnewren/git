@@ -23,74 +23,18 @@
 #include "xinclude.h"
 #include "ivec.h"
 
-#define XDL_KPDIS_RUN 4
 #define XDL_MAX_EQLIMIT 1024
-#define XDL_SIMSCAN_WINDOW 100
 
+extern void xdl_file_prepare(mmfile_t *mf, u64 flags, struct xdfile *file);
 
-void xdl_file_free(struct  xdfile *file) {
+static void xdl_file_free(struct  xdfile *file) {
 	ivec_free(&file->minimal_perfect_hash);
 	ivec_free(&file->record);
 }
 
 
-static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
-	long r, rdis0, rpdis0, rdis1, rpdis1;
 
-	/*
-	 * Limits the window the is examined during the similar-lines
-	 * scan. The loops below stops when dis[i - r] == 1 (line that
-	 * has no match), but there are corner cases where the loop
-	 * proceed all the way to the extremities by causing huge
-	 * performance penalties in case of big files.
-	 */
-	if (i - s > XDL_SIMSCAN_WINDOW)
-		s = i - XDL_SIMSCAN_WINDOW;
-	if (e - i > XDL_SIMSCAN_WINDOW)
-		e = i + XDL_SIMSCAN_WINDOW;
-
-	/*
-	 * Scans the lines before 'i' to find a run of lines that either
-	 * have no match (dis[j] == 0) or have multiple matches (dis[j] > 1).
-	 * Note that we always call this function with dis[i] > 1, so the
-	 * current line (i) is already a multimatch line.
-	 */
-	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
-		if (!dis[i - r])
-			rdis0++;
-		else if (dis[i - r] == 2)
-			rpdis0++;
-		else
-			break;
-	}
-	/*
-	 * If the run before the line 'i' found only multimatch lines, we
-	 * return 0 and hence we don't make the current line (i) discarded.
-	 * We want to discard multimatch lines only when they appear in the
-	 * middle of runs with nomatch lines (dis[j] == 0).
-	 */
-	if (rdis0 == 0)
-		return 0;
-	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < e; r++) {
-		if (!dis[i + r])
-			rdis1++;
-		else if (dis[i + r] == 2)
-			rpdis1++;
-		else
-			break;
-	}
-	/*
-	 * If the run after the line 'i' found only multimatch lines, we
-	 * return 0 and hence we don't make the current line (i) discarded.
-	 */
-	if (rdis1 == 0)
-		return 0;
-	rdis1 += rdis0;
-	rpdis1 += rpdis0;
-
-	return rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1);
-}
-
+extern bool xdl_clean_mmatch(struct ivec_u8 *dis, usize i, usize start, usize end);
 
 /*
  * Try to reduce the problem complexity, discard records that have no
@@ -108,6 +52,12 @@ static void xdl_cleanup_records(struct xdpair *pair) {
 	IVEC_INIT(dis2);
 	IVEC_INIT(occurrence);
 
+	/*
+	 * record.length for dis1, dis2 because this function
+	 * and xdl_clean_mmatch() does bounds checking,
+	 * everywhere else uses the sentinel values to stop
+	 * iteration
+	 */
 	ivec_zero(&dis1, pair->lhs.record->length + SENTINEL);
 	ivec_zero(&dis2, pair->rhs.record->length + SENTINEL);
 	ivec_zero(&occurrence, pair->minimal_perfect_hash_size);
@@ -141,7 +91,7 @@ static void xdl_cleanup_records(struct xdpair *pair) {
 
 	for (usize i = pair->delta_start; i < end1; i++) {
 		if (dis1.ptr[i] == YES ||
-		    (dis1.ptr[i] == TOO_MANY && !xdl_clean_mmatch((char const *) dis1.ptr, i, pair->delta_start, end1))) {
+		    (dis1.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis1, i, pair->delta_start, end1))) {
 			ivec_push(&pair->lhs.rindex, &i);
 		} else
 			pair->lhs.consider.ptr[SENTINEL + i] = YES;
@@ -150,7 +100,7 @@ static void xdl_cleanup_records(struct xdpair *pair) {
 
 	for (usize i = pair->delta_start; i < end2; i++) {
 		if (dis2.ptr[i] == YES ||
-		    (dis2.ptr[i] == TOO_MANY && !xdl_clean_mmatch((char const *) dis2.ptr, i, pair->delta_start, end2))) {
+		    (dis2.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis2, i, pair->delta_start, end2))) {
 			ivec_push(&pair->rhs.rindex, &i);
 		} else
 			pair->rhs.consider.ptr[SENTINEL + i] = YES;

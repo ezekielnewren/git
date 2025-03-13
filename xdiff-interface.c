@@ -297,15 +297,18 @@ void xdiff_clear_find_func(xdemitconf_t *xecfg)
 	}
 }
 
-unsigned long xdiff_hash_string(const char *s, size_t len, long flags)
-{
-	return xdl_hash_record(&s, s + len, flags);
+u64 xdiff_hash_string(const char *s, size_t len, u64 flags) {
+	usize size = xdl_strip_eol((u8 const*) s, len, flags);
+	return xdl_line_hash((u8 const*) s, size, flags);
 }
 
-int xdiff_compare_lines(const char *l1, long s1,
-			const char *l2, long s2, long flags)
+bool xdiff_compare_lines(const char *l1, long s1,
+			const char *l2, long s2, u64 flags)
 {
-	return xdl_recmatch(l1, s1, l2, s2, flags);
+	usize size1 = xdl_strip_eol((u8 const*) l1, s1, flags);
+	usize size2 = xdl_strip_eol((u8 const*) l2, s2, flags);
+
+	return xdl_line_equal((u8 const*) l1, size1, (u8 const*) l2, size2, flags);
 }
 
 int parse_conflict_style_name(const char *value)

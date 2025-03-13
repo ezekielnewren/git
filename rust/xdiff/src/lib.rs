@@ -7,7 +7,7 @@ use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 pub mod xtypes;
 pub mod xutils;
 pub mod xdiff;
-
+mod xprepare;
 
 #[no_mangle]
 unsafe extern "C" fn xdl_file_prepare(mf: *const mmfile, flags: u64, file: *mut xdfile) {

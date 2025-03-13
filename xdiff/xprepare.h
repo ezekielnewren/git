@@ -23,9 +23,6 @@
 #if !defined(XPREPARE_H)
 #define XPREPARE_H
 
-extern void xdl_file_prepare(mmfile_t *mf, u64 flags, struct xdfile *file);
-void xdl_file_free(struct  xdfile *file);
-
 void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way);
 void xdl_2way_free(struct xd2way *two_way);
 

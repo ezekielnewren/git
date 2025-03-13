@@ -4,6 +4,8 @@
 #include "hash.h"
 #include "xdiff/xdiff.h"
 
+#include "rust/header/types.h"
+
 /*
  * xdiff isn't equipped to handle content over a gigabyte;
  * we make the cutoff 1GB - 1MB to give some breathing
@@ -62,14 +64,14 @@ extern int git_xmerge_style;
  * The `flags` given as XDF_WHITESPACE_FLAGS determine how white spaces
  * are treated for the comparison.
  */
-int xdiff_compare_lines(const char *l1, long s1,
-			const char *l2, long s2, long flags);
+bool xdiff_compare_lines(const char *l1, long s1,
+			const char *l2, long s2, u64 flags);
 
 /*
  * Returns a hash of the string s of length len.
  * The `flags` given as XDF_WHITESPACE_FLAGS determine how white spaces
  * are treated for the hash.
  */
-unsigned long xdiff_hash_string(const char *s, size_t len, long flags);
+u64 xdiff_hash_string(const char *s, size_t len, u64 flags);
 
 #endif
