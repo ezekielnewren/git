@@ -28,32 +28,6 @@
 #define XDL_SIMSCAN_WINDOW 100
 
 
-
-void xdl_file_prepare(mmfile_t *mf, u64 flags, struct xdfile *file) {
-	struct xlinereader reader;
-
-	xd_trace2_region_enter("xdiff", "xdl_file_prepare");
-
-	IVEC_INIT(file->record);
-	IVEC_INIT(file->minimal_perfect_hash);
-
-	xdl_linereader_init(&reader, (u8 const *) mf->ptr, mf->size);
-	while (true) {
-		struct xrecord rec_new;
-		if (!xdl_linereader_next(&reader, &rec_new.ptr, &rec_new.size_no_eol, &rec_new.size_with_eol))
-			break;
-		if ((flags & XDF_IGNORE_CR_AT_EOL) != 0
-			&& rec_new.size_no_eol > 0
-			&& rec_new.ptr[rec_new.size_no_eol - 1] == '\r') {
-			rec_new.size_no_eol--;
-		}
-		ivec_push(&file->record, &rec_new);
-	}
-	ivec_shrink_to_fit(&file->record);
-
-	xd_trace2_region_leave("xdiff", "xdl_file_prepare");
-}
-
 void xdl_file_free(struct  xdfile *file) {
 	ivec_free(&file->minimal_perfect_hash);
 	ivec_free(&file->record);

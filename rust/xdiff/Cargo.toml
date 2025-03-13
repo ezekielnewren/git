@@ -13,3 +13,4 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 interop = { path = "../interop" }
+libc = "0.2.171"

@@ -51,11 +51,6 @@ struct xwhitespaceiter {
 };
 
 
-struct xlinereader {
-	u8 const* cur;
-	usize size;
-};
-
 long xdl_bogosqrt(long n);
 int xdl_emit_diffrec(char const *rec, long size, char const *pre, long psize,
 		     xdemitcb_t *ecb);
@@ -77,9 +72,6 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder *mphb, struct xrecord 
 void xdl_mphb_ingest(struct xdl_minimal_perfect_hash_builder *mphb, struct xdfile *file);
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder *mphb);
 usize xdl_strip_eol(u8 const* ptr, usize size, u64 flags);
-void xdl_linereader_init(struct xlinereader *it, u8 const* ptr, usize size);
-bool xdl_linereader_next(struct xlinereader *it, u8 const **cur, usize *no_eol, usize *with_eol);
-void xdl_linereader_assert_done(struct xlinereader *it);
 void xdl_whitespace_iter_init(struct xwhitespaceiter* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
 bool xdl_whitespace_iter_next(struct xwhitespaceiter* it, u8 const** ptr, usize *run_size);
 void xdl_whitespace_iter_assert_done(struct xwhitespaceiter* it);

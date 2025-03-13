@@ -487,32 +487,6 @@ usize xdl_strip_eol(u8 const* ptr, usize size, u64 flags) {
 	return size;
 }
 
-void xdl_linereader_init(struct xlinereader *it, u8 const* ptr, usize size) {
-	it->cur = ptr;
-	it->size = size;
-}
-
-bool xdl_linereader_next(struct xlinereader *it, u8 const **cur, usize *no_eol, usize *with_eol) {
-	if (it->size == 0) {
-		return false;
-	}
-
-	*cur = it->cur;
-	it->cur = memchr(it->cur, '\n', it->size);
-	if (it->cur) {
-		*no_eol = it->cur - *cur;
-		*with_eol = *no_eol + 1;
-		it->size -= *with_eol;
-		it->cur++;
-	} else {
-		*no_eol = it->size;
-		*with_eol = it->size;
-		it->size = 0;
-	}
-
-	return true;
-}
-
 void xdl_whitespace_iter_init(struct xwhitespaceiter* it,
 	u8 const* ptr, usize line_size_no_eol, u64 flags
 ) {
