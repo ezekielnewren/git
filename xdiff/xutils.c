@@ -596,64 +596,6 @@ void xdl_whitespace_iter_assert_done(struct xwhitespaceiter* it) {
 	it->flags = 0;
 }
 
-bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags) {
-	if ((flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0) {
-		if (size1 != size2)
-			return false;
-		return memcmp(line1, line2, size1) == 0;
-	} else {
-		struct xwhitespaceiter it1, it2;
-		u8 const *run_start1, *run_start2;
-		usize run_size1, run_size2;
-		usize i1, i2;
-		bool has_next1, has_next2;
-
-#ifdef DEBUG
-		validate_line_arguments(line1, size1, flags);
-		validate_line_arguments(line2, size2, flags);
-#endif
-
-		xdl_whitespace_iter_init(&it1, line1, size1, flags);
-		xdl_whitespace_iter_init(&it2, line2, size2, flags);
-
-		has_next1 = xdl_whitespace_iter_next(&it1, &run_start1, &run_size1);
-		has_next2 = xdl_whitespace_iter_next(&it2, &run_start2, &run_size2);
-
-		i1 = 0, i2 = 0;
-		while (has_next1 && has_next2) {
-			while (i1 < run_size1 && i2 < run_size2) {
-				if (run_start1[i1] != run_start2[i2])
-					return false;
-				i1++, i2++;
-			}
-
-			if (i1 == run_size1) {
-				i1 = 0;
-				has_next1 = xdl_whitespace_iter_next(&it1, &run_start1, &run_size1);
-			}
-
-			if (i2 == run_size2) {
-				i2 = 0;
-				has_next2 = xdl_whitespace_iter_next(&it2, &run_start2, &run_size2);
-			}
-		}
-
-		/*
-		 * check for emtpy runs
-		 */
-		while (has_next1 && run_size1 == 0) {
-			has_next1 = xdl_whitespace_iter_next(&it1, &run_start1, &run_size1);
-		}
-
-		while (has_next2 && run_size2 == 0) {
-			has_next2 = xdl_whitespace_iter_next(&it2, &run_start2, &run_size2);
-		}
-
-		return !has_next1 && !has_next2;
-	}
-}
-
-
 void* xdl_alloc_grow_helper(void *p, long nr, long *alloc, size_t size)
 {
 	void *tmp = NULL;

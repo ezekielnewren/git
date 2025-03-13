@@ -2,7 +2,7 @@ use std::hash::Hasher;
 use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
 use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE_WITHIN};
 use crate::xtypes::xdfile;
-use crate::xutils::{LineReader, WhitespaceIter};
+use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 
 pub mod xtypes;
 pub mod xutils;
@@ -44,5 +44,18 @@ unsafe extern "C" fn xdl_line_hash(ptr: *const u8, size_no_eol: usize, flags: u6
     }
 }
 
+#[no_mangle]
+unsafe extern "C" fn xdl_line_equal(line1: *const u8, size1: usize, line2: *const u8, size2: usize, flags: u64) -> bool {
+    let line1 = unsafe {
+        std::slice::from_raw_parts(line1, size1)
+    };
+    let line2 = unsafe {
+        std::slice::from_raw_parts(line2, size2)
+    };
+
+    let lhs = WhitespaceIter::new(line1, flags);
+    let rhs = WhitespaceIter::new(line2, flags);
+    chunked_iter_equal(lhs, rhs)
+}
 
 
