@@ -43,14 +43,6 @@ struct xdl_minimal_perfect_hash_builder {
 	u64 flags;
 };
 
-struct xwhitespaceiter {
-	u8 const* ptr;
-	usize size;
-	usize index;
-	u64 flags;
-};
-
-
 long xdl_bogosqrt(long n);
 int xdl_emit_diffrec(char const *rec, long size, char const *pre, long psize,
 		     xdemitcb_t *ecb);
@@ -72,9 +64,6 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder *mphb, struct xrecord 
 void xdl_mphb_ingest(struct xdl_minimal_perfect_hash_builder *mphb, struct xdfile *file);
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder *mphb);
 usize xdl_strip_eol(u8 const* ptr, usize size, u64 flags);
-void xdl_whitespace_iter_init(struct xwhitespaceiter* it, u8 const* ptr, usize line_size_without_eol, u64 flags);
-bool xdl_whitespace_iter_next(struct xwhitespaceiter* it, u8 const** ptr, usize *run_size);
-void xdl_whitespace_iter_assert_done(struct xwhitespaceiter* it);
 extern u64 xdl_line_hash(u8 const* ptr, usize size_no_eol, u64 flags);
 bool xdl_line_equal(u8 const* line1, usize size1, u8 const* line2, usize size2, u64 flags);
 
