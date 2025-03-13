@@ -49,6 +49,7 @@ struct xrecord {
 	u8 const *ptr;
 	usize size_no_eol;
 	usize size_with_eol;
+	u64 line_hash;
 };
 
 DEFINE_IVEC_TYPE(struct xrecord, xrecord);

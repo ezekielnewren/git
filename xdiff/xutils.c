@@ -431,7 +431,8 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder *mphb, struct xrecord 
 	struct xdl_mphb_node *node;
 	usize hi;
 
-	u64 line_hash = xdl_line_hash(key->ptr, key->size_no_eol, mphb->flags);
+	// u64 line_hash = xdl_line_hash(key->ptr, key->size_no_eol, mphb->flags);
+	u64 line_hash = key->line_hash;
 	hi = (long) XDL_HASHLONG(line_hash, mphb->hbits);
 	for (node = mphb->head[hi]; node; node = node->next) {
 		if (node->line_hash == line_hash &&

@@ -253,6 +253,13 @@ static void xdl_free_pair(struct xdpair *pair) {
 	xdl_free_file_context(&pair->rhs);
 }
 
+static void xdl_hash_records(struct xdfile *file, u64 flags) {
+	for (usize i = 0; i < file->record.length; i++) {
+		struct xrecord *rec = &file->record.ptr[i];
+		rec->line_hash = xdl_line_hash(rec->ptr, rec->size_no_eol, flags);
+	}
+}
+
 void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *two_way) {
 	struct xdl_minimal_perfect_hash_builder mphb;
 	usize max_unique_keys = 0;
@@ -261,6 +268,9 @@ void xdl_2way_prepare(mmfile_t *mf1, mmfile_t *mf2, u64 flags, struct xd2way *tw
 
 	xdl_file_prepare(mf1, &two_way->lhs);
 	xdl_file_prepare(mf2, &two_way->rhs);
+
+	xdl_hash_records(&two_way->lhs, flags);
+	xdl_hash_records(&two_way->rhs, flags);
 
 	max_unique_keys += two_way->lhs.record.length;
 	max_unique_keys += two_way->rhs.record.length;
@@ -292,6 +302,10 @@ void xdl_3way_prepare(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	xdl_file_prepare(orig, &three_way->base);
 	xdl_file_prepare(mf1, &three_way->side1);
 	xdl_file_prepare(mf2, &three_way->side2);
+
+	xdl_hash_records(&three_way->base, flags);
+	xdl_hash_records(&three_way->side1, flags);
+	xdl_hash_records(&three_way->side2, flags);
 
 	max_unique_keys += three_way->base.record.length;
 	max_unique_keys += three_way->side1.record.length;
