@@ -14,3 +14,4 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 interop = { path = "../interop" }
 xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
+rayon = "1.10.0"

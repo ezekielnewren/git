@@ -1,7 +1,7 @@
+use rayon::prelude::*;
 use xxhash_rust::xxh3::xxh3_64;
-use crate::xtypes::xdfile;
+use crate::xtypes::{xdfile, xrecord};
 
-pub mod xrecord;
 pub mod xtypes;
 
 
@@ -9,9 +9,10 @@ pub mod xtypes;
 unsafe extern "C" fn xdl_hash_records(file: *mut xdfile, flags: u64) {
     let file: &mut xdfile = &mut *file;
 
-    for i in 0..file.record.len() {
-        let mut rec = &mut file.record[i];
+    let slice: &mut [xrecord] = file.record.as_mut_slice();
+    slice.par_iter_mut().for_each(|rec| {
         rec.line_hash = xxh3_64(rec.as_ref());
-    }
+    });
+
 }
 
