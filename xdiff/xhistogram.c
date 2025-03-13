@@ -86,7 +86,7 @@ struct region {
 	((LINE_MAP(index, ptr))->cnt)
 
 #define MPH(env, s, l) \
-	(env->s.minimal_perfect_hash->ptr[l - 1])
+	(env->s.minimal_perfect_hash->ptr[l - LINE_SHIFT])
 
 #define CMP(i, s1, l1, s2, l2) \
 	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
