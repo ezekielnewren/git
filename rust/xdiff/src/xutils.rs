@@ -1,4 +1,4 @@
-use crate::xdiff::{XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN};
+use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN};
 use crate::xrecord::xrecord;
 
 pub(crate) fn XDL_ISSPACE(v: u8) -> bool {
@@ -135,6 +135,18 @@ impl<'a> Iterator for WhitespaceIter<'a> {
     }
 }
 
+pub fn strip_eol(line: &[u8], flags: u64) -> &[u8] {
+    let mut end = line.len();
+    if end > 0 && line[end - 1] == b'\n' {
+        end -= 1;
+    }
+    if (flags & XDF_IGNORE_CR_AT_EOL) != 0 && end > 0 && line[end - 1] == b'\r' {
+        end -= 1;
+    }
+    &line[0..end]
+}
+
+
 
 #[cfg(test)]
 mod tests {
@@ -142,7 +154,7 @@ mod tests {
     use std::io::Read;
     use std::path::PathBuf;
     use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE};
-    use crate::xutils::{LineReader, WhitespaceIter};
+    use crate::xutils::{strip_eol, LineReader, WhitespaceIter};
 
     fn extract_string<'a>(line: &[u8], flags: u64, buffer: &'a mut Vec<u8>) -> &'a str {
         let it;
@@ -180,51 +192,51 @@ mod tests {
     #[test]
     fn test_ignore_space() {
         let tv_individual = vec![
-            ("a", "\r \t a \r", XDF_IGNORE_WHITESPACE),
-            ("a", "\r a \r", XDF_IGNORE_WHITESPACE),
-            ("", "\r", XDF_IGNORE_WHITESPACE),
-            ("", "", XDF_IGNORE_WHITESPACE),
-            ("a", "\r a ", XDF_IGNORE_WHITESPACE),
-            ("", "     ", XDF_IGNORE_WHITESPACE),
-            ("a", "a     ", XDF_IGNORE_WHITESPACE),
-            ("aasdf", "  a  \t  asdf  \t \r", XDF_IGNORE_WHITESPACE),
-            ("ab", "\t a  b  \t ", XDF_IGNORE_WHITESPACE),
-            ("ab", "  a b \t \r", XDF_IGNORE_WHITESPACE),
-            ("a", "\t  a ", XDF_IGNORE_WHITESPACE),
-            ("a", "\t\t\ta\t", XDF_IGNORE_WHITESPACE),
-            ("a", "a", XDF_IGNORE_WHITESPACE),
-            ("a", "\ta", XDF_IGNORE_WHITESPACE),
+            ("a", "\r \t a \r\n", XDF_IGNORE_WHITESPACE),
+            ("a", "\r a \r\n", XDF_IGNORE_WHITESPACE),
+            ("", "\r\n", XDF_IGNORE_WHITESPACE),
+            ("", "\n", XDF_IGNORE_WHITESPACE),
+            ("a", "\r a \n", XDF_IGNORE_WHITESPACE),
+            ("", "     \n", XDF_IGNORE_WHITESPACE),
+            ("a", "a     \n", XDF_IGNORE_WHITESPACE),
+            ("aasdf", "  a  \t  asdf  \t \r\n", XDF_IGNORE_WHITESPACE),
+            ("ab", "\t a  b  \t \n", XDF_IGNORE_WHITESPACE),
+            ("ab", "  a b \t \r\n", XDF_IGNORE_WHITESPACE),
+            ("a", "\t  a \n", XDF_IGNORE_WHITESPACE),
+            ("a", "\t\t\ta\t\n", XDF_IGNORE_WHITESPACE),
+            ("a", "a\n", XDF_IGNORE_WHITESPACE),
+            ("a", "\ta\n", XDF_IGNORE_WHITESPACE),
 
-            // ("1", "1\r", XDF_IGNORE_CR_AT_EOL),
-            ("1", "1\r", XDF_IGNORE_WHITESPACE_CHANGE),
+            ("1", "1\r\n", XDF_IGNORE_CR_AT_EOL),
+            ("1", "1\r\n", XDF_IGNORE_WHITESPACE_CHANGE),
 
-            // ("\r \t a ", "\r \t a \r", XDF_IGNORE_CR_AT_EOL),
-            // ("\r a ", "\r a \r", XDF_IGNORE_CR_AT_EOL),
-            // ("", "\r", XDF_IGNORE_CR_AT_EOL),
-            // ("", "", XDF_IGNORE_CR_AT_EOL),
-            // ("\r a ", "\r a ", XDF_IGNORE_CR_AT_EOL),
+            ("\r \t a ", "\r \t a \r\n", XDF_IGNORE_CR_AT_EOL),
+            ("\r a ", "\r a \r\n", XDF_IGNORE_CR_AT_EOL),
+            ("", "\r\n", XDF_IGNORE_CR_AT_EOL),
+            ("", "\n", XDF_IGNORE_CR_AT_EOL),
+            ("\r a ", "\r a \n", XDF_IGNORE_CR_AT_EOL),
 
-            ("", "     ", XDF_IGNORE_WHITESPACE_AT_EOL),
-            ("a", "a     ", XDF_IGNORE_WHITESPACE_AT_EOL),
-            ("  a  \t  asdf", "  a  \t  asdf  \t \r", XDF_IGNORE_WHITESPACE_AT_EOL),
-            ("\t a  b", "\t a  b  \t ", XDF_IGNORE_WHITESPACE_AT_EOL),
+            ("", "     \n", XDF_IGNORE_WHITESPACE_AT_EOL),
+            ("a", "a     \n", XDF_IGNORE_WHITESPACE_AT_EOL),
+            ("  a  \t  asdf", "  a  \t  asdf  \t \r\n", XDF_IGNORE_WHITESPACE_AT_EOL),
+            ("\t a  b", "\t a  b  \t \n", XDF_IGNORE_WHITESPACE_AT_EOL),
 
-            (" a b", "  a b \t \r", XDF_IGNORE_WHITESPACE_CHANGE),
-            (" a", "\t  a ", XDF_IGNORE_WHITESPACE_CHANGE),
-            (" a", "\t\t\ta\t", XDF_IGNORE_WHITESPACE_CHANGE),
-            ("a", "a", XDF_IGNORE_WHITESPACE_CHANGE),
-            (" a", "\ta", XDF_IGNORE_WHITESPACE_CHANGE),
+            (" a b", "  a b \t \r\n", XDF_IGNORE_WHITESPACE_CHANGE),
+            (" a", "\t  a \n", XDF_IGNORE_WHITESPACE_CHANGE),
+            (" a", "\t\t\ta\t\n", XDF_IGNORE_WHITESPACE_CHANGE),
+            ("a", "a\n", XDF_IGNORE_WHITESPACE_CHANGE),
+            (" a", "\ta\n", XDF_IGNORE_WHITESPACE_CHANGE),
 
-            ("ab", "  a b \t \r", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
-            ("a", "\t  a ", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
-            ("a", "\t\t\ta\t", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
-            ("a", "a", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
-            ("a", "\ta", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
+            ("ab", "  a b \t \r\n", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
+            ("a", "\t  a \n", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
+            ("a", "\t\t\ta\t\n", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
+            ("a", "a\n", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
+            ("a", "\ta\n", XDF_IGNORE_WHITESPACE | XDF_IGNORE_WHITESPACE_CHANGE),
         ];
 
         let mut buffer = Vec::<u8>::new();
         for (expected, input, flags) in tv_individual {
-            let actual = extract_string(input.as_bytes(), flags, &mut buffer);
+            let actual = extract_string(strip_eol(input.as_bytes(), flags), flags, &mut buffer);
             assert_eq!(expected, actual, "input: {:?} flags: 0x{:x}", input, flags);
         }
     }
