@@ -147,3 +147,14 @@ impl xdpair {
 
 }
 
+
+#[macro_export]
+macro_rules! get_file_context {
+    ($pair:expr) => {
+        (
+            FileContext::new(&mut $pair.lhs),
+	        FileContext::new(&mut $pair.rhs)
+        )
+    }
+}
+

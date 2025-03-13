@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN};
 use crate::xtypes::xrecord;
 

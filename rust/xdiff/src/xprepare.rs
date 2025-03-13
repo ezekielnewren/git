@@ -1,6 +1,6 @@
-use interop::ivec::IVec;
 use crate::xdiff::*;
 use crate::xutils::xdl_bogosqrt;
+use crate::get_file_context;
 use crate::xtypes::{xdpair, FileContext};
 
 const XDL_KPDIS_RUN: usize = 4;
@@ -84,8 +84,7 @@ struct Occurrence {
 /// matches on the other file. Also, lines that have multiple matches
 /// might be potentially discarded if they appear in a run of discardable.
 fn xdl_cleanup_records(pair: &mut xdpair) {
-	let lhs = FileContext::new(&mut pair.lhs);
-	let rhs = FileContext::new(&mut pair.rhs);
+	let (lhs, rhs) = get_file_context!(pair);
 
 	let end1 = lhs.record.len() - pair.delta_end;
 	let end2 = rhs.record.len() - pair.delta_end;
@@ -159,8 +158,7 @@ fn xdl_cleanup_records(pair: &mut xdpair) {
 }
 
 fn xdl_trim_ends(pair: &mut xdpair) {
-	let lhs = FileContext::new(&mut pair.lhs);
-	let rhs = FileContext::new(&mut pair.rhs);
+	let (lhs, rhs) = get_file_context!(pair);
 
 	let lim = std::cmp::min(lhs.record.len(), rhs.record.len());
 
