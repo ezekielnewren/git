@@ -57,12 +57,9 @@ struct histindex {
 	  **line_map; /* map of line to record chain */
 	chastore_t rcha;
 	unsigned int *next_ptrs;
-	unsigned int table_bits,
-		     records_size,
-		     line_map_size;
+	unsigned int line_map_size;
 
 	unsigned int max_chain_length,
-		     key_shift,
 		     ptr_shift;
 
 	unsigned int cnt,
@@ -91,9 +88,6 @@ struct region {
 #define CMP(i, s1, l1, s2, l2) \
 	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
 
-#define TABLE_HASH(index, side, line) \
-	XDL_HASHLONG((MPH(index->env, side, line)), index->table_bits)
-
 static int scanA(struct histindex *index, int line1, int count1)
 {
 	unsigned int ptr, tbl_idx;
@@ -101,7 +95,7 @@ static int scanA(struct histindex *index, int line1, int count1)
 	struct record **rec_chain, *rec;
 
 	for (ptr = LINE_END(1); (unsigned int)line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(index, lhs, ptr);
+		tbl_idx = MPH(index->env, lhs, ptr);
 		rec_chain = index->records + tbl_idx;
 		rec = *rec_chain;
 
@@ -151,7 +145,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
-	struct record *rec = index->records[TABLE_HASH(index, rhs, b_ptr)];
+	struct record *rec = index->records[MPH(index->env, rhs, b_ptr)];
 	unsigned int as, ae, bs, be, np, rc;
 	int should_break;
 
@@ -258,10 +252,7 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 	/* in case of early xdl_cha_free() */
 	index.rcha.head = NULL;
 
-	index.table_bits = xdl_hashbits(count1);
-	index.records_size = 1 << index.table_bits;
-	if (!XDL_CALLOC_ARRAY(index.records, index.records_size))
-		goto cleanup;
+	XDL_CALLOC_ARRAY(index.records, pair->minimal_perfect_hash_size);
 
 	index.line_map_size = count1;
 	if (!XDL_CALLOC_ARRAY(index.line_map, index.line_map_size))
