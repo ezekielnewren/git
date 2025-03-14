@@ -48,8 +48,8 @@ static u64 get_mph(struct xd_file_context *ctx, usize index) {
  */
 static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 		      struct xd_file_context *ctx2, long off2, long lim2,
-		      long *kvdf, long *kvdb, int need_min, xdpsplit_t *spl,
-		      xdalgoenv_t *xenv) {
+		      long *kvdf, long *kvdb, bool need_min, xdpsplit_t *spl,
+		      struct xdalgoenv *xenv) {
 	long dmin = off1 - lim2, dmax = lim1 - off2;
 	long fmid = off1 - off2, bmid = lim1 - lim2;
 	long odd = (fmid - bmid) & 1;
@@ -259,7 +259,7 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
  */
 int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 		 struct xd_file_context *ctx2, long off2, long lim2,
-		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv) {
+		 long *kvdf, long *kvdb, int need_min, struct xdalgoenv *xenv) {
 
 	/*
 	 * Shrink the box by walking through each diagonal snake (SW and NE).
@@ -309,7 +309,7 @@ int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
-	xdalgoenv_t xenv;
+	struct xdalgoenv xenv;
 	int res;
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
@@ -354,10 +354,10 @@ int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 }
 
 
-static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1, long chg2) {
-	xdchange_t *xch;
+static struct xdchange *xdl_add_change(struct xdchange *xscr, long i1, long i2, long chg1, long chg2) {
+	struct xdchange *xch;
 
-	if (!(xch = (xdchange_t *) xdl_malloc(sizeof(xdchange_t))))
+	if (!(xch = (struct xdchange *) xdl_malloc(sizeof(struct xdchange))))
 		return NULL;
 
 	xch->next = xscr;
@@ -924,8 +924,8 @@ int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 }
 
 
-int xdl_build_script(struct xdpair *pair, xdchange_t **xscr) {
-	xdchange_t *cscr = NULL, *xch;
+int xdl_build_script(struct xdpair *pair, struct xdchange **xscr) {
+	struct xdchange *cscr = NULL, *xch;
 	long i1, i2, l1, l2;
 
 	/*
@@ -949,8 +949,8 @@ int xdl_build_script(struct xdpair *pair, xdchange_t **xscr) {
 }
 
 
-void xdl_free_script(xdchange_t *xscr) {
-	xdchange_t *xch;
+void xdl_free_script(struct xdchange *xscr) {
+	struct xdchange *xch;
 
 	while ((xch = xscr) != NULL) {
 		xscr = xscr->next;
@@ -958,10 +958,10 @@ void xdl_free_script(xdchange_t *xscr) {
 	}
 }
 
-static int xdl_call_hunk_func(struct xdpair *pair UNUSED, xdchange_t *xscr, xdemitcb_t *ecb,
+static int xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, xdemitcb_t *ecb,
 			      xdemitconf_t const *xecfg)
 {
-	xdchange_t *xch, *xche;
+	struct xdchange *xch, *xche;
 
 	for (xch = xscr; xch; xch = xche->next) {
 		xche = xdl_get_hunk(&xch, xecfg);
@@ -975,9 +975,9 @@ static int xdl_call_hunk_func(struct xdpair *pair UNUSED, xdchange_t *xscr, xdem
 	return 0;
 }
 
-static void xdl_mark_ignorable_lines(xdchange_t *xscr, struct xdpair *pair, long flags)
+static void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, long flags)
 {
-	xdchange_t *xch;
+	struct xdchange *xch;
 
 	for (xch = xscr; xch; xch = xch->next) {
 		int ignore = 1;
@@ -1008,10 +1008,10 @@ static int record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
 	return 0;
 }
 
-static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair,
+static void xdl_mark_ignorable_regex(struct xdchange *xscr, const struct xdpair *pair,
 				     xpparam_t const *xpp)
 {
-	xdchange_t *xch;
+	struct xdchange *xch;
 
 	for (xch = xscr; xch; xch = xch->next) {
 		struct xrecord *rec;
@@ -1038,7 +1038,7 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair
 
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
-	xdchange_t *xscr;
+	struct xdchange *xscr;
 	struct xd2way two_way;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 

@@ -49,9 +49,9 @@ static int xdl_emit_record(struct xd_file_context *ctx, long ri, char const *pre
  * inside the differential hunk according to the specified configuration.
  * Also advance xscr if the first changes must be discarded.
  */
-xdchange_t *xdl_get_hunk(xdchange_t **xscr, xdemitconf_t const *xecfg)
+struct xdchange *xdl_get_hunk(struct xdchange **xscr, xdemitconf_t const *xecfg)
 {
-	xdchange_t *xch, *xchp, *lxch;
+	struct xdchange *xch, *xchp, *lxch;
 	long max_common = 2 * xecfg->ctxlen + xecfg->interhunkctxlen;
 	long max_ignorable = xecfg->ctxlen;
 	long ignored = 0; /* number of ignored blank lines */
@@ -164,15 +164,15 @@ static int is_empty_rec(struct xd_file_context *ctx, long ri)
 	return !len;
 }
 
-int xdl_emit_diff(struct xdpair *pair, xdchange_t *xscr, xdemitcb_t *ecb,
+int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
 		  xdemitconf_t const *xecfg) {
 	long s1, s2, e1, e2, lctx;
-	xdchange_t *xch, *xche;
+	struct xdchange *xch, *xche;
 	long funclineprev = -1;
 	struct func_line func_line = { 0 };
 
 	for (xch = xscr; xch; xch = xche->next) {
-		xdchange_t *xchp = xch;
+		struct xdchange *xchp = xch;
 		xche = xdl_get_hunk(&xch, xecfg);
 		if (!xch)
 			break;
