@@ -262,12 +262,14 @@ impl<T> IVec<T> {
     }
 
     pub fn push(&mut self, value: T) {
-        if self.length + 1 > self.capacity {
+        if self.length == self.capacity {
             self.reserve(1);
         }
 
         let i = self.length;
-        self._buffer_mut()[i] = value;
+        unsafe {
+            std::ptr::write(self.ptr.add(i), value);
+        }
         self.length += 1;
     }
 
