@@ -19,6 +19,101 @@ pub trait Comparator<T: Ord> {
     fn cmp(lhs: &T, rhs: &T) -> Ordering;
 }
 
+
+impl<'a, K: Hash + Eq, V> FixedMap<'a, K, V, DefaultHashEq<K>> {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::with_capacity_and_hash_eq(capacity, DefaultHashEq::new())
+    }
+}
+
+
+struct DefaultComparator<T> {
+    _phantom: PhantomData<T>,
+}
+
+impl<T> Default for DefaultComparator<T> {
+    fn default() -> Self {
+        Self {
+            _phantom: PhantomData::default()
+        }
+    }
+}
+
+impl<T> DefaultComparator<T> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<T: Ord> Comparator<T> for DefaultComparator<T> {
+    fn cmp(lhs: &T, rhs: &T) -> Ordering {
+        lhs.cmp(rhs)
+    }
+}
+
+
+struct HashEqHasher<K, B: BuildHasher> {
+    builder: B,
+    _phantom: PhantomData<K>,
+}
+
+
+impl<K, B: BuildHasher> HashEqHasher<K, B> {
+    pub fn new(builder: B) -> Self {
+        Self {
+            builder,
+            _phantom: PhantomData::default(),
+        }
+    }
+}
+
+impl<K: Hash + Eq, B: BuildHasher> HashEq<K> for HashEqHasher<K, B> {
+    fn hash(&self, key: &K) -> u64 {
+        let mut state = self.builder.build_hasher();
+        key.hash(&mut state);
+        state.finish()
+    }
+
+    fn eq(&self, lhs: &K, rhs: &K) -> bool {
+        lhs == rhs
+    }
+}
+
+struct DefaultHashEq<K> {
+    hasher: HashEqHasher<K, RandomState>,
+}
+
+impl<K> DefaultHashEq<K> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> Default for DefaultHashEq<K> {
+    fn default() -> Self {
+        Self {
+            hasher: HashEqHasher::new(RandomState::new()),
+        }
+    }
+}
+
+impl<K: Hash + Eq> HashEq<K> for DefaultHashEq<K> {
+    fn hash(&self, key: &K) -> u64 {
+        let mut hasher = self.hasher.builder.build_hasher();
+        key.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn eq(&self, lhs: &K, rhs: &K) -> bool {
+        lhs == rhs
+    }
+}
+
+
+
+
+
+
 enum ProbeResult {
     Found(usize),
     Empty(usize),
@@ -185,159 +280,6 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
 
 }
 
-impl<'a, K: Hash + Eq, V> FixedMap<'a, K, V, DefaultHashEq<K>> {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self::with_capacity_and_hash_eq(capacity, DefaultHashEq::new())
-    }
-}
-
-
-struct DefaultComparator<T> {
-    _phantom: PhantomData<T>,
-}
-
-impl<T> Default for DefaultComparator<T> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData::default()
-        }
-    }
-}
-
-impl<T> DefaultComparator<T> {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl<T: Ord> Comparator<T> for DefaultComparator<T> {
-    fn cmp(lhs: &T, rhs: &T) -> Ordering {
-        lhs.cmp(rhs)
-    }
-}
-
-
-struct HashEqHasher<K, B: BuildHasher> {
-    builder: B,
-    _phantom: PhantomData<K>,
-}
-
-
-impl<K, B: BuildHasher> HashEqHasher<K, B> {
-    pub fn new(builder: B) -> Self {
-        Self {
-            builder,
-            _phantom: PhantomData::default(),
-        }
-    }
-}
-
-impl<K: Hash + Eq, B: BuildHasher> HashEq<K> for HashEqHasher<K, B> {
-    fn hash(&self, key: &K) -> u64 {
-        let mut state = self.builder.build_hasher();
-        key.hash(&mut state);
-        state.finish()
-    }
-
-    fn eq(&self, lhs: &K, rhs: &K) -> bool {
-        lhs == rhs
-    }
-}
-
-struct DefaultHashEq<K> {
-    hasher: HashEqHasher<K, RandomState>,
-}
-
-impl<K> DefaultHashEq<K> {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl<K> Default for DefaultHashEq<K> {
-    fn default() -> Self {
-        Self {
-            hasher: HashEqHasher::new(RandomState::new()),
-        }
-    }
-}
-
-impl<K: Hash + Eq> HashEq<K> for DefaultHashEq<K> {
-    fn hash(&self, key: &K) -> u64 {
-        let mut hasher = self.hasher.builder.build_hasher();
-        key.hash(&mut hasher);
-        hasher.finish()
-    }
-
-    fn eq(&self, lhs: &K, rhs: &K) -> bool {
-        lhs == rhs
-    }
-}
-
-
-
-
-
-pub struct KeyWrapper<'a, K, HE: HashEq<K>> {
-    key: &'a K,
-    he: &'a HE,
-}
-
-
-impl<'a, K, HE: HashEq<K>> Hash for KeyWrapper<'a, K, HE> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let hash = self.he.hash(self.key);
-        state.write_u64(hash);
-    }
-}
-
-impl<'a, K, HE: HashEq<K>> PartialEq for KeyWrapper<'a, K, HE> {
-    fn eq(&self, other: &Self) -> bool {
-        self.he.eq(self.key, other.key)
-    }
-}
-
-impl<'a, K, HE: HashEq<K>> Eq for KeyWrapper<'a, K, HE> {}
-
-
-pub struct MPHB<'a, K, HE: HashEq<K>> {
-    map: HashMap<KeyWrapper<'a, K, HE>, u64>,
-    he: &'a HE,
-    monotonic: u64,
-}
-
-impl<'a, K, HE: HashEq<K>> MPHB<'a, K, HE> {
-
-    pub fn new(capacity: usize, he: &'a HE) -> Self {
-        Self {
-            map: HashMap::with_capacity(capacity),
-            he,
-            monotonic: 0,
-        }
-    }
-
-
-    pub fn hash(&mut self, key: &'a K) -> u64 {
-        let kw = KeyWrapper {
-            key,
-            he: self.he,
-        };
-
-        if let Some(mph) = self.map.get(&kw) {
-            *mph
-        } else {
-            let mph = self.monotonic;
-            self.monotonic += 1;
-            self.map.insert(kw, mph);
-            mph
-        }
-    }
-
-    pub fn finish(self) -> usize {
-        self.map.len()
-    }
-
-}
 
 
 
@@ -348,7 +290,7 @@ mod tests {
     use std::io::BufRead;
     use std::path::PathBuf;
     use crate::mock::helper::read_test_file;
-    use crate::maps::{DefaultHashEq, HashEq, HashEqHasher, FixedMap, MPHB};
+    use crate::maps::{DefaultHashEq, HashEq, HashEqHasher, FixedMap};
     use crate::xtypes::{xrecord, xrecord_he};
 
     const FURNITURE: [&str; 41] = [
@@ -364,18 +306,6 @@ mod tests {
     const FRUIT: [&str; 8] = [
         "apple", "apple", "apple", "cherry", "cherry", "orange", "apple", "cherry"
     ];
-
-    // struct StringHE {}
-    //
-    // impl HashEq<String> for StringHE {
-    //     fn hash(&self, key: &String) -> u64 {
-    //         xxh3_64(key.as_bytes())
-    //     }
-    //
-    //     fn eq(&self, lhs: &String, rhs: &String) -> bool {
-    //         lhs == rhs
-    //     }
-    // }
 
 
     struct MPHBSimple<K: Hash + Eq> {
