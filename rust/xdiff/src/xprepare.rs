@@ -1,7 +1,8 @@
+use interop::ivec::IVec;
 use crate::xdiff::*;
 use crate::xutils::xdl_bogosqrt;
 use crate::get_file_context;
-use crate::xtypes::{xdpair, FileContext};
+use crate::xtypes::{xd_file_context, xdfile, xdpair, FileContext};
 
 const XDL_KPDIS_RUN: usize = 4;
 const XDL_MAX_EQLIMIT: u64 = 1024;
@@ -187,4 +188,16 @@ unsafe extern "C" fn xdl_optimize_ctxs(pair: *mut xdpair) {
 
 	xdl_trim_ends(pair);
 	xdl_cleanup_records(pair);
+}
+
+#[no_mangle]
+unsafe extern "C" fn xdl_setup_ctx(file: *mut xdfile, ctx: *mut xd_file_context) {
+	let file = xdfile::from_raw_mut(file, false);
+
+	std::ptr::write(ctx, xd_file_context {
+		minimal_perfect_hash: &mut file.minimal_perfect_hash,
+		record: &mut file.record,
+		consider: IVec::zero(SENTINEL + file.record.len() + SENTINEL),
+		rindex: IVec::new(),
+	});
 }

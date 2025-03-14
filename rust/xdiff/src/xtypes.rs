@@ -158,3 +158,23 @@ macro_rules! get_file_context {
     }
 }
 
+
+#[repr(C)]
+pub struct xd2way {
+    pub lhs: xdfile,
+    pub rhs: xdfile,
+    pub pair: xdpair,
+	pub minimal_perfect_hash_size: usize,
+}
+
+#[repr(C)]
+pub struct xd3way {
+    pub base: xdfile,
+    pub side1: xdfile,
+    pub side2: xdfile,
+    pub pair1: xdpair,
+    pub pair2: xdpair,
+	pub minimal_perfect_hash_size: usize,
+}
+
+

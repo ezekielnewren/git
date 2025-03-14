@@ -34,16 +34,7 @@ static void xdl_file_free(struct  xdfile *file) {
 
 extern void xdl_optimize_ctxs(struct xdpair *pair);
 
-static void xdl_setup_ctx(struct xdfile *file, struct xd_file_context *ctx) {
-	ctx->minimal_perfect_hash = &file->minimal_perfect_hash;
-
-	ctx->record = &file->record;
-
-	IVEC_INIT(ctx->consider);
-	ivec_zero(&ctx->consider, SENTINEL + ctx->record->length + SENTINEL);
-
-	IVEC_INIT(ctx->rindex);
-}
+extern void xdl_setup_ctx(struct xdfile *file, struct xd_file_context *ctx);
 
 static void xdl_pair_prepare(struct xdfile *lhs, struct xdfile *rhs, usize mph_size, u64 flags, struct xdpair *pair) {
 	pair->delta_start = 0;
