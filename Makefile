@@ -2726,7 +2726,6 @@ XDIFF_OBJS += xdiff/xemit.o
 XDIFF_OBJS += xdiff/xhistogram.o
 XDIFF_OBJS += xdiff/xmerge.o
 XDIFF_OBJS += xdiff/xpatience.o
-XDIFF_OBJS += xdiff/xprepare.o
 XDIFF_OBJS += xdiff/xtrace2.o
 XDIFF_OBJS += xdiff/xutils.o
 XDIFF_OBJS += xdiff/ivec.o

@@ -195,47 +195,25 @@ fn xdl_setup_ctx(file: &xdfile, ctx: &mut xd_file_context) {
 	ctx.rindex = IVec::new();
 }
 
-#[no_mangle]
-unsafe extern "C" fn xdl_pair_prepare(
-	lhs: *mut xdfile, rhs: *mut xdfile, mph_size: usize,
-	flags: u64, _pair: *mut xdpair
+fn xdl_pair_prepare(
+	lhs: &mut xdfile, rhs: &mut xdfile, mph_size: usize,
+	flags: u64, pair: &mut xdpair
 ) {
-	let lhs = xdfile::from_raw(lhs);
-	let rhs = xdfile::from_raw(rhs);
-
-	let mut pair = xdpair {
-		lhs: xd_file_context::default(),
-		rhs: xd_file_context::default(),
-		delta_start: 0,
-		delta_end: 0,
-		minimal_perfect_hash_size: mph_size,
-	};
+	pair.lhs = xd_file_context::default();
+	pair.rhs = xd_file_context::default();
+	pair.delta_start = 0;
+	pair.delta_end = 0;
+	pair.minimal_perfect_hash_size = mph_size;
 
 	xdl_setup_ctx(lhs, &mut pair.lhs);
 	xdl_setup_ctx(rhs, &mut pair.rhs);
 
 	if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
-		xdl_optimize_ctxs(&mut pair);
+		xdl_optimize_ctxs(pair);
 	}
-
-	std::ptr::write(_pair, pair);
 }
 
-
-#[no_mangle]
-unsafe extern "C" fn xdl_2way_prepare(mf1: *const mmfile, mf2: *const mmfile, flags: u64, two_way: *mut xd2way) {
-	/* initialize memory of two_way */
-	std::ptr::write(two_way, xd2way {
-		lhs: xdfile::default(),
-		rhs: xdfile::default(),
-		pair: xdpair::default(),
-		minimal_perfect_hash_size: 0,
-	});
-	let two_way = &mut *two_way;
-
-	let file1 = mmfile::from_raw(mf1);
-	let file2 = mmfile::from_raw(mf2);
-
+pub fn safe_2way_prepare(file1: &[u8], file2: &[u8], flags: u64, two_way: &mut xd2way) {
 	let ignore_cr_at_eol = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
 	parse_lines(file1, ignore_cr_at_eol, &mut two_way.lhs.record);
 	parse_lines(file2, ignore_cr_at_eol, &mut two_way.rhs.record);
@@ -254,26 +232,10 @@ unsafe extern "C" fn xdl_2way_prepare(mf1: *const mmfile, mf2: *const mmfile, fl
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn xdl_3way_prepare(
-	base: *const mmfile, side1: *const mmfile, side2: *const mmfile,
-	flags: u64, three_way: *mut xd3way
+pub fn safe_3way_prepare(
+	base: &[u8], side1: &[u8], side2: &[u8],
+	flags: u64, three_way: &mut xd3way
 ) {
-	/* initialize memory of three_way */
-	std::ptr::write(three_way, xd3way {
-		base: xdfile::default(),
-		side1: xdfile::default(),
-		side2: xdfile::default(),
-		pair1: xdpair::default(),
-		pair2: xdpair::default(),
-		minimal_perfect_hash_size: 0,
-	});
-	let three_way = &mut *three_way;
-
-	let base = mmfile::from_raw(base);
-	let side1 = mmfile::from_raw(side1);
-	let side2 = mmfile::from_raw(side2);
-
 	let ignore_cr_at_eol = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
 	parse_lines(base, ignore_cr_at_eol, &mut three_way.base.record);
 	parse_lines(side1, ignore_cr_at_eol, &mut three_way.side1.record);

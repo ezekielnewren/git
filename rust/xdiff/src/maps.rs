@@ -1,10 +1,7 @@
 use std::alloc::Layout;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher, RandomState};
 use std::marker::PhantomData;
-use std::ops::Range;
-use crate::xdiff::INVALID_INDEX;
 
 pub trait HashEq<K> {
 
@@ -17,13 +14,6 @@ pub trait HashEq<K> {
 
 pub trait Comparator<T: Ord> {
     fn cmp(lhs: &T, rhs: &T) -> Ordering;
-}
-
-
-impl<'a, K: Hash + Eq, V> FixedMap<'a, K, V, DefaultHashEq<K>> {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self::with_capacity_and_hash_eq(capacity, DefaultHashEq::new())
-    }
 }
 
 
@@ -113,186 +103,16 @@ impl<K: Hash + Eq> HashEq<K> for DefaultHashEq<K> {
 
 
 
-
-enum ProbeResult {
-    Found(usize),
-    Empty(usize),
-    OutOfMemory,
-}
-
 struct FixedMapEntry<K, V> {
-    key: K,
-    value: V,
-}
-
-
-pub struct FixedMap<'a, K, V, HE: HashEq<K>> {
-    meta: &'a mut [u64],
-    data: &'a mut [FixedMapEntry<K, V>],
-    meta_layout: Layout,
-    data_layout: Layout,
-    size: usize,
-    mask: usize,
-    he: HE,
-}
-
-
-impl<'a, K, V, HE: HashEq<K>> Drop for FixedMap<'a, K, V, HE> {
-    fn drop(&mut self) {
-        unsafe {
-            if std::mem::needs_drop::<V>() {
-                for i in 0..self.meta.len() {
-                    if self.meta[i] != 0 {
-                        std::ptr::drop_in_place(&mut self.data[i]);
-                    }
-                }
-            }
-
-            std::alloc::dealloc(self.meta.as_mut_ptr() as *mut u8, self.meta_layout);
-            std::alloc::dealloc(self.data.as_mut_ptr() as *mut u8, self.data_layout);
-        }
-    }
-}
-
-
-impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
-
-    pub fn with_capacity_and_hash_eq(capacity: usize, inst: HE) -> Self
-    {
-        let po2 = (capacity*2).next_power_of_two();
-        let meta_layout = Layout::array::<u64>(po2).unwrap();
-        let data_layout = Layout::array::<FixedMapEntry<K, V>>(po2).unwrap();
-
-        let ptr1 = unsafe { std::alloc::alloc_zeroed(meta_layout) };
-        let ptr2 = unsafe { std::alloc::alloc(data_layout) };
-
-        Self {
-            meta: unsafe { std::slice::from_raw_parts_mut(ptr1 as *mut u64, po2) },
-            data: unsafe { std::slice::from_raw_parts_mut(ptr2 as *mut FixedMapEntry<K, V>, po2) },
-            meta_layout,
-            data_layout,
-            size: 0,
-            mask: po2 - 1,
-            he: inst,
-        }
-    }
-
-
-    fn _hash(&self, key: &K) -> u64 {
-        /*
-         * or with 1 << 63 to ensure valid hashes are never 0
-         */
-        self.he.hash(&key) | (1 << 63)
-    }
-
-    fn _find_entry(&self, key: &K, hash: u64) -> ProbeResult {
-        let start = hash as usize & self.mask;
-        for index in start..start + self.meta.len() {
-            let i = index & self.mask;
-            match self.meta[i] {
-                0 => return ProbeResult::Empty(i),
-                h if h == hash && self.he.eq(&self.data[i].key, key) => return ProbeResult::Found(i),
-                _ => continue,
-            }
-        }
-        ProbeResult::OutOfMemory
-    }
-
-    fn _overwrite(&mut self, index: usize, hash: u64, key: K, value: V) {
-        self.meta[index] = hash;
-        unsafe {
-            std::ptr::write(&mut self.data[index], FixedMapEntry {
-                key,
-                value,
-            });
-        }
-        self.size += 1;
-    }
-
-    pub fn get(&self, key: &K) -> Option<&V> {
-        let hash = self._hash(key);
-        let index = self._find_entry(key, hash);
-        match index {
-            ProbeResult::Found(i) => Some(&self.data[i].value),
-            _ => None,
-        }
-    }
-
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        let hash = self._hash(key);
-        let index = self._find_entry(key, hash);
-        match index {
-            ProbeResult::Found(i) => Some(&mut self.data[i].value),
-            _ => None,
-        }
-    }
-
-    pub fn get_or_insert(&mut self, key: &K, value: V) -> &mut V
-    where K: Clone, V: Default
-    {
-        let hash = self._hash(key);
-        let index = self._find_entry(key, hash);
-        match index {
-            ProbeResult::Found(i) => &mut self.data[i].value,
-            ProbeResult::Empty(i) => {
-                self._overwrite(i, hash, key.clone(), value);
-                &mut self.data[i].value
-            }
-            ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
-        }
-
-    }
-
-    pub fn get_or_default(&mut self, key: &K) -> &mut V
-    where K: Clone, V: Default
-    {
-        let hash = self._hash(key);
-        let index = self._find_entry(key, hash);
-        match index {
-            ProbeResult::Found(i) => &mut self.data[i].value,
-            ProbeResult::Empty(i) => {
-                self._overwrite(i, hash, key.clone(), V::default());
-                &mut self.data[i].value
-            }
-            ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
-        }
-
-    }
-
-    pub fn insert(&mut self, key: &K, value: V)
-    where K: Clone
-    {
-        let hash = self._hash(key);
-        let index = self._find_entry(key, hash);
-        match index {
-            ProbeResult::Found(i) => {
-                self.data[i].value = value;
-            }
-            ProbeResult::Empty(i) => {
-                self._overwrite(i, hash, key.clone(), value);
-            }
-            ProbeResult::OutOfMemory => panic!("FixedMap ran out of memory"),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.size
-    }
-
-}
-
-
-
-struct ChainMapEntry<K, V> {
     key_hash: u64,
     key: K,
     value: V,
-    next: *mut ChainMapEntry<K, V>,
+    next: *mut FixedMapEntry<K, V>,
 }
 
-pub struct ChainMap<'a, K, V, HE: HashEq<K>> {
-    head: &'a mut [*mut ChainMapEntry<K, V>],
-    entry: &'a mut [ChainMapEntry<K, V>],
+pub struct FixedMap<'a, K, V, HE: HashEq<K>> {
+    head: &'a mut [*mut FixedMapEntry<K, V>],
+    entry: &'a mut [FixedMapEntry<K, V>],
     head_layout: Layout,
     entry_layout: Layout,
     count: usize,
@@ -302,7 +122,7 @@ pub struct ChainMap<'a, K, V, HE: HashEq<K>> {
 }
 
 
-impl<'a, K, V, HE: HashEq<K>> Drop for ChainMap<'a, K, V, HE> {
+impl<'a, K, V, HE: HashEq<K>> Drop for FixedMap<'a, K, V, HE> {
     fn drop(&mut self) {
         unsafe {
             if std::mem::needs_drop::<V>() {
@@ -323,27 +143,27 @@ impl<'a, K, V, HE: HashEq<K>> Drop for ChainMap<'a, K, V, HE> {
 }
 
 
-impl<'a, K: Hash + Eq, V> ChainMap<'a, K, V, DefaultHashEq<K>> {
+impl<'a, K: Hash + Eq, V> FixedMap<'a, K, V, DefaultHashEq<K>> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self::with_capacity_and_hash_eq(capacity, DefaultHashEq::new())
     }
 }
 
 
-impl<'a, K, V, HE: HashEq<K>> ChainMap<'a, K, V, HE> {
+impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
 
     pub fn with_capacity_and_hash_eq(capacity: usize, inst: HE) -> Self
     {
         let po2 = capacity.next_power_of_two();
-        let head_layout = Layout::array::<*mut ChainMapEntry<K, V>>(po2).unwrap();
-        let entry_layout = Layout::array::<ChainMapEntry<K, V>>(po2).unwrap();
+        let head_layout = Layout::array::<*mut FixedMapEntry<K, V>>(po2).unwrap();
+        let entry_layout = Layout::array::<FixedMapEntry<K, V>>(po2).unwrap();
 
         let ptr1 = unsafe { std::alloc::alloc_zeroed(head_layout) };
         let ptr2 = unsafe { std::alloc::alloc(entry_layout) };
 
         Self {
-            head: unsafe { std::slice::from_raw_parts_mut(ptr1 as *mut *mut ChainMapEntry<K, V>, po2) },
-            entry: unsafe { std::slice::from_raw_parts_mut(ptr2 as *mut ChainMapEntry<K, V>, po2) },
+            head: unsafe { std::slice::from_raw_parts_mut(ptr1 as *mut *mut FixedMapEntry<K, V>, po2) },
+            entry: unsafe { std::slice::from_raw_parts_mut(ptr2 as *mut FixedMapEntry<K, V>, po2) },
             head_layout,
             entry_layout,
             count: 0,
@@ -354,11 +174,11 @@ impl<'a, K, V, HE: HashEq<K>> ChainMap<'a, K, V, HE> {
     }
 
 
-    fn _push(&mut self, key: K, hash: u64, value: V)  -> *mut ChainMapEntry<K, V> {
+    fn _push(&mut self, key: K, hash: u64, value: V)  -> *mut FixedMapEntry<K, V> {
         let i = hash as usize & self.mask;
         let dst = &mut self.entry[self.count];
         unsafe {
-            std::ptr::write(dst, ChainMapEntry {
+            std::ptr::write(dst, FixedMapEntry {
                 key_hash: hash,
                 key,
                 value,
@@ -370,7 +190,7 @@ impl<'a, K, V, HE: HashEq<K>> ChainMap<'a, K, V, HE> {
         dst
     }
 
-    fn _find_entry(&self, key: &K, hash: u64) -> *mut ChainMapEntry<K, V> {
+    fn _find_entry(&self, key: &K, hash: u64) -> *mut FixedMapEntry<K, V> {
         let mut cur = self.head[hash as usize & self.mask];
         while !cur.is_null() {
             let entry = unsafe { &mut *cur };
@@ -458,7 +278,7 @@ mod tests {
     use std::io::BufRead;
     use std::path::PathBuf;
     use crate::mock::helper::read_test_file;
-    use crate::maps::{DefaultHashEq, HashEq, HashEqHasher, FixedMap, ChainMap};
+    use crate::maps::{HashEq, FixedMap};
     use crate::xtypes::{xrecord, xrecord_he};
 
     const FURNITURE: [&str; 41] = [
@@ -497,59 +317,6 @@ mod tests {
     }
 
     #[test]
-    fn test_fixed_map() {
-        let flags = 0;
-        let he = xrecord_he::new(flags);
-
-        let data = "alsdfkjalsdvnlas";
-
-        let key = xrecord::new(data.as_ptr(), data.len(), data.len());
-
-        let mut table = FixedMap::with_capacity_and_hash_eq(300, he);
-        table.insert(&key, 0u64);
-
-
-
-
-
-    }
-
-    #[test]
-    fn test_new_fixed_map() {
-        let flags = 0u64;
-
-        let mut list_vec: Vec<Vec<String>> = Vec::new();
-        list_vec.push(FRUIT.iter().map(|s| s.to_string()).collect());
-        list_vec.push(FURNITURE.iter().map(|s| s.to_string()).collect());
-        let data = read_test_file(&PathBuf::from("xhistogram/gitdump.txt")).unwrap();
-        let dump: Vec<String> = data.lines().map(|v| v.unwrap()).collect();
-        list_vec.push(dump);
-
-        for list in list_vec {
-            let mut mphb_simple = MPHBSimple {
-                map: HashMap::new(),
-                monotonic: 0,
-            };
-
-            let mut monotonic = 0u64;
-
-            let mut fm = FixedMap::with_capacity(list.len());
-            for key in list.iter() {
-                let expected = (key.clone(), mphb_simple.hash(&key));
-                let mph = *fm.get_or_insert(key, monotonic);
-                if mph == monotonic {
-                    monotonic += 1;
-                }
-                let actual = (key.clone(), mph);
-                assert_eq!(expected, actual);
-            }
-
-            let mph_size = fm.len();
-            assert_eq!(mphb_simple.map.len(), mph_size);
-        }
-    }
-
-    #[test]
     fn test_chain_map() {
         let flags = 0u64;
 
@@ -568,7 +335,7 @@ mod tests {
 
             let mut monotonic = 0u64;
 
-            let mut fm = ChainMap::with_capacity(list.len());
+            let mut fm = FixedMap::with_capacity(list.len());
             for key in list.iter() {
                 let expected = (key.clone(), mphb_simple.hash(&key));
                 let mph = *fm.get_or_insert(key, monotonic);

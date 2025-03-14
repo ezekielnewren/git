@@ -2,7 +2,8 @@ use std::hash::Hasher;
 use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
 use interop::ivec::IVec;
 use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE_WITHIN, XDF_WHITESPACE_FLAGS};
-use crate::xtypes::{parse_lines, xdfile};
+use crate::xprepare::{safe_2way_prepare, safe_3way_prepare};
+use crate::xtypes::{parse_lines, xd2way, xd3way, xdfile, xdpair};
 use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 
 pub mod xtypes;
@@ -13,19 +14,6 @@ pub mod maps;
 #[cfg(test)]
 pub(crate) mod mock;
 
-#[no_mangle]
-unsafe extern "C" fn xdl_file_prepare(mf: *const mmfile, flags: u64, _file: *mut xdfile) {
-    let mf = mmfile::from_raw(mf);
-    let mut file = xdfile {
-        minimal_perfect_hash: IVec::default(),
-        record: IVec::default(),
-    };
-
-    parse_lines(mf, (flags & XDF_IGNORE_CR_AT_EOL) != 0, &mut file.record);
-    file.record.shrink_to_fit();
-
-    std::ptr::write(_file, file);
-}
 
 #[no_mangle]
 unsafe extern "C" fn xdl_line_hash(ptr: *const u8, size_no_eol: usize, flags: u64) -> u64 {
@@ -61,4 +49,55 @@ unsafe extern "C" fn xdl_line_equal(line1: *const u8, size1: usize, line2: *cons
     }
 }
 
+#[no_mangle]
+unsafe extern "C" fn xdl_2way_prepare(mf1: *const mmfile, mf2: *const mmfile, flags: u64, two_way: *mut xd2way) {
+    /* initialize memory of two_way */
+    std::ptr::write(two_way, xd2way {
+        lhs: xdfile::default(),
+        rhs: xdfile::default(),
+        pair: xdpair::default(),
+        minimal_perfect_hash_size: 0,
+    });
+    let two_way = &mut *two_way;
+
+    let file1 = mmfile::from_raw(mf1);
+    let file2 = mmfile::from_raw(mf2);
+
+    safe_2way_prepare(file1, file2, flags, two_way);
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_2way_free(two_way: *mut xd2way) {
+    std::ptr::drop_in_place(two_way);
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_3way_prepare(
+    base: *const mmfile, side1: *const mmfile, side2: *const mmfile,
+    flags: u64, three_way: *mut xd3way
+) {
+    /* initialize memory of three_way */
+    std::ptr::write(three_way, xd3way {
+        base: xdfile::default(),
+        side1: xdfile::default(),
+        side2: xdfile::default(),
+        pair1: xdpair::default(),
+        pair2: xdpair::default(),
+        minimal_perfect_hash_size: 0,
+    });
+    let three_way = &mut *three_way;
+
+    let base = mmfile::from_raw(base);
+    let side1 = mmfile::from_raw(side1);
+    let side2 = mmfile::from_raw(side2);
+
+    safe_3way_prepare(base, side1, side2, flags, three_way);
+}
+
+#[no_mangle]
+unsafe extern "C" fn xdl_3way_free(three_way: *mut xd3way) {
+    std::ptr::drop_in_place(three_way);
+}
 
