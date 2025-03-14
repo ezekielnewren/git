@@ -90,35 +90,16 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
         self.he.hash(&key) | (1 << 63)
     }
 
-    fn _probe_slots(&self, key: &K, hash: u64, range: Range<usize>) -> Result<usize, usize> {
-        for i in range {
-            match self.meta[i] {
-                0 => return Err(i),
-                h if h == hash && self.he.eq(&self.data[i].key, key) => return Ok(i),
+    fn _find_entry(&self, key: &K, hash: u64) -> ProbeResult {
+        let start = hash as usize & self.mask;
+        for i in start..start + self.meta.len() {
+            match self.meta[i & self.mask] {
+                0 => return ProbeResult::Empty(i),
+                h if h == hash && self.he.eq(&self.data[i].key, key) => return ProbeResult::Found(i),
                 _ => continue,
             }
         }
-        Err(INVALID_INDEX)
-    }
-
-    fn _find_entry(&self, key: &K, hash: u64) -> ProbeResult {
-        let start = hash as usize & self.mask;
-        let mut index = self._probe_slots(key, hash, start..self.meta.len());
-        if let Err(i) = index {
-            if i == INVALID_INDEX {
-                index = self._probe_slots(key, hash, 0..start);
-            }
-        }
-        match index {
-            Ok(i) => ProbeResult::Found(i),
-            Err(i) => {
-                if i == INVALID_INDEX {
-                    ProbeResult::OutOfMemory
-                } else {
-                    ProbeResult::Empty(i)
-                }
-            }
-        }
+        ProbeResult::OutOfMemory
     }
 
     fn _overwrite(&mut self, index: usize, hash: u64, key: K, value: V) {
