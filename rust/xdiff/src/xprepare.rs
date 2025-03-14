@@ -2,7 +2,7 @@ use interop::ivec::IVec;
 use crate::xdiff::*;
 use crate::xutils::xdl_bogosqrt;
 use crate::get_file_context;
-use crate::xtypes::{xd_file_context, xdfile, xdpair, FileContext};
+use crate::xtypes::{FileContext, xd_file_context, xdfile, xdpair, xrecord};
 
 const XDL_KPDIS_RUN: usize = 4;
 const XDL_MAX_EQLIMIT: u64 = 1024;
@@ -182,22 +182,40 @@ fn xdl_trim_ends(pair: &mut xdpair) {
 	}
 }
 
-#[no_mangle]
-unsafe extern "C" fn xdl_optimize_ctxs(pair: *mut xdpair) {
-	let pair = xdpair::from_raw_mut(pair, false);
-
+fn xdl_optimize_ctxs(pair: &mut xdpair) {
 	xdl_trim_ends(pair);
 	xdl_cleanup_records(pair);
 }
 
-#[no_mangle]
-unsafe extern "C" fn xdl_setup_ctx(file: *mut xdfile, ctx: *mut xd_file_context) {
-	let file = xdfile::from_raw_mut(file, false);
+fn xdl_setup_ctx(file: &xdfile, ctx: &mut xd_file_context) {
+	ctx.minimal_perfect_hash = &file.minimal_perfect_hash as *const IVec<u64> as *mut IVec<u64>;
+	ctx.record = &file.record as *const IVec<xrecord> as *mut IVec<xrecord>;
+	ctx.consider = unsafe { IVec::zero(SENTINEL + file.record.len() + SENTINEL) };
+	ctx.rindex = IVec::new();
+}
 
-	std::ptr::write(ctx, xd_file_context {
-		minimal_perfect_hash: &mut file.minimal_perfect_hash,
-		record: &mut file.record,
-		consider: IVec::zero(SENTINEL + file.record.len() + SENTINEL),
-		rindex: IVec::new(),
-	});
+#[no_mangle]
+unsafe extern "C" fn xdl_pair_prepare(
+	lhs: *mut xdfile, rhs: *mut xdfile, mph_size: usize,
+	flags: u64, _pair: *mut xdpair
+) {
+	let lhs = xdfile::from_raw(lhs);
+	let rhs = xdfile::from_raw(rhs);
+
+	let mut pair = xdpair {
+		lhs: xd_file_context::default(),
+		rhs: xd_file_context::default(),
+		delta_start: 0,
+		delta_end: 0,
+		minimal_perfect_hash_size: mph_size,
+	};
+
+	xdl_setup_ctx(lhs, &mut pair.lhs);
+	xdl_setup_ctx(rhs, &mut pair.rhs);
+
+	if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
+		xdl_optimize_ctxs(&mut pair);
+	}
+
+	std::ptr::write(_pair, pair);
 }

@@ -1,5 +1,6 @@
 use std::hash::Hasher;
 use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
+use interop::ivec::IVec;
 use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE_WITHIN, XDF_WHITESPACE_FLAGS};
 use crate::xtypes::{parse_lines, xdfile};
 use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
@@ -7,14 +8,22 @@ use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 pub mod xtypes;
 pub mod xutils;
 pub mod xdiff;
-mod xprepare;
+pub mod xprepare;
+pub mod maps;
+#[cfg(test)]
+pub(crate) mod mock;
 
 #[no_mangle]
-unsafe extern "C" fn xdl_file_prepare(mf: *const mmfile, flags: u64, file: *mut xdfile) {
+unsafe extern "C" fn xdl_file_prepare(mf: *const mmfile, flags: u64, _file: *mut xdfile) {
     let mf = mmfile::from_raw(mf);
-    let file = xdfile::from_raw_mut(file, true);
+    let mut file = xdfile {
+        minimal_perfect_hash: IVec::default(),
+        record: IVec::default(),
+    };
 
     parse_lines(mf, (flags & XDF_IGNORE_CR_AT_EOL) != 0, &mut file.record);
+
+    std::ptr::write(_file, file);
 }
 
 #[no_mangle]

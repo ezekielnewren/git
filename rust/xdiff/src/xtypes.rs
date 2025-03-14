@@ -1,14 +1,27 @@
 #![allow(non_camel_case_types)]
 
+use std::hash::Hasher;
 use interop::ivec::IVec;
-use crate::xdiff::XDF_IGNORE_CR_AT_EOL;
-use crate::xutils::LineReader;
+use crate::maps::HashEq;
+use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE_WITHIN};
+use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 
 #[repr(C)]
 pub struct xrecord {
     ptr: *const u8,
     size_no_eol: usize,
     size_with_eol: usize,
+}
+
+
+impl Clone for xrecord {
+    fn clone(&self) -> Self {
+        Self {
+            ptr: self.ptr,
+            size_no_eol: self.size_no_eol,
+            size_with_eol: self.size_with_eol,
+        }
+    }
 }
 
 
@@ -48,6 +61,41 @@ impl xrecord {
     }
 }
 
+pub struct xrecord_he {
+    flags: u64
+}
+
+impl xrecord_he {
+    pub(crate) fn new(flags: u64) -> Self {
+        Self {
+            flags,
+        }
+    }
+}
+impl HashEq<xrecord> for xrecord_he {
+    fn hash(&self, key: &xrecord) -> u64 {
+        if (self.flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+            xxhash_rust::xxh3::xxh3_64(key.as_ref())
+        } else {
+            let mut state = xxhash_rust::xxh3::Xxh3::default();
+            for run in WhitespaceIter::new(key.as_ref(), self.flags) {
+                state.write(run);
+            }
+            state.finish()
+        }
+    }
+
+    fn eq(&self, lhs: &xrecord, rhs: &xrecord) -> bool {
+        if (self.flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+            lhs.as_ref() == rhs.as_ref()
+        } else {
+            let lhs = WhitespaceIter::new(lhs.as_ref(), self.flags);
+            let rhs = WhitespaceIter::new(rhs.as_ref(), self.flags);
+            chunked_iter_equal(lhs, rhs)
+        }
+    }
+}
+
 
 pub fn parse_lines(file: &[u8], ignore_cr_at_eol: bool, line_vec: &mut IVec<xrecord>) {
     for record in LineReader::new(file) {
@@ -65,7 +113,6 @@ pub fn parse_lines(file: &[u8], ignore_cr_at_eol: bool, line_vec: &mut IVec<xrec
 }
 
 #[repr(C)]
-#[derive(Default)]
 pub struct xdfile {
     pub minimal_perfect_hash: IVec<u64>,
     pub record: IVec<xrecord>,
@@ -75,12 +122,20 @@ pub struct xdfile {
 
 impl xdfile {
 
-    pub unsafe fn from_raw_mut<'a>(file: *mut xdfile, do_init: bool) -> &'a mut xdfile {
-        if do_init {
-            std::ptr::write(file, xdfile::default());
+    pub unsafe fn from_raw_mut<'a>(file: *mut xdfile) -> &'a mut xdfile {
+        if file.is_null() {
+            panic!("null pointer");
         }
 
         &mut *file
+    }
+
+    pub unsafe fn from_raw<'a>(file: *mut xdfile) -> &'a xdfile {
+        if file.is_null() {
+            panic!("null pointer");
+        }
+
+        &*file
     }
 
 }
@@ -126,7 +181,6 @@ impl<'a> FileContext<'a> {
 
 
 #[repr(C)]
-#[derive(Default)]
 pub struct xdpair {
     pub lhs: xd_file_context,
     pub rhs: xd_file_context,
@@ -137,11 +191,10 @@ pub struct xdpair {
 
 impl xdpair {
 
-    pub unsafe fn from_raw_mut<'a>(pair: *mut xdpair, do_init: bool) -> &'a mut xdpair {
-        if do_init {
-            std::ptr::write(pair, xdpair::default());
+    pub unsafe fn from_raw_mut<'a>(pair: *mut xdpair) -> &'a mut xdpair {
+        if pair.is_null() {
+            panic!("null pointer");
         }
-
         &mut *pair
     }
 

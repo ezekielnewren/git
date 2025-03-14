@@ -35,20 +35,7 @@ static void xdl_file_free(struct  xdfile *file) {
 extern void xdl_optimize_ctxs(struct xdpair *pair);
 
 extern void xdl_setup_ctx(struct xdfile *file, struct xd_file_context *ctx);
-
-static void xdl_pair_prepare(struct xdfile *lhs, struct xdfile *rhs, usize mph_size, u64 flags, struct xdpair *pair) {
-	pair->delta_start = 0;
-	pair->delta_end = 0;
-	pair->minimal_perfect_hash_size = mph_size;
-
-	xdl_setup_ctx(lhs, &pair->lhs);
-	xdl_setup_ctx(rhs, &pair->rhs);
-
-
-	if ((flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
-		xdl_optimize_ctxs(pair);
-	}
-}
+extern void xdl_pair_prepare(struct xdfile *lhs, struct xdfile *rhs, usize mph_size, u64 flags, struct xdpair *pair);
 
 static void xdl_free_file_context(struct xd_file_context *ctx) {
 	ctx->minimal_perfect_hash = NULL;
