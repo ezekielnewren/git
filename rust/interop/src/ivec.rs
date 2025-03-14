@@ -241,8 +241,8 @@ impl<T> IVec<T> {
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        let new_capacity = self.capacity + std::cmp::max(additional, self.capacity);
-        self._set_capacity(new_capacity);
+        let growby = std::cmp::max(128, self.capacity);
+        self.reserve_exact(std::cmp::max(additional, growby));
     }
 
     pub fn shrink_to_fit(&mut self) {
