@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::maps::FixedMap;
+use crate::maps::{ChainMap, FixedMap};
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN};
 use crate::xtypes::{xdfile, xrecord, xrecord_he};
 
@@ -218,7 +218,7 @@ pub fn xdl_bogosqrt(mut n: u64) -> u64 {
 
 
 pub struct MinimalPerfectHashBuilder<'a> {
-    map: FixedMap<'a, xrecord, u64, xrecord_he>,
+    map: ChainMap<'a, xrecord, u64, xrecord_he>,
     monotonic: u64,
 }
 
@@ -226,7 +226,7 @@ impl<'a> MinimalPerfectHashBuilder<'a> {
 
     pub fn new(max_unique_keys: usize, flags: u64) -> Self {
         Self {
-            map: FixedMap::with_capacity_and_hash_eq(max_unique_keys, xrecord_he::new(flags)),
+            map: ChainMap::with_capacity_and_hash_eq(max_unique_keys, xrecord_he::new(flags)),
             monotonic: 0,
         }
     }
