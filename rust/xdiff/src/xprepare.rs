@@ -1,8 +1,9 @@
 use interop::ivec::IVec;
-use crate::xdiff::*;
-use crate::xutils::xdl_bogosqrt;
 use crate::get_file_context;
-use crate::xtypes::{FileContext, xd_file_context, xdfile, xdpair, xrecord};
+use crate::xdiff::*;
+use crate::xtypes::{parse_lines, FileContext, xd2way, xd3way, xd_file_context, xdfile, xdpair, xrecord};
+use crate::xutils::{xdl_bogosqrt, MinimalPerfectHashBuilder};
+
 
 const XDL_KPDIS_RUN: usize = 4;
 const XDL_MAX_EQLIMIT: u64 = 1024;
@@ -218,4 +219,79 @@ unsafe extern "C" fn xdl_pair_prepare(
 	}
 
 	std::ptr::write(_pair, pair);
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_2way_prepare(mf1: *const mmfile, mf2: *const mmfile, flags: u64, two_way: *mut xd2way) {
+	/* initialize memory of two_way */
+	std::ptr::write(two_way, xd2way {
+		lhs: xdfile::default(),
+		rhs: xdfile::default(),
+		pair: xdpair::default(),
+		minimal_perfect_hash_size: 0,
+	});
+	let two_way = &mut *two_way;
+
+	let file1 = mmfile::from_raw(mf1);
+	let file2 = mmfile::from_raw(mf2);
+
+	let ignore_cr_at_eol = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
+	parse_lines(file1, ignore_cr_at_eol, &mut two_way.lhs.record);
+	parse_lines(file2, ignore_cr_at_eol, &mut two_way.rhs.record);
+
+	let mut max_unique_keys = 0;
+	max_unique_keys += two_way.lhs.record.len();
+	max_unique_keys += two_way.rhs.record.len();
+	let mut mphb = MinimalPerfectHashBuilder::new(max_unique_keys, flags);
+
+	mphb.process(&mut two_way.lhs);
+	mphb.process(&mut two_way.rhs);
+	two_way.minimal_perfect_hash_size = mphb.finish();
+
+	xdl_pair_prepare(&mut two_way.lhs, &mut two_way.rhs,
+					 two_way.minimal_perfect_hash_size, flags, &mut two_way.pair);
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_3way_prepare(
+	base: *const mmfile, side1: *const mmfile, side2: *const mmfile,
+	flags: u64, three_way: *mut xd3way
+) {
+	/* initialize memory of three_way */
+	std::ptr::write(three_way, xd3way {
+		base: xdfile::default(),
+		side1: xdfile::default(),
+		side2: xdfile::default(),
+		pair1: xdpair::default(),
+		pair2: xdpair::default(),
+		minimal_perfect_hash_size: 0,
+	});
+	let three_way = &mut *three_way;
+
+	let base = mmfile::from_raw(base);
+	let side1 = mmfile::from_raw(side1);
+	let side2 = mmfile::from_raw(side2);
+
+	let ignore_cr_at_eol = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
+	parse_lines(base, ignore_cr_at_eol, &mut three_way.base.record);
+	parse_lines(side1, ignore_cr_at_eol, &mut three_way.side1.record);
+	parse_lines(side2, ignore_cr_at_eol, &mut three_way.side2.record);
+
+	let mut max_unique_keys = 0;
+	max_unique_keys += three_way.base.record.len();
+	max_unique_keys += three_way.side1.record.len();
+	max_unique_keys += three_way.side2.record.len();
+	let mut mphb = MinimalPerfectHashBuilder::new(max_unique_keys, flags);
+
+	mphb.process(&mut three_way.base);
+	mphb.process(&mut three_way.side1);
+	mphb.process(&mut three_way.side2);
+	three_way.minimal_perfect_hash_size = mphb.finish();
+
+	xdl_pair_prepare(&mut three_way.base, &mut three_way.side1,
+					 three_way.minimal_perfect_hash_size, flags, &mut three_way.pair1);
+	xdl_pair_prepare(&mut three_way.base, &mut three_way.side2,
+					 three_way.minimal_perfect_hash_size, flags, &mut three_way.pair2);
 }

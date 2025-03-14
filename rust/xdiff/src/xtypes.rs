@@ -113,6 +113,7 @@ pub fn parse_lines(file: &[u8], ignore_cr_at_eol: bool, line_vec: &mut IVec<xrec
 }
 
 #[repr(C)]
+#[derive(Default)]
 pub struct xdfile {
     pub minimal_perfect_hash: IVec<u64>,
     pub record: IVec<xrecord>,
@@ -181,6 +182,7 @@ impl<'a> FileContext<'a> {
 
 
 #[repr(C)]
+#[derive(Default)]
 pub struct xdpair {
     pub lhs: xd_file_context,
     pub rhs: xd_file_context,

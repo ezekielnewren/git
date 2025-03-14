@@ -187,8 +187,9 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
 
     fn _find_entry(&self, key: &K, hash: u64) -> ProbeResult {
         let start = hash as usize & self.mask;
-        for i in start..start + self.meta.len() {
-            match self.meta[i & self.mask] {
+        for index in start..start + self.meta.len() {
+            let i = index & self.mask;
+            match self.meta[i] {
                 0 => return ProbeResult::Empty(i),
                 h if h == hash && self.he.eq(&self.data[i].key, key) => return ProbeResult::Found(i),
                 _ => continue,

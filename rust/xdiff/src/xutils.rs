@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
+use crate::maps::FixedMap;
 use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN};
-use crate::xtypes::xrecord;
+use crate::xtypes::{xdfile, xrecord, xrecord_he};
 
 pub(crate) fn XDL_ISSPACE(v: u8) -> bool {
     match v {
@@ -214,6 +215,44 @@ pub fn xdl_bogosqrt(mut n: u64) -> u64 {
 
 	i
 }
+
+
+pub struct MinimalPerfectHashBuilder<'a> {
+    map: FixedMap<'a, xrecord, u64, xrecord_he>,
+    monotonic: u64,
+}
+
+impl<'a> MinimalPerfectHashBuilder<'a> {
+
+    pub fn new(max_unique_keys: usize, flags: u64) -> Self {
+        Self {
+            map: FixedMap::with_capacity_and_hash_eq(max_unique_keys, xrecord_he::new(flags)),
+            monotonic: 0,
+        }
+    }
+
+    pub fn hash(&mut self, record: &xrecord) -> u64 {
+        let mph = *self.map.get_or_insert(record, self.monotonic);
+        if mph == self.monotonic {
+            self.monotonic += 1;
+        }
+        mph
+    }
+
+    pub fn process(&mut self, file: &mut xdfile) {
+        for rec in file.record.as_slice() {
+            file.minimal_perfect_hash.push(self.hash(rec));
+        }
+        file.minimal_perfect_hash.shrink_to_fit();
+    }
+
+    pub fn finish(self) -> usize {
+        self.monotonic as usize
+    }
+
+}
+
+
 
 
 #[cfg(test)]

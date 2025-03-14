@@ -22,6 +22,7 @@ unsafe extern "C" fn xdl_file_prepare(mf: *const mmfile, flags: u64, _file: *mut
     };
 
     parse_lines(mf, (flags & XDF_IGNORE_CR_AT_EOL) != 0, &mut file.record);
+    file.record.shrink_to_fit();
 
     std::ptr::write(_file, file);
 }
