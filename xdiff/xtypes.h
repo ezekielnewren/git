@@ -72,6 +72,13 @@ struct xdpair {
 	usize minimal_perfect_hash_size;
 };
 
+struct xd2way {
+	struct xdfile lhs, rhs;
+	struct xdpair pair;
+	usize minimal_perfect_hash_size;
+};
+
+
 
 
 #endif /* #if !defined(XTYPES_H) */

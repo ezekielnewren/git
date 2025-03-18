@@ -448,6 +448,19 @@ u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder *mphb, struct xrecord 
 	return node->value;
 }
 
+void xdl_mphb_ingest(struct xdl_minimal_perfect_hash_builder *mphb, struct xdfile *file) {
+	if (file->record.length > file->minimal_perfect_hash.capacity) {
+		usize grow = file->record.length - file->minimal_perfect_hash.capacity;
+		ivec_reserve_exact(&file->minimal_perfect_hash, grow);
+	}
+	for (usize i = 0; i < file->record.length; i++) {
+		u64 mph = xdl_mphb_hash(mphb, &file->record.ptr[i]);
+		file->minimal_perfect_hash.ptr[i] = mph;
+	}
+	file->minimal_perfect_hash.length = file->record.length;
+	ivec_shrink_to_fit(&file->minimal_perfect_hash);
+}
+
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder *mphb) {
 	usize minimal_perfect_hash_size = mphb->kv_length;
 	free(mphb->head);

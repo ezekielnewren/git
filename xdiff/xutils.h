@@ -74,6 +74,7 @@ int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 
 void xdl_mphb_init(struct xdl_minimal_perfect_hash_builder *mphb, usize size, u64 flags);
 u64 xdl_mphb_hash(struct xdl_minimal_perfect_hash_builder *mphb, struct xrecord *key);
+void xdl_mphb_ingest(struct xdl_minimal_perfect_hash_builder *mphb, struct xdfile *file);
 usize xdl_mphb_finish(struct xdl_minimal_perfect_hash_builder *mphb);
 usize xdl_strip_eol(u8 const* ptr, usize size, u64 flags);
 void xdl_linereader_init(struct xlinereader *it, u8 const* ptr, usize size);
