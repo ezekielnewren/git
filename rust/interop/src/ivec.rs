@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::{Index, IndexMut};
-use crate::xrealloc;
+use crate::{xcalloc, xrealloc};
 
 #[repr(C)]
 pub struct IVec<T> {
@@ -70,6 +70,17 @@ impl<T> IVec<T> {
             ptr: std::ptr::null_mut(),
             length: 0,
             capacity: 0,
+            element_size: size_of::<T>(),
+        }
+    }
+
+    /// uses calloc to create the IVec, it's unsafe because
+    /// zeroed memory may not be a valid default value
+    pub unsafe fn zero(capacity: usize) -> Self {
+        Self {
+            ptr: xcalloc(capacity, size_of::<T>()) as *mut T,
+            length: capacity,
+            capacity,
             element_size: size_of::<T>(),
         }
     }

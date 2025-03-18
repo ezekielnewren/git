@@ -199,6 +199,19 @@ where
 }
 
 
+pub fn xdl_bogosqrt(mut n: u64) -> u64 {
+	let mut i = 1;
+
+	/*
+	 * Classical integer square root approximation using shifts.
+	 */
+    while n > 0 {
+        i <<= 1;
+        n >>= 2;
+    }
+
+	i
+}
 
 
 #[cfg(test)]
