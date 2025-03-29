@@ -3,7 +3,7 @@
 use std::hash::Hasher;
 use interop::ivec::IVec;
 use crate::maps::HashEq;
-use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE_WITHIN};
+use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
 use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 
 #[repr(C)]
@@ -74,7 +74,7 @@ impl xrecord_he {
 }
 impl HashEq<xrecord> for xrecord_he {
     fn hash(&self, key: &xrecord) -> u64 {
-        if (self.flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+        if (self.flags & XDF_WHITESPACE_FLAGS) == 0 {
             xxhash_rust::xxh3::xxh3_64(key.as_ref())
         } else {
             let mut state = xxhash_rust::xxh3::Xxh3::default();
@@ -86,7 +86,7 @@ impl HashEq<xrecord> for xrecord_he {
     }
 
     fn eq(&self, lhs: &xrecord, rhs: &xrecord) -> bool {
-        if (self.flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+        if (self.flags & XDF_WHITESPACE_FLAGS) == 0 {
             lhs.as_ref() == rhs.as_ref()
         } else {
             let lhs = WhitespaceIter::new(lhs.as_ref(), self.flags);

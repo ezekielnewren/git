@@ -1,7 +1,7 @@
 use std::hash::Hasher;
 use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
 use interop::ivec::IVec;
-use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE_WITHIN, XDF_WHITESPACE_FLAGS};
+use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
 use crate::xprepare::{safe_2way_prepare, safe_3way_prepare};
 use crate::xtypes::{parse_lines, xd2way, xd3way, xdfile, xdpair};
 use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
@@ -20,7 +20,7 @@ unsafe extern "C" fn xdl_line_hash(ptr: *const u8, size_no_eol: usize, flags: u6
     let line = unsafe {
         std::slice::from_raw_parts(ptr, size_no_eol)
     };
-    if (flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+    if (flags & XDF_WHITESPACE_FLAGS) == 0 {
         xxh3_64(line)
     } else {
         let mut state = Xxh3Default::new();
@@ -40,7 +40,7 @@ unsafe extern "C" fn xdl_line_equal(line1: *const u8, size1: usize, line2: *cons
         std::slice::from_raw_parts(line2, size2)
     };
 
-    if (flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+    if (flags & XDF_WHITESPACE_FLAGS) == 0 {
         line1 == line2
     } else {
         let lhs = WhitespaceIter::new(line1, flags);

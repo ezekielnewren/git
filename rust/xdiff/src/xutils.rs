@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::maps::{FixedMap};
-use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_IGNORE_WHITESPACE_WITHIN};
+use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_IGNORE_WHITESPACE, XDF_IGNORE_WHITESPACE_AT_EOL, XDF_IGNORE_WHITESPACE_CHANGE, XDF_WHITESPACE_FLAGS};
 use crate::xtypes::{xdfile, xrecord, xrecord_he};
 
 pub(crate) fn XDL_ISSPACE(v: u8) -> bool {
@@ -84,7 +84,7 @@ impl<'a> Iterator for WhitespaceIter<'a> {
             return None;
         }
 
-        if (self.flags & XDF_IGNORE_WHITESPACE_WITHIN) == 0 {
+        if (self.flags & XDF_WHITESPACE_FLAGS) == 0 {
             self.index = self.line.len();
             return Some(self.line);
         }
@@ -266,12 +266,7 @@ mod tests {
     use crate::xutils::{chunked_iter_equal, strip_eol, LineReader, WhitespaceIter};
 
     fn extract_string<'a>(line: &[u8], flags: u64, buffer: &'a mut Vec<u8>) -> &'a str {
-        let it;
-        if line.len() > 0 && line[line.len() - 1] == b'\n' {
-            it = WhitespaceIter::new(&line[0..line.len() - 1], flags);
-        } else {
-            it = WhitespaceIter::new(line, flags);
-        }
+        let it = WhitespaceIter::new(line, flags);
         buffer.clear();
         for run in it {
             #[cfg(test)]
@@ -305,6 +300,9 @@ mod tests {
     #[test]
     fn test_ignore_space() {
         let tv_individual = vec![
+            ("1\n", "1\r\n", XDF_IGNORE_CR_AT_EOL),
+            ("1", "1\r\n", XDF_IGNORE_WHITESPACE_CHANGE),
+
             ("\r \t a \r\n", "\r \t a \r\n", 0),
             ("\r a \r\n", "\r a \r\n", 0),
             ("\r\n", "\r\n", 0),
@@ -335,8 +333,6 @@ mod tests {
             ("a", "a\n", XDF_IGNORE_WHITESPACE),
             ("a", "\ta\n", XDF_IGNORE_WHITESPACE),
 
-            ("1", "1\r\n", XDF_IGNORE_CR_AT_EOL),
-            ("1", "1\r\n", XDF_IGNORE_WHITESPACE_CHANGE),
 
             ("\r \t a ", "\r \t a \r\n", XDF_IGNORE_CR_AT_EOL),
             ("\r a ", "\r a \r\n", XDF_IGNORE_CR_AT_EOL),
@@ -364,7 +360,7 @@ mod tests {
 
         let mut buffer = Vec::<u8>::new();
         for (expected, input, flags) in tv_individual {
-            let actual = extract_string(strip_eol(input.as_bytes(), flags), flags, &mut buffer);
+            let actual = extract_string(input.as_bytes(), flags, &mut buffer);
             assert_eq!(expected, actual, "input: {:?} flags: 0x{:x}", input, flags);
         }
     }
