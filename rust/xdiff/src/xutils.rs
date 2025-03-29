@@ -133,6 +133,26 @@ impl<'a> Iterator for WhitespaceIter<'a> {
                 }
                 return Some(" ".as_bytes());
             }
+            if (self.flags & XDF_IGNORE_CR_AT_EOL) != 0 {
+                if start < self.line.len() && self.index == self.line.len() {
+                    let mut end = self.line.len();
+                    if end > 0 && self.line[end - 1] == b'\n' {
+                        if end - start == 1 {
+                            return Some(&self.line[start..end]);
+                        } else {
+                            end -= 1;
+                        }
+                    }
+                    if end > 0 && self.line[end - 1] == b'\r' {
+                        self.index = end;
+                        end -= 1;
+                        if end - start == 0 {
+                            continue;
+                        }
+                        return Some(&self.line[start..end]);
+                    }
+                }
+            }
             return Some(&self.line[start..self.index]);
         }
     }
