@@ -317,6 +317,13 @@ mod tests {
     #[test]
     fn test_ignore_space() {
         let tv_individual = vec![
+            ("ab", "ab\r", XDF_IGNORE_CR_AT_EOL),
+            ("\r \t a ", "\r \t a \r", XDF_IGNORE_CR_AT_EOL),
+            ("\r a ", "\r a \r", XDF_IGNORE_CR_AT_EOL),
+            ("", "\r", XDF_IGNORE_CR_AT_EOL),
+            ("", "", XDF_IGNORE_CR_AT_EOL),
+            ("\r a ", "\r a ", XDF_IGNORE_CR_AT_EOL),
+
             ("\r \t a \n", "\r \t a \r\n", XDF_IGNORE_CR_AT_EOL),
             ("\r a \n", "\r a \r\n", XDF_IGNORE_CR_AT_EOL),
             ("\n", "\r\n", XDF_IGNORE_CR_AT_EOL),
