@@ -94,12 +94,12 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 	char const *line;
 	xdlclass_t *rcrec;
 
-	line = rec->ptr;
-	hi = (long) XDL_HASHLONG(rec->ha, cf->hbits);
+	line = (char const*) rec->ptr;
+	hi = (long) XDL_HASHLONG(rec->line_hash, cf->hbits);
 	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
-		if (rcrec->ha == rec->ha &&
+		if (rcrec->ha == rec->line_hash &&
 				xdl_recmatch(rcrec->line, rcrec->size,
-					rec->ptr, rec->size, cf->flags))
+					(char const*) rec->ptr, rec->size, cf->flags))
 			break;
 
 	if (!rcrec) {
@@ -113,7 +113,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 		cf->rcrecs[rcrec->idx] = rcrec;
 		rcrec->line = line;
 		rcrec->size = rec->size;
-		rcrec->ha = rec->ha;
+		rcrec->ha = rec->line_hash;
 		rcrec->len1 = rcrec->len2 = 0;
 		rcrec->next = cf->rchash[hi];
 		cf->rchash[hi] = rcrec;
@@ -121,7 +121,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 
 	(pass == 1) ? rcrec->len1++ : rcrec->len2++;
 
-	rec->ha = (unsigned long) rcrec->idx;
+	rec->line_hash = (unsigned long) rcrec->idx;
 
 
 	return 0;
@@ -140,9 +140,9 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			struct xrecord rec_new;
 			prev = cur;
 			hav = xdl_hash_record(&cur, top, xpp->flags);
-			rec_new.ptr = prev;
+			rec_new.ptr = (u8 const*) prev;
 			rec_new.size = (long) (cur - prev);
-			rec_new.ha = hav;
+			rec_new.line_hash = hav;
 			ivec_push(&ctx->file_storage.record, &rec_new);
 		}
 	}
@@ -258,7 +258,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 	if ((mlim = xdl_bogosqrt(lhs->record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart]; i <= lhs->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->ha];
+		rcrec = cf->rcrecs[recs->line_hash];
 		nm = rcrec ? rcrec->len2 : 0;
 		dis1[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
@@ -266,7 +266,7 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 	if ((mlim = xdl_bogosqrt(rhs->record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart]; i <= rhs->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->ha];
+		rcrec = cf->rcrecs[recs->line_hash];
 		nm = rcrec ? rcrec->len1 : 0;
 		dis2[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
@@ -308,7 +308,7 @@ static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rh
 	recs2 = rhs->record->ptr;
 	for (i = 0, lim = XDL_MIN(lhs->record->length, rhs->record->length); i < lim;
 	     i++, recs1++, recs2++)
-		if (recs1->ha != recs2->ha)
+		if (recs1->line_hash != recs2->line_hash)
 			break;
 
 	lhs->dstart = rhs->dstart = i;
@@ -316,7 +316,7 @@ static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rh
 	recs1 = lhs->record->ptr + lhs->record->length - 1;
 	recs2 = rhs->record->ptr + rhs->record->length - 1;
 	for (lim -= i, i = 0; i < lim; i++, recs1--, recs2--)
-		if (recs1->ha != recs2->ha)
+		if (recs1->line_hash != recs2->line_hash)
 			break;
 
 	lhs->dend = lhs->record->length - i - 1;

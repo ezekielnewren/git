@@ -34,7 +34,7 @@ typedef struct s_xdpsplit {
 } xdpsplit_t;
 
 static u64 get_mph(struct xd_file_context *ctx, usize index) {
-	return ctx->record->ptr[ctx->rindex.ptr[index]].ha;
+	return ctx->record->ptr[ctx->rindex.ptr[index]].line_hash;
 }
 
 /*
@@ -381,7 +381,7 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 
 static int recs_match(struct xrecord *rec1, struct xrecord *rec2)
 {
-	return (rec1->ha == rec2->ha);
+	return (rec1->line_hash == rec2->line_hash);
 }
 
 /*

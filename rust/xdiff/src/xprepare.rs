@@ -214,9 +214,8 @@ fn xdl_pair_prepare(
 }
 
 pub fn safe_2way_prepare(file1: &[u8], file2: &[u8], flags: u64, two_way: &mut xd2way) {
-	let ignore_cr_at_eol = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
-	parse_lines(file1, ignore_cr_at_eol, &mut two_way.lhs.record);
-	parse_lines(file2, ignore_cr_at_eol, &mut two_way.rhs.record);
+	parse_lines(file1, &mut two_way.lhs.record);
+	parse_lines(file2, &mut two_way.rhs.record);
 
 	let mut max_unique_keys = 0;
 	max_unique_keys += two_way.lhs.record.len();
@@ -236,10 +235,9 @@ pub fn safe_3way_prepare(
 	base: &[u8], side1: &[u8], side2: &[u8],
 	flags: u64, three_way: &mut xd3way
 ) {
-	let ignore_cr_at_eol = (flags & XDF_IGNORE_CR_AT_EOL) != 0;
-	parse_lines(base, ignore_cr_at_eol, &mut three_way.base.record);
-	parse_lines(side1, ignore_cr_at_eol, &mut three_way.side1.record);
-	parse_lines(side2, ignore_cr_at_eol, &mut three_way.side2.record);
+	parse_lines(base,  &mut three_way.base.record);
+	parse_lines(side1, &mut three_way.side1.record);
+	parse_lines(side2, &mut three_way.side2.record);
 
 	let mut max_unique_keys = 0;
 	max_unique_keys += three_way.base.record.len();

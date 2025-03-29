@@ -3,14 +3,14 @@
 use std::hash::Hasher;
 use interop::ivec::IVec;
 use crate::maps::HashEq;
-use crate::xdiff::{XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
+use crate::xdiff::{XDF_WHITESPACE_FLAGS};
 use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 
 #[repr(C)]
 pub struct xrecord {
     ptr: *const u8,
-    size_no_eol: usize,
-    size_with_eol: usize,
+    size: usize,
+    line_hash: u64,
 }
 
 
@@ -18,8 +18,8 @@ impl Clone for xrecord {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr,
-            size_no_eol: self.size_no_eol,
-            size_with_eol: self.size_with_eol,
+            size: self.size,
+            line_hash: 0,
         }
     }
 }
@@ -27,11 +27,11 @@ impl Clone for xrecord {
 
 impl xrecord {
 
-    pub fn new(ptr: *const u8, size_no_eol: usize, size_with_eol: usize) -> Self {
+    pub fn new(ptr: *const u8, size: usize) -> Self {
         Self {
             ptr,
-            size_no_eol,
-            size_with_eol
+            size,
+            line_hash: 0,
         }
     }
 
@@ -41,22 +41,12 @@ impl xrecord {
 
     /// Length of the line excluding end of line bytes.
     pub fn len(&self) -> usize {
-        self.size_no_eol
+        self.size
     }
 
     pub fn as_ref(&self) -> &[u8] {
         unsafe {
-            std::slice::from_raw_parts(self.ptr, self.size_no_eol)
-        }
-    }
-
-    /// Returns a slice of the end of line bytes.
-    pub fn eol(&self) -> &[u8] {
-        unsafe {
-            std::slice::from_raw_parts(
-                self.ptr.add(self.size_no_eol),
-                self.size_with_eol - self.size_no_eol
-            )
+            std::slice::from_raw_parts(self.ptr, self.size)
         }
     }
 }
@@ -97,19 +87,11 @@ impl HashEq<xrecord> for xrecord_he {
 }
 
 
-pub fn parse_lines(file: &[u8], ignore_cr_at_eol: bool, line_vec: &mut IVec<xrecord>) {
+pub fn parse_lines(file: &[u8], line_vec: &mut IVec<xrecord>) {
     for record in LineReader::new(file) {
         line_vec.push(record);
     }
     line_vec.shrink_to_fit();
-
-    if ignore_cr_at_eol {
-        for rec in line_vec.as_mut_slice() {
-            if rec.size_no_eol > 0 && rec.as_ref()[rec.size_no_eol - 1] == b'\r' {
-                rec.size_no_eol -= 1;
-            }
-        }
-    }
 }
 
 #[repr(C)]

@@ -90,7 +90,7 @@ struct region {
 
 static int cmp_recs(struct xrecord *r1, struct xrecord *r2)
 {
-	return r1->ha == r2->ha;
+	return r1->line_hash == r2->line_hash;
 
 }
 
@@ -98,7 +98,7 @@ static int cmp_recs(struct xrecord *r1, struct xrecord *r2)
 	(cmp_recs(REC(i->env, s1, l1), REC(i->env, s2, l2)))
 
 #define TABLE_HASH(index, side, line) \
-	XDL_HASHLONG((REC(index->env, side, line))->ha, index->table_bits)
+	XDL_HASHLONG((REC(index->env, side, line))->line_hash, index->table_bits)
 
 static int scanA(struct histindex *index, int line1, int count1)
 {

@@ -395,11 +395,11 @@ int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 	mmfile_t subfile1, subfile2;
 	struct xdpair tmp_pair;
 
-	subfile1.ptr = (char *)pair->lhs.record->ptr[line1 - 1].ptr;
-	subfile1.size = pair->lhs.record->ptr[line1 + count1 - 2].ptr +
+	subfile1.ptr = (char *) pair->lhs.record->ptr[line1 - 1].ptr;
+	subfile1.size = (char *) pair->lhs.record->ptr[line1 + count1 - 2].ptr +
 		pair->lhs.record->ptr[line1 + count1 - 2].size - subfile1.ptr;
 	subfile2.ptr = (char *)pair->rhs.record->ptr[line2 - 1].ptr;
-	subfile2.size = pair->rhs.record->ptr[line2 + count2 - 2].ptr +
+	subfile2.size = (char *) pair->rhs.record->ptr[line2 + count2 - 2].ptr +
 		pair->rhs.record->ptr[line2 + count2 - 2].size - subfile2.ptr;
 	if (xdl_do_diff(&subfile1, &subfile2, xpp, &tmp_pair) < 0)
 		return -1;

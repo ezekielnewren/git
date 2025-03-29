@@ -37,24 +37,21 @@ impl Iterator for LineReader {
         unsafe {
             self.cur = libc::memchr(self.cur as *mut libc::c_void, b'\n' as libc::c_int, self.size) as *const u8;
         }
-        let no_eol: usize;
         let with_eol: usize;
         if !self.cur.is_null() {
-            no_eol = unsafe { self.cur.sub(cur as usize) } as usize;
-            with_eol = no_eol + 1;
+            with_eol = unsafe { self.cur.sub(cur as usize) } as usize + 1;
             self.size -= with_eol;
             self.cur = unsafe { self.cur.add(1) };
         } else {
-            no_eol = self.size;
             with_eol = self.size;
             self.size = 0;
         }
         #[cfg(test)]
         let view = unsafe {
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts(cur, no_eol))
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(cur, with_eol))
         };
 
-        Some(xrecord::new(cur, no_eol, with_eol))
+        Some(xrecord::new(cur, with_eol))
     }
 }
 

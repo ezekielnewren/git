@@ -101,10 +101,10 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	 * So we multiply ha by 2 in the hope that the hashing was
 	 * "unique enough".
 	 */
-	int index = (int)((record->ha << 1) % map->alloc);
+	int index = (int)((record->line_hash << 1) % map->alloc);
 
 	while (map->entries[index].line1) {
-		if (map->entries[index].hash != record->ha) {
+		if (map->entries[index].hash != record->line_hash) {
 			if (++index >= map->alloc)
 				index = 0;
 			continue;
@@ -120,7 +120,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	if (pass == 2)
 		return;
 	map->entries[index].line1 = line;
-	map->entries[index].hash = record->ha;
+	map->entries[index].hash = record->line_hash;
 	map->entries[index].anchor = is_anchor(xpp, map->pair->lhs.record->ptr[line - 1].ptr);
 	if (!map->first)
 		map->first = map->entries + index;
@@ -248,7 +248,7 @@ static int match(struct hashmap *map, int line1, int line2)
 {
 	struct xrecord *record1 = &map->pair->lhs.record->ptr[line1 - 1];
 	struct xrecord *record2 = &map->pair->rhs.record->ptr[line2 - 1];
-	return record1->ha == record2->ha;
+	return record1->line_hash == record2->line_hash;
 }
 
 static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
