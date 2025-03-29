@@ -320,6 +320,12 @@ mod tests {
     #[test]
     fn test_ignore_space() {
         let tv_individual = vec![
+            ("\r \t a \n", "\r \t a \r\n", XDF_IGNORE_CR_AT_EOL),
+            ("\r a \n", "\r a \r\n", XDF_IGNORE_CR_AT_EOL),
+            ("\n", "\r\n", XDF_IGNORE_CR_AT_EOL),
+            ("\n", "\n", XDF_IGNORE_CR_AT_EOL),
+            ("\r a \n", "\r a \n", XDF_IGNORE_CR_AT_EOL),
+
             ("1\n", "1\r\n", XDF_IGNORE_CR_AT_EOL),
             ("1", "1\r\n", XDF_IGNORE_WHITESPACE_CHANGE),
 
@@ -352,13 +358,6 @@ mod tests {
             ("a", "\t\t\ta\t\n", XDF_IGNORE_WHITESPACE),
             ("a", "a\n", XDF_IGNORE_WHITESPACE),
             ("a", "\ta\n", XDF_IGNORE_WHITESPACE),
-
-
-            ("\r \t a ", "\r \t a \r\n", XDF_IGNORE_CR_AT_EOL),
-            ("\r a ", "\r a \r\n", XDF_IGNORE_CR_AT_EOL),
-            ("", "\r\n", XDF_IGNORE_CR_AT_EOL),
-            ("", "\n", XDF_IGNORE_CR_AT_EOL),
-            ("\r a ", "\r a \n", XDF_IGNORE_CR_AT_EOL),
 
             ("", "     \n", XDF_IGNORE_WHITESPACE_AT_EOL),
             ("a", "a     \n", XDF_IGNORE_WHITESPACE_AT_EOL),
