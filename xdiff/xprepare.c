@@ -98,8 +98,8 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 	hi = (long) XDL_HASHLONG(rec->line_hash, cf->hbits);
 	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
 		if (rcrec->ha == rec->line_hash &&
-				xdl_recmatch(rcrec->line, rcrec->size,
-					(char const*) rec->ptr, rec->size, cf->flags))
+				xdl_line_equal((u8 const*) rcrec->line, rcrec->size,
+					rec->ptr, rec->size, cf->flags))
 			break;
 
 	if (!rcrec) {
@@ -342,8 +342,6 @@ extern u64 link_with_rust();
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    struct xdpair *pair) {
 	xdlclassifier_t cf;
-
-	u64 t = link_with_rust();
 
 	memset(&cf, 0, sizeof(cf));
 
