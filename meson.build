@@ -229,19 +229,25 @@ version_gen_environment.set('GIT_DATE', get_option('build_date'))
 version_gen_environment.set('GIT_USER_AGENT', get_option('user_agent'))
 version_gen_environment.set('GIT_VERSION', get_option('version'))
 
-rust_target = 'debug'
-cargo_cmd = ['cargo', 'build']
-if get_option('optimization') in ['2', '3', 's', 'z']
-  cargo_cmd += ['--release']
-  rust_target = 'release'
-endif
-cargo_cmd += ['-p', 'xdiff', '--manifest-path', meson.project_source_root() / 'rust/Cargo.toml']
 
-rust_xdiff = custom_target('rust_xdiff',
+if get_option('optimization') in ['2', '3', 's', 'z']
+  rust_target = 'release'
+else
+  rust_target = 'debug'
+endif
+
+rust_args = []
+if rust_target == 'release'
+  rust_args += '--release'
+endif
+
+rust_leaf = custom_target('rust_leaf',
   output: 'libxdiff.a',
   build_by_default: true,
   build_always_stale: true,
-  command: cargo_cmd,
+  command: ['cargo', 'build',
+            '--manifest-path', meson.project_source_root() / 'rust/Cargo.toml'
+  ] + rust_args,
   env: {
     'RUSTFLAGS': '-Aunused_imports -Adead_code',
   },
