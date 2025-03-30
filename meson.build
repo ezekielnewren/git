@@ -185,6 +185,10 @@ project('git', 'c',
     # GNU C99 and fall back to C11. Meson only learned to handle the fallback
     # with version 1.3.0, so on older versions we use GNU C99 unconditionally.
     'c_std=' + (meson.version().version_compare('>=1.3.0') ? 'gnu99,c11' : 'gnu99'),
+    'buildtype=release',
+    'optimization=2',
+    'strip=true',
+    'debug=false',
   ],
 )
 
