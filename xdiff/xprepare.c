@@ -178,7 +178,7 @@ void xdl_free_env(struct xdpair *pair) {
 }
 
 
-static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
+static int xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
 	long r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
@@ -200,9 +200,9 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	 * current line (i) is already a multimatch line.
 	 */
 	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
-		if (!dis[i - r])
+		if (dis->ptr[i - r] == NO)
 			rdis0++;
-		else if (dis[i - r] == 2)
+		else if (dis->ptr[i - r] == TOO_MANY)
 			rpdis0++;
 		else
 			break;
@@ -216,9 +216,9 @@ static int xdl_clean_mmatch(char const *dis, long i, long s, long e) {
 	if (rdis0 == 0)
 		return 0;
 	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
-		if (!dis[i + r])
+		if (dis->ptr[i + r] == NO)
 			rdis1++;
-		else if (dis[i + r] == 2)
+		else if (dis->ptr[i + r] == TOO_MANY)
 			rpdis1++;
 		else
 			break;
@@ -245,19 +245,20 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 	long i, nm, mlim;
 	struct xrecord *recs;
 	xdlclass_t *rcrec;
-	char *dis, *dis1, *dis2;
+	struct ivec_u8 dis1, dis2;
 
-	if (!XDL_CALLOC_ARRAY(dis, lhs->record->length + rhs->record->length + 2))
-		return -1;
-	dis1 = dis;
-	dis2 = dis1 + lhs->record->length + 1;
+	IVEC_INIT(dis1);
+	IVEC_INIT(dis2);
+
+	ivec_zero(&dis1, lhs->record->length + SENTINEL);
+	ivec_zero(&dis2, rhs->record->length + SENTINEL);
 
 	if ((mlim = xdl_bogosqrt(lhs->record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart]; i <= lhs->dend; i++, recs++) {
 		rcrec = cf->rcrecs[recs->line_hash];
 		nm = rcrec ? rcrec->len2 : 0;
-		dis1[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
+		dis1.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
 	if ((mlim = xdl_bogosqrt(rhs->record->length)) > XDL_MAX_EQLIMIT)
@@ -265,13 +266,13 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart]; i <= rhs->dend; i++, recs++) {
 		rcrec = cf->rcrecs[recs->line_hash];
 		nm = rcrec ? rcrec->len1 : 0;
-		dis2[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
+		dis2.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
 	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart];
 	     i <= lhs->dend; i++, recs++) {
-		if (dis1[i] == 1 ||
-		    (dis1[i] == 2 && !xdl_clean_mmatch(dis1, i, lhs->dstart, lhs->dend))) {
+		if (dis1.ptr[i] == YES ||
+		    (dis1.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis1, i, lhs->dstart, lhs->dend))) {
 			ivec_push(&lhs->rindex, &i);
 		} else
 			lhs->consider.ptr[SENTINEL + i] = YES;
@@ -280,15 +281,16 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 
 	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart];
 	     i <= rhs->dend; i++, recs++) {
-		if (dis2[i] == 1 ||
-		    (dis2[i] == 2 && !xdl_clean_mmatch(dis2, i, rhs->dstart, rhs->dend))) {
+		if (dis2.ptr[i] == YES ||
+		    (dis2.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis2, i, rhs->dstart, rhs->dend))) {
 			ivec_push(&rhs->rindex, &i);
 		} else
 			rhs->consider.ptr[SENTINEL + i] = YES;
 	}
 	ivec_shrink_to_fit(&rhs->rindex);
 
-	xdl_free(dis);
+	ivec_free(&dis1);
+	ivec_free(&dis2);
 
 	return 0;
 }
