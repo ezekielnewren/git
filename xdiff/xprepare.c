@@ -337,9 +337,13 @@ static int xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, s
 	return 0;
 }
 
+extern u64 link_with_rust();
+
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    struct xdpair *pair) {
 	xdlclassifier_t cf;
+
+	u64 t = link_with_rust();
 
 	memset(&cf, 0, sizeof(cf));
 

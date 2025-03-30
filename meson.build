@@ -229,6 +229,30 @@ version_gen_environment.set('GIT_DATE', get_option('build_date'))
 version_gen_environment.set('GIT_USER_AGENT', get_option('user_agent'))
 version_gen_environment.set('GIT_VERSION', get_option('version'))
 
+rust_target = 'debug'
+cargo_cmd = ['cargo', 'build']
+if get_option('optimization') in ['2', '3', 's', 'z']
+  cargo_cmd += ['--release']
+  rust_target = 'release'
+endif
+cargo_cmd += ['-p', 'xdiff', '--manifest-path', meson.project_source_root() / 'rust/Cargo.toml']
+
+rust_xdiff = custom_target('rust_xdiff',
+  output: 'libxdiff.a',
+  build_by_default: true,
+  build_always_stale: true,
+  command: cargo_cmd,
+  env: {
+    'RUSTFLAGS': '-Aunused_imports -Adead_code',
+  },
+  install: false,
+)
+
+rust_xdiff_dep = declare_dependency(
+  link_args: ['-L' + meson.project_source_root() / 'rust/target' / rust_target, '-lxdiff'],
+#  include_directories: include_directories('xdiff/include'),  # Adjust if you expose headers
+)
+
 compiler = meson.get_compiler('c')
 
 libgit_sources = [
@@ -1584,6 +1608,8 @@ version_def_h = custom_target(
   env: version_gen_environment,
 )
 libgit_sources += version_def_h
+
+libgit_dependencies += rust_xdiff_dep
 
 libgit = declare_dependency(
   link_with: static_library('git',
