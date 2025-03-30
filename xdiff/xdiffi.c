@@ -402,7 +402,7 @@ static int get_indent(struct xrecord *rec)
 	long i;
 	int ret = 0;
 
-	for (i = 0; i < rec->size; i++) {
+	for (i = 0; i < (isize) rec->size; i++) {
 		char c = rec->ptr[i];
 
 		if (!XDL_ISSPACE(c))
@@ -988,11 +988,11 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, struct xdpair *pair, long
 
 		rec = &pair->lhs.record->ptr[xch->i1];
 		for (i = 0; i < xch->chg1 && ignore; i++)
-			ignore = xdl_blankline(rec[i].ptr, rec[i].size, flags);
+			ignore = xdl_blankline((const char*) rec[i].ptr, rec[i].size, flags);
 
 		rec = &pair->rhs.record->ptr[xch->i2];
 		for (i = 0; i < xch->chg2 && ignore; i++)
-			ignore = xdl_blankline(rec[i].ptr, rec[i].size, flags);
+			ignore = xdl_blankline((const char*)rec[i].ptr, rec[i].size, flags);
 
 		xch->ignore = ignore;
 	}
@@ -1003,7 +1003,7 @@ static int record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
 	size_t i;
 
 	for (i = 0; i < xpp->ignore_regex_nr; i++)
-		if (!regexec_buf(xpp->ignore_regex[i], rec->ptr, rec->size, 1,
+		if (!regexec_buf(xpp->ignore_regex[i], (const char*) rec->ptr, rec->size, 1,
 				 &regmatch, 0))
 			return 1;
 

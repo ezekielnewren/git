@@ -121,7 +121,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 		return;
 	map->entries[index].line1 = line;
 	map->entries[index].hash = record->line_hash;
-	map->entries[index].anchor = is_anchor(xpp, map->pair->lhs.record->ptr[line - 1].ptr);
+	map->entries[index].anchor = is_anchor(xpp, (const char*) map->pair->lhs.record->ptr[line - 1].ptr);
 	if (!map->first)
 		map->first = map->entries + index;
 	if (map->last) {
