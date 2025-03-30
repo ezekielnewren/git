@@ -3,7 +3,7 @@ use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
 use interop::ivec::IVec;
 use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
 use crate::xprepare::{safe_2way_prepare, safe_3way_prepare};
-use crate::xtypes::{parse_lines, xd2way, xd3way, xdfile, xdpair};
+use crate::xtypes::{parse_lines, xd2way, xd3way, xdfile, xdpair, xrecord};
 use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 
 pub mod xtypes;
@@ -16,9 +16,18 @@ pub(crate) mod mock;
 
 
 #[no_mangle]
-unsafe extern "C" fn xdl_line_hash(ptr: *const u8, size_no_eol: usize, flags: u64) -> u64 {
+unsafe extern "C" fn xdl_parse_lines(file: *const mmfile, record: *mut IVec<xrecord>) {
+    let file = mmfile::from_raw(file);
+    let record = IVec::from_raw_mut(record);
+
+    parse_lines(file, record);
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_line_hash(ptr: *const u8, size: usize, flags: u64) -> u64 {
     let line = unsafe {
-        std::slice::from_raw_parts(ptr, size_no_eol)
+        std::slice::from_raw_parts(ptr, size)
     };
     if (flags & XDF_WHITESPACE_FLAGS) == 0 {
         xxh3_64(line)

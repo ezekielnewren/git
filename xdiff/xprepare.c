@@ -89,12 +89,11 @@ static void xdl_free_classifier(xdlclassifier_t *cf) {
 
 
 static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
-			       struct xrecord *rec) {
+			       struct xrecord *rec, u64 *mph) {
 	long hi;
-	char const *line;
 	xdlclass_t *rcrec;
 
-	line = (char const*) rec->ptr;
+	rec->line_hash = xdl_line_hash(rec->ptr, rec->size, cf->flags);
 	hi = (long) XDL_HASHLONG(rec->line_hash, cf->hbits);
 	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
 		if (rcrec->ha == rec->line_hash &&
@@ -111,7 +110,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 		if (XDL_ALLOC_GROW(cf->rcrecs, cf->count, cf->alloc))
 				return -1;
 		cf->rcrecs[rcrec->idx] = rcrec;
-		rcrec->line = line;
+		rcrec->line = (char const*) rec->ptr;
 		rcrec->size = rec->size;
 		rcrec->ha = rec->line_hash;
 		rcrec->len1 = rcrec->len2 = 0;
@@ -121,30 +120,28 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 
 	(pass == 1) ? rcrec->len1++ : rcrec->len2++;
 
-	rec->line_hash = (unsigned long) rcrec->idx;
+	*mph = (unsigned long) rcrec->idx;
+	rec->line_hash = *mph;
 
 
 	return 0;
 }
 
 
+extern void xdl_parse_lines(mmfile_t const* file, struct ivec_xrecord* record);
+
 static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			   struct xd_file_context *ctx) {
-	long bsize;
-	unsigned long hav;
-	char const *blk, *cur, *top, *prev;
+	u8 const* cur = (u8 const*) mf->ptr;
+	u8 const* top = (u8 const*) mf->ptr + mf->size;
 
 	IVEC_INIT(ctx->file_storage.record);
-	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
-		for (top = blk + bsize; cur < top; ) {
-			struct xrecord rec_new;
-			prev = cur;
-			hav = xdl_hash_record(&cur, top, xpp->flags);
-			rec_new.ptr = (u8 const*) prev;
-			rec_new.size = (long) (cur - prev);
-			rec_new.line_hash = hav;
-			ivec_push(&ctx->file_storage.record, &rec_new);
-		}
+	while (cur < top) {
+		struct xrecord rec;
+		rec.ptr = cur;
+		while (cur < top && *cur++ != '\n') {}
+		rec.size = cur - rec.ptr;
+		ivec_push(&ctx->file_storage.record, &rec);
 	}
 	ivec_shrink_to_fit(&ctx->file_storage.record);
 	ctx->record = &ctx->file_storage.record;
@@ -361,11 +358,11 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		return -1;
 
 	for (usize i = 0; i < pair->lhs.record->length; i++) {
-		xdl_classify_record(1, &cf, &pair->lhs.record->ptr[i]);
+		xdl_classify_record(1, &cf, &pair->lhs.record->ptr[i], &pair->lhs.minimal_perfect_hash->ptr[i]);
 	}
 
 	for (usize i = 0; i < pair->rhs.record->length; i++) {
-		xdl_classify_record(2, &cf, &pair->rhs.record->ptr[i]);
+		xdl_classify_record(2, &cf, &pair->rhs.record->ptr[i], &pair->rhs.minimal_perfect_hash->ptr[i]);
 	}
 
 	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 &&
