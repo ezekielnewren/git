@@ -139,14 +139,14 @@ impl<'a> Iterator for WhitespaceIter<'a> {
                         } else {
                             end -= 1;
                         }
-                    }
-                    if end > 0 && self.line[end - 1] == b'\r' {
-                        self.index = end;
-                        end -= 1;
-                        if end - start == 0 {
-                            continue;
+                        if end > 0 && self.line[end - 1] == b'\r' {
+                            self.index = end;
+                            end -= 1;
+                            if end - start == 0 {
+                                continue;
+                            }
+                            return Some(&self.line[start..end]);
                         }
-                        return Some(&self.line[start..end]);
                     }
                 }
             }
@@ -317,12 +317,13 @@ mod tests {
     #[test]
     fn test_ignore_space() {
         let tv_individual = vec![
-            ("ab", "ab\r", XDF_IGNORE_CR_AT_EOL),
-            ("\r \t a ", "\r \t a \r", XDF_IGNORE_CR_AT_EOL),
-            ("\r a ", "\r a \r", XDF_IGNORE_CR_AT_EOL),
-            ("", "\r", XDF_IGNORE_CR_AT_EOL),
+            ("ab\r", "ab\r", XDF_IGNORE_CR_AT_EOL),
+            ("ab \r", "ab \r", XDF_IGNORE_CR_AT_EOL),
+            ("\r \t a \r", "\r \t a \r", XDF_IGNORE_CR_AT_EOL),
+            ("\r a \r", "\r a \r", XDF_IGNORE_CR_AT_EOL),
+            ("\r", "\r", XDF_IGNORE_CR_AT_EOL),
             ("", "", XDF_IGNORE_CR_AT_EOL),
-            ("\r a ", "\r a ", XDF_IGNORE_CR_AT_EOL),
+            ("\r a \r", "\r a \r", XDF_IGNORE_CR_AT_EOL),
 
             ("\r \t a \n", "\r \t a \r\n", XDF_IGNORE_CR_AT_EOL),
             ("\r a \n", "\r a \r\n", XDF_IGNORE_CR_AT_EOL),
