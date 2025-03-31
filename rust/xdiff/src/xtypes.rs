@@ -10,7 +10,6 @@ use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
 pub struct xrecord {
     ptr: *const u8,
     size: usize,
-    line_hash: u64,
 }
 
 
@@ -19,7 +18,6 @@ impl Clone for xrecord {
         Self {
             ptr: self.ptr,
             size: self.size,
-            line_hash: 0,
         }
     }
 }
@@ -31,7 +29,6 @@ impl xrecord {
         Self {
             ptr,
             size,
-            line_hash: 0,
         }
     }
 

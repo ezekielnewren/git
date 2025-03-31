@@ -41,7 +41,6 @@ typedef struct s_chastore {
 struct xrecord {
 	u8 const* ptr;
 	usize size;
-	u64 line_hash;
 };
 
 DEFINE_IVEC_TYPE(struct xrecord, xrecord);

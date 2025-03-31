@@ -93,10 +93,10 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 	long hi;
 	xdlclass_t *rcrec;
 
-	rec->line_hash = xdl_line_hash(rec->ptr, rec->size, cf->flags);
-	hi = (long) XDL_HASHLONG(rec->line_hash, cf->hbits);
+	u64 line_hash = xdl_line_hash(rec->ptr, rec->size, cf->flags);
+	hi = (long) XDL_HASHLONG(line_hash, cf->hbits);
 	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
-		if (rcrec->ha == rec->line_hash &&
+		if (rcrec->ha == line_hash &&
 				xdl_line_equal((u8 const*) rcrec->line, rcrec->size,
 					rec->ptr, rec->size, cf->flags))
 			break;
@@ -112,7 +112,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 		cf->rcrecs[rcrec->idx] = rcrec;
 		rcrec->line = (char const*) rec->ptr;
 		rcrec->size = rec->size;
-		rcrec->ha = rec->line_hash;
+		rcrec->ha = line_hash;
 		rcrec->len1 = rcrec->len2 = 0;
 		rcrec->next = cf->rchash[hi];
 		cf->rchash[hi] = rcrec;
@@ -121,8 +121,6 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 	(pass == 1) ? rcrec->len1++ : rcrec->len2++;
 
 	*mph = (unsigned long) rcrec->idx;
-	rec->line_hash = *mph;
-
 
 	return 0;
 }
