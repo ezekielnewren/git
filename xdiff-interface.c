@@ -297,9 +297,8 @@ void xdiff_clear_find_func(xdemitconf_t *xecfg)
 	}
 }
 
-unsigned long xdiff_hash_string(const char *s, size_t len, long flags)
-{
-	return xdl_hash_record(&s, s + len, flags);
+unsigned long xdiff_hash_string(const char *s, size_t len, long flags) {
+	return xdl_line_hash((u8 const*) s, len, flags);
 }
 
 int xdiff_compare_lines(const char *l1, long s1,
