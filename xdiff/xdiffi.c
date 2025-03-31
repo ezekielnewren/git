@@ -34,7 +34,7 @@ typedef struct s_xdpsplit {
 } xdpsplit_t;
 
 static u64 get_mph(struct xd_file_context *ctx, usize index) {
-	return ctx->record->ptr[ctx->rindex.ptr[index]].line_hash;
+	return ctx->minimal_perfect_hash->ptr[ctx->rindex.ptr[index]];
 }
 
 /*
@@ -378,11 +378,6 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 	return xch;
 }
 
-
-static int recs_match(struct xrecord *rec1, struct xrecord *rec2)
-{
-	return (rec1->line_hash == rec2->line_hash);
-}
 
 /*
  * If a line is indented more than this, get_indent() just returns this value.
@@ -748,7 +743,7 @@ static inline int group_previous(struct xd_file_context *ctx, struct xdlgroup *g
 static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	if (g->end < (isize) ctx->record->length &&
-	    recs_match(&ctx->record->ptr[g->start], &ctx->record->ptr[g->end])) {
+	    ctx->minimal_perfect_hash->ptr[g->start] == ctx->minimal_perfect_hash->ptr[g->end]) {
 		ctx->consider.ptr[SENTINEL + g->start++] = NO;
 		ctx->consider.ptr[SENTINEL + g->end++] = YES;
 
@@ -769,7 +764,7 @@ static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
 static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
 {
 	if (g->start > 0 &&
-	    recs_match(&ctx->record->ptr[g->start - 1], &ctx->record->ptr[g->end - 1])) {
+	    ctx->minimal_perfect_hash->ptr[g->start - 1] == ctx->minimal_perfect_hash->ptr[g->end - 1]) {
 		ctx->consider.ptr[SENTINEL + --g->start] = YES;
 		ctx->consider.ptr[SENTINEL + --g->end] = NO;
 
