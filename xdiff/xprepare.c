@@ -241,7 +241,6 @@ static bool xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
  */
 static void xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
 	long i, nm, mlim;
-	struct xrecord *recs;
 	xdlclass_t *rcrec;
 	struct ivec_u8 dis1, dis2;
 
@@ -253,22 +252,23 @@ static void xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs
 
 	if ((mlim = xdl_bogosqrt(lhs->record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart]; i <= lhs->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->line_hash];
+	for (i = lhs->dstart; i <= lhs->dend; i++) {
+		u64 mph = lhs->minimal_perfect_hash->ptr[i];
+		rcrec = cf->rcrecs[mph];
 		nm = rcrec ? rcrec->len2 : 0;
 		dis1.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
 	if ((mlim = xdl_bogosqrt(rhs->record->length)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart]; i <= rhs->dend; i++, recs++) {
-		rcrec = cf->rcrecs[recs->line_hash];
+	for (i = rhs->dstart; i <= rhs->dend; i++) {
+		u64 mph = rhs->minimal_perfect_hash->ptr[i];
+		rcrec = cf->rcrecs[mph];
 		nm = rcrec ? rcrec->len1 : 0;
 		dis2.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
 	}
 
-	for (i = lhs->dstart, recs = &lhs->record->ptr[lhs->dstart];
-	     i <= lhs->dend; i++, recs++) {
+	for (i = lhs->dstart; i <= lhs->dend; i++) {
 		if (dis1.ptr[i] == YES ||
 		    (dis1.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis1, i, lhs->dstart, lhs->dend))) {
 			ivec_push(&lhs->rindex, &i);
@@ -277,8 +277,7 @@ static void xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs
 	}
 	ivec_shrink_to_fit(&lhs->rindex);
 
-	for (i = rhs->dstart, recs = &rhs->record->ptr[rhs->dstart];
-	     i <= rhs->dend; i++, recs++) {
+	for (i = rhs->dstart; i <= rhs->dend; i++) {
 		if (dis2.ptr[i] == YES ||
 		    (dis2.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis2, i, rhs->dstart, rhs->dend))) {
 			ivec_push(&rhs->rindex, &i);
