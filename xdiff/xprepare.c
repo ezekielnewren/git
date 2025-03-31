@@ -296,26 +296,29 @@ static void xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs
  * Early trim initial and terminal matching records.
  */
 static void xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs) {
-	long i, lim;
-	struct xrecord *recs1, *recs2;
+	usize lim = XDL_MIN(lhs->minimal_perfect_hash->length, rhs->minimal_perfect_hash->length);
 
-	recs1 = lhs->record->ptr;
-	recs2 = rhs->record->ptr;
-	for (i = 0, lim = XDL_MIN(lhs->record->length, rhs->record->length); i < lim;
-	     i++, recs1++, recs2++)
-		if (recs1->line_hash != recs2->line_hash)
+	for (usize i = 0; i < lim; i++) {
+		u64 mph1 = lhs->minimal_perfect_hash->ptr[i];
+		u64 mph2 = rhs->minimal_perfect_hash->ptr[i];
+		if (mph1 != mph2) {
+			lim -= i;
+			lhs->dstart = rhs->dstart = i;
 			break;
+		}
+	}
 
-	lhs->dstart = rhs->dstart = i;
-
-	recs1 = lhs->record->ptr + lhs->record->length - 1;
-	recs2 = rhs->record->ptr + rhs->record->length - 1;
-	for (lim -= i, i = 0; i < lim; i++, recs1--, recs2--)
-		if (recs1->line_hash != recs2->line_hash)
+	for (usize i = 0; i < lim; i++) {
+		usize i1 = lhs->minimal_perfect_hash->length - 1 - i;
+		usize i2 = rhs->minimal_perfect_hash->length - 1 - i;
+		u64 mph1 = lhs->minimal_perfect_hash->ptr[i1];
+		u64 mph2 = rhs->minimal_perfect_hash->ptr[i2];
+		if (mph1 != mph2) {
+			lhs->dend = (isize) i1;
+			rhs->dend = (isize) i2;
 			break;
-
-	lhs->dend = lhs->record->length - i - 1;
-	rhs->dend = rhs->record->length - i - 1;
+		}
+	}
 }
 
 
