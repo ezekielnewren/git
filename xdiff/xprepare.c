@@ -130,7 +130,7 @@ static int xdl_classify_record(unsigned int pass, xdlclassifier_t *cf,
 
 extern void xdl_parse_lines(mmfile_t const* file, struct ivec_xrecord* record);
 
-static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
+static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			   struct xd_file_context *ctx) {
 	u8 const* cur = (u8 const*) mf->ptr;
 	u8 const* top = (u8 const*) mf->ptr + mf->size;
@@ -158,8 +158,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 	ctx->record->length = ctx->record->length;
 	ctx->dstart = 0;
 	ctx->dend = ctx->record->length - 1;
-
-	return 0;
 }
 
 
@@ -178,7 +176,7 @@ void xdl_free_env(struct xdpair *pair) {
 }
 
 
-static int xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
+static bool xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
 	long r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
@@ -214,7 +212,7 @@ static int xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
 	 * middle of runs with nomatch lines (dis[j] == 0).
 	 */
 	if (rdis0 == 0)
-		return 0;
+		return false;
 	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
 		if (dis->ptr[i + r] == NO)
 			rdis1++;
@@ -228,11 +226,11 @@ static int xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
 	 * return 0 and hence we don't make the current line (i) discarded.
 	 */
 	if (rdis1 == 0)
-		return 0;
+		return false;
 	rdis1 += rdis0;
 	rpdis1 += rpdis0;
 
-	return rpdis1 * XDL_KPDIS_RUN < (rpdis1 + rdis1);
+	return rpdis1 * XDL_KPDIS_RUN < rpdis1 + rdis1;
 }
 
 
@@ -241,7 +239,7 @@ static int xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
+static void xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
 	long i, nm, mlim;
 	struct xrecord *recs;
 	xdlclass_t *rcrec;
@@ -291,15 +289,13 @@ static int xdl_cleanup_records(xdlclassifier_t *cf, struct xd_file_context *lhs,
 
 	ivec_free(&dis1);
 	ivec_free(&dis2);
-
-	return 0;
 }
 
 
 /*
  * Early trim initial and terminal matching records.
  */
-static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs) {
+static void xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rhs) {
 	long i, lim;
 	struct xrecord *recs1, *recs2;
 
@@ -320,20 +316,12 @@ static int xdl_trim_ends(struct xd_file_context *lhs, struct xd_file_context *rh
 
 	lhs->dend = lhs->record->length - i - 1;
 	rhs->dend = rhs->record->length - i - 1;
-
-	return 0;
 }
 
 
-static int xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
-
-	if (xdl_trim_ends(lhs, rhs) < 0 ||
-	    xdl_cleanup_records(cf, lhs, rhs) < 0) {
-
-		return -1;
-	}
-
-	return 0;
+static void xdl_optimize_ctxs(xdlclassifier_t *cf, struct xd_file_context *lhs, struct xd_file_context *rhs) {
+	xdl_trim_ends(lhs, rhs);
+	xdl_cleanup_records(cf, lhs, rhs);
 }
 
 extern u64 link_with_rust();
@@ -344,17 +332,8 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 	memset(&cf, 0, sizeof(cf));
 
-	if (xdl_prepare_ctx(mf1, xpp, &pair->lhs) < 0) {
-
-		xdl_free_classifier(&cf);
-		return -1;
-	}
-	if (xdl_prepare_ctx(mf2, xpp, &pair->rhs) < 0) {
-
-		xdl_free_ctx(&pair->lhs);
-		xdl_free_classifier(&cf);
-		return -1;
-	}
+	xdl_prepare_ctx(mf1, xpp, &pair->lhs);
+	xdl_prepare_ctx(mf2, xpp, &pair->rhs);
 
 	if (xdl_init_classifier(&cf, pair->lhs.record->length + pair->rhs.record->length + 1, xpp->flags) < 0)
 		return -1;
@@ -367,14 +346,9 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		xdl_classify_record(2, &cf, &pair->rhs.record->ptr[i], &pair->rhs.minimal_perfect_hash->ptr[i]);
 	}
 
-	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 &&
-	    xdl_optimize_ctxs(&cf, &pair->lhs, &pair->rhs) < 0) {
-
-		xdl_free_ctx(&pair->rhs);
-		xdl_free_ctx(&pair->lhs);
-		xdl_free_classifier(&cf);
-		return -1;
-	    }
+	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
+		xdl_optimize_ctxs(&cf, &pair->lhs, &pair->rhs);
+	}
 
 	xdl_free_classifier(&cf);
 
