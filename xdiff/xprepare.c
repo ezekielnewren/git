@@ -320,6 +320,7 @@ usize xdl_mphb_finish(void* mphb);
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    struct xdpair *pair) {
+	void* mphb;
 	xdlclassifier_t cf;
 
 	memset(&cf, 0, sizeof(cf));
@@ -329,6 +330,11 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 	xdl_prepare_ctx(mf1, xpp, &pair->lhs);
 	xdl_prepare_ctx(mf2, xpp, &pair->rhs);
+
+	mphb = xdl_mphb_new(pair->lhs.record->length + pair->rhs.record->length + 1, xpp->flags);
+	xdl_mphb_process(mphb, &pair->lhs.file_storage);
+	xdl_mphb_process(mphb, &pair->rhs.file_storage);
+	pair->minimal_perfect_hash_size = xdl_mphb_finish(mphb);
 
 	if (xdl_init_classifier(&cf, pair->lhs.record->length + pair->rhs.record->length + 1, xpp->flags) < 0)
 		return -1;
