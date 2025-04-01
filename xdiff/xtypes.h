@@ -68,6 +68,8 @@ struct xd_file_context {
 
 struct xdpair {
 	struct xd_file_context lhs, rhs;
+	usize delta_start, delta_end;
+	usize minimal_perfect_hash_size;
 };
 
 
