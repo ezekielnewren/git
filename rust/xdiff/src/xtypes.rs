@@ -179,7 +179,20 @@ impl xdpair {
         if pair.is_null() {
             panic!("null pointer");
         }
-        &mut *pair
+
+        let out = &mut *pair;
+
+        (*out.lhs.minimal_perfect_hash).test_invariants();
+        (*out.lhs.record).test_invariants();
+        out.lhs.consider.test_invariants();
+        out.lhs.rindex.test_invariants();
+
+        (*out.rhs.minimal_perfect_hash).test_invariants();
+        (*out.rhs.record).test_invariants();
+        out.rhs.consider.test_invariants();
+        out.rhs.rindex.test_invariants();
+
+        out
     }
 
 }
