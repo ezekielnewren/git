@@ -162,12 +162,13 @@ fn xdl_cleanup_records(pair: &mut xdpair) {
 fn xdl_trim_ends(pair: &mut xdpair) {
 	let (lhs, rhs) = get_file_context!(pair);
 
-	let lim = std::cmp::min(lhs.record.len(), rhs.record.len());
+	let mut lim = std::cmp::min(lhs.record.len(), rhs.record.len());
 
 	for i in 0..lim {
 		let mph1 = lhs.minimal_perfect_hash[i];
 		let mph2 = rhs.minimal_perfect_hash[i];
 		if mph1 != mph2 {
+			lim -= i;
 			pair.delta_start = i;
 			break;
 		}
