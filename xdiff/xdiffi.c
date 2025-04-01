@@ -1039,6 +1039,9 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	struct xdpair pair;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 
+	struct xd2way two_way;
+	xdl_2way_prepare(mf1, mf2, xpp->flags, &two_way);
+
 	if (xdl_do_diff(mf1, mf2, xpp, &pair) < 0) {
 
 		return -1;

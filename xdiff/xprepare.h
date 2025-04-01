@@ -23,7 +23,13 @@
 #if !defined(XPREPARE_H)
 #define XPREPARE_H
 
+extern void xdl_2way_prepare(mmfile_t const* mf1, mmfile_t const* mf2,
+	u64 flags, struct xd2way *two_way);
+extern void xdl_2way_free(struct xd2way *two_way);
 
+extern void xdl_3way_prepare(mmfile_t const* base, mmfile_t const* side1, mmfile_t const* side2,
+	u64 flags, struct xd3way *three_way);
+extern void xdl_3way_free(struct xd3way *three_way);
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    struct xdpair *pair);
