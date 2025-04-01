@@ -130,18 +130,9 @@ extern void xdl_parse_lines(mmfile_t const* file, struct ivec_xrecord* record);
 
 static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 			   struct xd_file_context *ctx) {
-	u8 const* cur = (u8 const*) mf->ptr;
-	u8 const* top = (u8 const*) mf->ptr + mf->size;
 
 	IVEC_INIT(ctx->file_storage.record);
-	while (cur < top) {
-		struct xrecord rec;
-		rec.ptr = cur;
-		while (cur < top && *cur++ != '\n') {}
-		rec.size = cur - rec.ptr;
-		ivec_push(&ctx->file_storage.record, &rec);
-	}
-	ivec_shrink_to_fit(&ctx->file_storage.record);
+	xdl_parse_lines(mf, &ctx->file_storage.record);
 	ctx->record = &ctx->file_storage.record;
 
 	IVEC_INIT(ctx->file_storage.minimal_perfect_hash);
