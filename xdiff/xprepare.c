@@ -314,7 +314,9 @@ static void xdl_optimize_ctxs(xdlclassifier_t *cf, struct xdpair *pair) {
 	xdl_cleanup_records(cf, pair);
 }
 
-extern u64 link_with_rust();
+void* xdl_mphb_new(usize max_unique_keys, u64 flags);
+void xdl_mphb_process(void* mphb, struct xdfile *file);
+usize xdl_mphb_finish(void* mphb);
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		    struct xdpair *pair) {

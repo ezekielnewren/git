@@ -4,7 +4,7 @@ use interop::ivec::IVec;
 use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
 use crate::xprepare::{safe_2way_prepare, safe_3way_prepare};
 use crate::xtypes::{parse_lines, xd2way, xd3way, xdfile, xdpair, xrecord};
-use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
+use crate::xutils::{chunked_iter_equal, LineReader, MinimalPerfectHashBuilder, WhitespaceIter};
 
 pub mod xtypes;
 pub mod xutils;
@@ -13,6 +13,28 @@ pub mod xprepare;
 pub mod maps;
 #[cfg(test)]
 pub(crate) mod mock;
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_mphb_new(max_unique_keys: usize, flags: u64) -> *mut libc::c_void {
+    let a = Box::new(MinimalPerfectHashBuilder::new(max_unique_keys, flags));
+    let b = Box::into_raw(a);
+    b as *mut libc::c_void
+}
+
+#[no_mangle]
+unsafe extern "C" fn xdl_mphb_process(mphb: *mut libc::c_void, file: *mut xdfile) {
+    let mphb: &mut MinimalPerfectHashBuilder = &mut *(mphb as *mut MinimalPerfectHashBuilder);
+    let file = xdfile::from_raw_mut(file);
+
+    mphb.process(file);
+}
+
+#[no_mangle]
+unsafe extern "C" fn xdl_mphb_finish(mphb: *mut libc::c_void) -> usize {
+    let mphb = Box::from_raw(mphb as *mut MinimalPerfectHashBuilder);
+    mphb.finish()
+}
 
 
 #[no_mangle]

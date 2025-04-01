@@ -107,7 +107,10 @@ impl xdfile {
             panic!("null pointer");
         }
 
-        &mut *file
+        let out = &mut *file;
+        out.minimal_perfect_hash.test_invariants();
+        out.record.test_invariants();
+        out
     }
 
     pub unsafe fn from_raw<'a>(file: *mut xdfile) -> &'a xdfile {
