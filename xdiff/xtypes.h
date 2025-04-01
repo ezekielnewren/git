@@ -38,6 +38,13 @@ typedef struct s_chastore {
 	long scurr;
 } chastore_t;
 
+struct xoccurrence {
+	usize file1;
+	usize file2;
+};
+
+DEFINE_IVEC_TYPE(struct xoccurrence, xoccurrence);
+
 struct xrecord {
 	u8 const* ptr;
 	usize size;
