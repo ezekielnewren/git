@@ -10,27 +10,6 @@ const XDL_MAX_EQLIMIT: u64 = 1024;
 const XDL_SIMSCAN_WINDOW: usize = 100;
 
 
-#[no_mangle]
-unsafe extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: usize, mut start: usize, mut end: usize) -> bool {
-	let dis = IVec::from_raw_mut(dis);
-	clean_mmatch(dis, i, start, end)
-}
-
-
-#[no_mangle]
-unsafe extern "C" fn xdl_cleanup_records(pair: *mut xdpair) {
-	let pair = xdpair::from_raw_mut(pair);
-	cleanup_records(pair)
-}
-
-
-#[no_mangle]
-unsafe extern "C" fn xdl_trim_ends(pair: *mut xdpair) {
-	let pair = xdpair::from_raw_mut(pair);
-	trim_ends(pair)
-}
-
-
 fn clean_mmatch(dis: &mut IVec<u8>, i: usize, mut start: usize, mut end: usize) -> bool {
 	/*
 	 * Limits the window the is examined during the similar-lines
