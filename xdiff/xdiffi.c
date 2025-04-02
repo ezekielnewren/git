@@ -1028,10 +1028,11 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
 	xdchange_t *xscr;
+	struct xdfile fs1, fs2;
 	struct xdpair pair;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 
-	xdl_prepare_env(mf1, mf2, xpp, &pair);
+	xdl_prepare_env(mf1, mf2, xpp, &fs1, &fs2, &pair);
 
 	if (xdl_do_diff(xpp, &pair) < 0) {
 
@@ -1041,7 +1042,7 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	    xdl_change_compact(&pair.rhs, &pair.lhs, xpp->flags) < 0 ||
 	    xdl_build_script(&pair, &xscr) < 0) {
 
-		xdl_free_env(&pair);
+		xdl_free_env(&fs1, &fs2, &pair);
 		return -1;
 	}
 	if (xscr) {
@@ -1054,12 +1055,12 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		if (ef(&pair, xscr, ecb, xecfg) < 0) {
 
 			xdl_free_script(xscr);
-			xdl_free_env(&pair);
+			xdl_free_env(&fs1, &fs2, &pair);
 			return -1;
 		}
 		xdl_free_script(xscr);
 	}
-	xdl_free_env(&pair);
+	xdl_free_env(&fs1, &fs2, &pair);
 
 	return 0;
 }

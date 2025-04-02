@@ -364,6 +364,7 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 {
 	for (; m; m = m->next) {
 		mmfile_t t1, t2;
+		struct xdfile fs1, fs2;
 		struct xdpair pair;
 		xdchange_t *xscr, *x;
 		int i1 = m->i1, i2 = m->i2;
@@ -386,18 +387,18 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		t2.ptr = (char *) pair2->rhs.record->ptr[m->i2].ptr;
 		t2.size = (char *) pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
 			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size - t2.ptr;
-		xdl_prepare_env(&t1, &t2, xpp, &pair);
+		xdl_prepare_env(&t1, &t2, xpp, &fs1, &fs2, &pair);
 		if (xdl_do_diff(xpp, &pair) < 0)
 			return -1;
 		if (xdl_change_compact(&pair.lhs, &pair.rhs, xpp->flags) < 0 ||
 		    xdl_change_compact(&pair.rhs, &pair.lhs, xpp->flags) < 0 ||
 		    xdl_build_script(&pair, &xscr) < 0) {
-			xdl_free_env(&pair);
+			xdl_free_env(&fs1, &fs2, &pair);
 			return -1;
 		}
 		if (!xscr) {
 			/* If this happens, the changes are identical. */
-			xdl_free_env(&pair);
+			xdl_free_env(&fs1, &fs2, &pair);
 			m->mode = 4;
 			continue;
 		}
@@ -409,7 +410,7 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		while (xscr->next) {
 			xdmerge_t *m2 = xdl_malloc(sizeof(xdmerge_t));
 			if (!m2) {
-				xdl_free_env(&pair);
+				xdl_free_env(&fs1, &fs2, &pair);
 				xdl_free_script(x);
 				return -1;
 			}
@@ -423,7 +424,7 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 			m->i2 = xscr->i2 + i2;
 			m->chg2 = xscr->chg2;
 		}
-		xdl_free_env(&pair);
+		xdl_free_env(&fs1, &fs2, &pair);
 		xdl_free_script(x);
 	}
 	return 0;
@@ -685,6 +686,7 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
 	xdchange_t *xscr1 = NULL, *xscr2 = NULL;
+	struct xdfile fs11, fs12, fs21, fs22;
 	struct xdpair pair1, pair2;
 	int status = -1;
 	xpparam_t const *xpp = &xmp->xpp;
@@ -692,8 +694,8 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	result->ptr = NULL;
 	result->size = 0;
 
-	xdl_prepare_env(orig, mf1, xpp, &pair1);
-	xdl_prepare_env(orig, mf2, xpp, &pair2);
+	xdl_prepare_env(orig, mf1, xpp, &fs11, &fs12, &pair1);
+	xdl_prepare_env(orig, mf2, xpp, &fs21, &fs22, &pair2);
 
 	if (xdl_do_diff(xpp, &pair1) < 0)
 		return -1;
@@ -734,9 +736,9 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	xdl_free_script(xscr1);
 	xdl_free_script(xscr2);
 
-	xdl_free_env(&pair2);
+	xdl_free_env(&fs11, &fs12, &pair2);
  free_xe1:
-	xdl_free_env(&pair1);
+	xdl_free_env(&fs21, &fs22, &pair1);
 
 	return status;
 }

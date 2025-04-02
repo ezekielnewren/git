@@ -32,8 +32,8 @@ extern void xdl_3way_prepare(mmfile_t const* base, mmfile_t const* side1, mmfile
 extern void xdl_3way_free(struct xd3way *three_way);
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		    struct xdpair *pair);
-void xdl_free_env(struct xdpair *pair);
+			struct xdfile *fs1, struct xdfile *fs2, struct xdpair *pair);
+void xdl_free_env(struct xdfile *fs1, struct xdfile *fs2, struct xdpair *pair);
 
 
 

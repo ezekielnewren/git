@@ -30,16 +30,22 @@
 
 extern void xdl_parse_lines(mmfile_t const* file, struct ivec_xrecord* record);
 
-static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
-			   struct xd_file_context *ctx) {
+static void xdl_file_prepare(mmfile_t *mf, struct xdfile *file_storage) {
+	IVEC_INIT(file_storage->record);
+	xdl_parse_lines(mf, &file_storage->record);
 
-	IVEC_INIT(ctx->file_storage.record);
-	xdl_parse_lines(mf, &ctx->file_storage.record);
-	ctx->record = &ctx->file_storage.record;
+	IVEC_INIT(file_storage->minimal_perfect_hash);
+	ivec_reserve_exact(&file_storage->minimal_perfect_hash, file_storage->record.length);
+}
 
-	IVEC_INIT(ctx->file_storage.minimal_perfect_hash);
-	ctx->minimal_perfect_hash = &ctx->file_storage.minimal_perfect_hash;
-	ivec_reserve_exact(&ctx->file_storage.minimal_perfect_hash, ctx->file_storage.record.length);
+static void xdl_file_free(struct xdfile *file_storage) {
+	ivec_free(&file_storage->minimal_perfect_hash);
+	ivec_free(&file_storage->record);
+}
+
+static void xdl_prepare_ctx(struct xdfile *file_storage, struct xd_file_context *ctx) {
+	ctx->record = &file_storage->record;
+	ctx->minimal_perfect_hash = &file_storage->minimal_perfect_hash;
 
 	IVEC_INIT(ctx->consider);
 	ivec_zero(&ctx->consider, SENTINEL + ctx->record->length + SENTINEL);
@@ -51,15 +57,16 @@ static void xdl_prepare_ctx(mmfile_t *mf, xpparam_t const *xpp,
 
 
 static void xdl_free_ctx(struct xd_file_context *ctx) {
-	ivec_free(&ctx->file_storage.minimal_perfect_hash);
-	ivec_free(&ctx->file_storage.record);
+	ctx->minimal_perfect_hash = NULL;
+	ctx->record = NULL;
 	ivec_free(&ctx->consider);
 	ivec_free(&ctx->rindex);
 }
 
 
-void xdl_free_env(struct xdpair *pair) {
-
+void xdl_free_env(struct xdfile *fs1, struct xdfile *fs2, struct xdpair *pair) {
+	xdl_file_free(fs1);
+	xdl_file_free(fs2);
 	xdl_free_ctx(&pair->rhs);
 	xdl_free_ctx(&pair->lhs);
 }
@@ -237,18 +244,21 @@ void xdl_mphb_process(void* mphb, struct xdfile *file);
 usize xdl_mphb_finish(void* mphb);
 
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		    struct xdpair *pair) {
+		    struct xdfile *fs1, struct xdfile *fs2, struct xdpair *pair) {
 	void* mphb;
 
 	pair->delta_start = 0;
 	pair->delta_end = 0;
 
-	xdl_prepare_ctx(mf1, xpp, &pair->lhs);
-	xdl_prepare_ctx(mf2, xpp, &pair->rhs);
+	xdl_file_prepare(mf1, fs1);
+	xdl_file_prepare(mf2, fs2);
+
+	xdl_prepare_ctx(fs1, &pair->lhs);
+	xdl_prepare_ctx(fs2, &pair->rhs);
 
 	mphb = xdl_mphb_new(pair->lhs.record->length + pair->rhs.record->length + 1, xpp->flags);
-	xdl_mphb_process(mphb, &pair->lhs.file_storage);
-	xdl_mphb_process(mphb, &pair->rhs.file_storage);
+	xdl_mphb_process(mphb, fs1);
+	xdl_mphb_process(mphb, fs2);
 	pair->minimal_perfect_hash_size = xdl_mphb_finish(mphb);
 
 	if ((xpp->flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0) {
