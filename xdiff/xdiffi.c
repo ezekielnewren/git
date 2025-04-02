@@ -47,9 +47,9 @@ static u64 get_mph(struct xd_file_context *ctx, usize index) {
  * search and to return a suboptimal point.
  */
 static isize xdl_split(struct xd_file_context *ctx1, isize off1, isize lim1,
-		      struct xd_file_context *ctx2, isize off2, isize lim2,
-		      isize *kvdf, isize *kvdb, bool need_min, struct xdpsplit *spl,
-		      struct xdalgoenv *xenv) {
+		       struct xd_file_context *ctx2, isize off2, isize lim2,
+		       isize *kvdf, isize *kvdb,
+		       bool need_min, struct xdpsplit *spl, struct xdalgoenv *xenv) {
 	isize dmin = off1 - lim2, dmax = lim1 - off2;
 	isize fmid = off1 - off2, bmid = lim1 - lim2;
 	bool odd = (fmid - bmid) & 1;
@@ -259,7 +259,8 @@ static isize xdl_split(struct xd_file_context *ctx1, isize off1, isize lim1,
  */
 i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 		 struct xd_file_context *ctx2, isize off2, isize lim2,
-		 isize *kvdf, isize *kvdb, bool need_min, struct xdalgoenv *xenv) {
+		 isize *kvdf, isize *kvdb,
+		 bool need_min, struct xdalgoenv *xenv) {
 
 	/*
 	 * Shrink the box by walking through each diagonal snake (SW and NE).
@@ -308,7 +309,8 @@ i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 
 int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	long ndiags;
-	long *kvd, *kvdf, *kvdb;
+	struct ivec_isize _kvdf, _kvdb;
+	isize *kvdf, *kvdb;
 	struct xdalgoenv xenv;
 	int res;
 
@@ -329,13 +331,14 @@ int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	 * One is to store the forward path and one to store the backward path.
 	 */
 	ndiags = pair->lhs.rindex.length + pair->rhs.rindex.length + 3;
-	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
-		return -1;
-	}
-	kvdf = kvd;
-	kvdb = kvdf + ndiags;
-	kvdf += pair->rhs.rindex.length + 1;
-	kvdb += pair->rhs.rindex.length + 1;
+	IVEC_INIT(_kvdf);
+	ivec_zero(&_kvdf, ndiags);
+
+	IVEC_INIT(_kvdb);
+	ivec_zero(&_kvdb, 2 * ndiags + 2 - ndiags);
+
+	kvdf = _kvdf.ptr + pair->rhs.rindex.length + 1;
+	kvdb = _kvdb.ptr + pair->rhs.rindex.length + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -343,11 +346,11 @@ int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	xenv.snake_cnt = XDL_SNAKE_CNT;
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
-
 	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.rindex.length, &pair->rhs, 0, pair->rhs.rindex.length,
 			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
-	xdl_free(kvd);
+	ivec_free(&_kvdf);
+	ivec_free(&_kvdb);
  out:
 
 	return res;
