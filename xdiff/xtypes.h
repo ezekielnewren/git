@@ -38,6 +38,10 @@ typedef struct s_chastore {
 	long scurr;
 } chastore_t;
 
+struct xrange {
+	usize start, end;
+};
+
 struct xoccurrence {
 	usize file1;
 	usize file2;
