@@ -72,8 +72,8 @@ void xdl_free_env(struct xdfile *fs1, struct xdfile *fs2, struct xdpair *pair) {
 }
 
 
-static bool xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
-	long r, rdis0, rpdis0, rdis1, rpdis1;
+static bool xdl_clean_mmatch(struct ivec_u8* dis, usize i, usize start, usize end) {
+	usize r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
 	 * Limits the window the is examined during the similar-lines
@@ -82,10 +82,10 @@ static bool xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
 	 * proceed all the way to the extremities by causing huge
 	 * performance penalties in case of big files.
 	 */
-	if (i - s > XDL_SIMSCAN_WINDOW)
-		s = i - XDL_SIMSCAN_WINDOW;
-	if (e - i > XDL_SIMSCAN_WINDOW)
-		e = i + XDL_SIMSCAN_WINDOW;
+	if (i - start > XDL_SIMSCAN_WINDOW)
+		start = i - XDL_SIMSCAN_WINDOW;
+	if (end - i > XDL_SIMSCAN_WINDOW)
+		end = i + XDL_SIMSCAN_WINDOW;
 
 	/*
 	 * Scans the lines before 'i' to find a run of lines that either
@@ -93,7 +93,7 @@ static bool xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
 	 * Note that we always call this function with dis[i] > 1, so the
 	 * current line (i) is already a multimatch line.
 	 */
-	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= s; r++) {
+	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= start; r++) {
 		if (dis->ptr[i - r] == NO)
 			rdis0++;
 		else if (dis->ptr[i - r] == TOO_MANY)
@@ -109,7 +109,7 @@ static bool xdl_clean_mmatch(struct ivec_u8* dis, long i, long s, long e) {
 	 */
 	if (rdis0 == 0)
 		return false;
-	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < e; r++) {
+	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < end; r++) {
 		if (dis->ptr[i + r] == NO)
 			rdis1++;
 		else if (dis->ptr[i + r] == TOO_MANY)
