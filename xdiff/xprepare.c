@@ -80,74 +80,7 @@ extern bool xdl_clean_mmatch(struct ivec_u8* dis, usize i, usize start, usize en
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they happear in a run of discardable.
  */
-static void xdl_cleanup_records(struct xdpair *pair) {
-	long i, nm, mlim;
-	struct ivec_u8 dis1, dis2;
-	struct ivec_xoccurrence occurrence;
-	usize end1 = pair->lhs.minimal_perfect_hash->length - pair->delta_end;
-	usize end2 = pair->rhs.minimal_perfect_hash->length - pair->delta_end;
-
-	if (pair->lhs.minimal_perfect_hash->length != pair->lhs.record->length)
-		BUG("mph size != record size");
-	if (pair->rhs.minimal_perfect_hash->length != pair->rhs.record->length)
-		BUG("mph size != record size");
-
-	IVEC_INIT(dis1);
-	IVEC_INIT(dis2);
-	IVEC_INIT(occurrence);
-
-	ivec_zero(&dis1, pair->lhs.minimal_perfect_hash->length + SENTINEL);
-	ivec_zero(&dis2, pair->rhs.minimal_perfect_hash->length + SENTINEL);
-	ivec_zero(&occurrence, pair->minimal_perfect_hash_size);
-
-	for (usize i = 0; i < pair->lhs.minimal_perfect_hash->length; i++) {
-		u64 mph = pair->lhs.minimal_perfect_hash->ptr[i];
-		occurrence.ptr[mph].file1 += 1;
-	}
-
-	for (usize i = 0; i < pair->rhs.minimal_perfect_hash->length; i++) {
-		u64 mph = pair->rhs.minimal_perfect_hash->ptr[i];
-		occurrence.ptr[mph].file2 += 1;
-	}
-
-	if ((mlim = xdl_bogosqrt(pair->lhs.minimal_perfect_hash->length)) > XDL_MAX_EQLIMIT)
-		mlim = XDL_MAX_EQLIMIT;
-	for (i = pair->delta_start; i < end1; i++) {
-		u64 mph = pair->lhs.minimal_perfect_hash->ptr[i];
-		nm = occurrence.ptr[mph].file2;
-		dis1.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
-	}
-
-	if ((mlim = xdl_bogosqrt(pair->rhs.minimal_perfect_hash->length)) > XDL_MAX_EQLIMIT)
-		mlim = XDL_MAX_EQLIMIT;
-	for (i = pair->delta_start; i < end2; i++) {
-		u64 mph = pair->rhs.minimal_perfect_hash->ptr[i];
-		nm = occurrence.ptr[mph].file1;
-		dis2.ptr[i] = (nm == 0) ? NO: (nm >= mlim) ? TOO_MANY: YES;
-	}
-
-	for (i = pair->delta_start; i < end1; i++) {
-		if (dis1.ptr[i] == YES ||
-		    (dis1.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis1, i, pair->delta_start, end1))) {
-			ivec_push(&pair->lhs.rindex, &i);
-		} else
-			pair->lhs.consider.ptr[SENTINEL + i] = YES;
-	}
-	ivec_shrink_to_fit(&pair->lhs.rindex);
-
-	for (i = pair->delta_start; i < end2; i++) {
-		if (dis2.ptr[i] == YES ||
-		    (dis2.ptr[i] == TOO_MANY && !xdl_clean_mmatch(&dis2, i, pair->delta_start, end2))) {
-			ivec_push(&pair->rhs.rindex, &i);
-		} else
-			pair->rhs.consider.ptr[SENTINEL + i] = YES;
-	}
-	ivec_shrink_to_fit(&pair->rhs.rindex);
-
-	ivec_free(&dis1);
-	ivec_free(&dis2);
-	ivec_free(&occurrence);
-}
+extern void xdl_cleanup_records(struct xdpair *pair);
 
 
 /*

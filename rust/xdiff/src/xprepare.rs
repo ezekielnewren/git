@@ -17,6 +17,14 @@ unsafe extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: usize, mut start: u
 }
 
 
+#[no_mangle]
+unsafe extern "C" fn xdl_cleanup_records(pair: *mut xdpair) {
+	let pair = xdpair::from_raw_mut(pair);
+	cleanup_records(pair)
+}
+
+
+
 fn clean_mmatch(dis: &mut IVec<u8>, i: usize, mut start: usize, mut end: usize) -> bool {
 	/*
 	 * Limits the window the is examined during the similar-lines
@@ -92,7 +100,7 @@ struct Occurrence {
 /// Try to reduce the problem complexity, discard records that have no
 /// matches on the other file. Also, lines that have multiple matches
 /// might be potentially discarded if they appear in a run of discardable.
-fn xdl_cleanup_records(pair: &mut xdpair) {
+fn cleanup_records(pair: &mut xdpair) {
 	let (lhs, rhs) = get_file_context!(pair);
 
 	let end1 = lhs.record.len() - pair.delta_end;
@@ -193,7 +201,7 @@ fn xdl_trim_ends(pair: &mut xdpair) {
 
 fn xdl_optimize_ctxs(pair: &mut xdpair) {
 	xdl_trim_ends(pair);
-	xdl_cleanup_records(pair);
+	cleanup_records(pair);
 }
 
 fn xdl_setup_ctx(file: &xdfile, ctx: &mut xd_file_context) {
