@@ -244,7 +244,8 @@ int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 	subfile2.ptr = (char *)pair->rhs.record->ptr[line2 - 1].ptr;
 	subfile2.size = (char *) pair->rhs.record->ptr[line2 + count2 - 2].ptr +
 		pair->rhs.record->ptr[line2 + count2 - 2].size - subfile2.ptr;
-	if (xdl_do_diff(&subfile1, &subfile2, xpp, &tmp_pair) < 0)
+	xdl_prepare_env(&subfile1, &subfile2, xpp, &tmp_pair);
+	if (xdl_do_diff(xpp, &tmp_pair) < 0)
 		return -1;
 
 	memcpy(pair->lhs.consider.ptr + SENTINEL + line1 - 1, tmp_pair.lhs.consider.ptr + SENTINEL, count1);

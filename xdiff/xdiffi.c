@@ -306,15 +306,11 @@ int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 }
 
 
-int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		struct xdpair *pair) {
+int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
 	xdalgoenv_t xenv;
 	int res;
-
-	if (xdl_prepare_env(mf1, mf2, xpp, pair) < 0)
-		return -1;
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
 		res = xdl_do_patience_diff(xpp, pair);
@@ -334,8 +330,6 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	 */
 	ndiags = pair->lhs.rindex.length + pair->rhs.rindex.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
-
-		xdl_free_env(pair);
 		return -1;
 	}
 	kvdf = kvd;
@@ -355,8 +349,6 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 			   &xenv);
 	xdl_free(kvd);
  out:
-	if (res < 0)
-		xdl_free_env(pair);
 
 	return res;
 }
@@ -1039,10 +1031,9 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	struct xdpair pair;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 
-	struct xd2way two_way;
-	xdl_2way_prepare(mf1, mf2, xpp->flags, &two_way);
+	xdl_prepare_env(mf1, mf2, xpp, &pair);
 
-	if (xdl_do_diff(mf1, mf2, xpp, &pair) < 0) {
+	if (xdl_do_diff(xpp, &pair) < 0) {
 
 		return -1;
 	}
