@@ -29,8 +29,8 @@
 #define XDL_K_HEUR 4
 
 typedef struct s_xdpsplit {
-	long i1, i2;
-	int min_lo, min_hi;
+	isize i1, i2;
+	bool min_lo, min_hi;
 } xdpsplit_t;
 
 static u64 get_mph(struct xd_file_context *ctx, usize index) {
@@ -46,16 +46,16 @@ static u64 get_mph(struct xd_file_context *ctx, usize index) {
  * using this algorithm, so a little bit of heuristic is needed to cut the
  * search and to return a suboptimal point.
  */
-static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
-		      struct xd_file_context *ctx2, long off2, long lim2,
-		      long *kvdf, long *kvdb, int need_min, xdpsplit_t *spl,
+static isize xdl_split(struct xd_file_context *ctx1, isize off1, isize lim1,
+		      struct xd_file_context *ctx2, isize off2, isize lim2,
+		      isize *kvdf, isize *kvdb, bool need_min, xdpsplit_t *spl,
 		      xdalgoenv_t *xenv) {
-	long dmin = off1 - lim2, dmax = lim1 - off2;
-	long fmid = off1 - off2, bmid = lim1 - lim2;
-	long odd = (fmid - bmid) & 1;
-	long fmin = fmid, fmax = fmid;
-	long bmin = bmid, bmax = bmid;
-	long ec, d, i1, i2, prev1, best, dd, v, k;
+	isize dmin = off1 - lim2, dmax = lim1 - off2;
+	isize fmid = off1 - off2, bmid = lim1 - lim2;
+	bool odd = (fmid - bmid) & 1;
+	isize fmin = fmid, fmax = fmid;
+	isize bmin = bmid, bmax = bmid;
+	isize ec, d, i1, i2, prev1, best, dd, v, k;
 
 	/*
 	 * Set initial diagonal values for both forward and backward path.
@@ -64,7 +64,7 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 	kvdb[bmid] = lim1;
 
 	for (ec = 1;; ec++) {
-		int got_snake = 0;
+		bool got_snake = false;
 
 		/*
 		 * We need to extend the diagonal "domain" by one. If the next
@@ -93,12 +93,12 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 			i2 = i1 - d;
 			for (; i1 < lim1 && i2 < lim2 && get_mph(ctx1, i1) == get_mph(ctx2, i2); i1++, i2++);
 			if (i1 - prev1 > xenv->snake_cnt)
-				got_snake = 1;
+				got_snake = true;
 			kvdf[d] = i1;
 			if (odd && bmin <= d && d <= bmax && kvdb[d] <= i1) {
 				spl->i1 = i1;
 				spl->i2 = i2;
-				spl->min_lo = spl->min_hi = 1;
+				spl->min_lo = spl->min_hi = true;
 				return ec;
 			}
 		}
@@ -130,12 +130,12 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 			i2 = i1 - d;
 			for (; i1 > off1 && i2 > off2 && get_mph(ctx1, i1 - 1) == get_mph(ctx2, i2 - 1); i1--, i2--);
 			if (prev1 - i1 > xenv->snake_cnt)
-				got_snake = 1;
+				got_snake = true;
 			kvdb[d] = i1;
 			if (!odd && fmin <= d && d <= fmax && i1 <= kvdf[d]) {
 				spl->i1 = i1;
 				spl->i2 = i2;
-				spl->min_lo = spl->min_hi = 1;
+				spl->min_lo = spl->min_hi = true;
 				return ec;
 			}
 		}
@@ -173,8 +173,8 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 				}
 			}
 			if (best > 0) {
-				spl->min_lo = 1;
-				spl->min_hi = 0;
+				spl->min_lo = true;
+				spl->min_hi = false;
 				return ec;
 			}
 
@@ -197,8 +197,8 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 				}
 			}
 			if (best > 0) {
-				spl->min_lo = 0;
-				spl->min_hi = 1;
+				spl->min_lo = false;
+				spl->min_hi = true;
 				return ec;
 			}
 		}
@@ -209,7 +209,7 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 		 * measure.
 		 */
 		if (ec >= xenv->mxcost) {
-			long fbest, fbest1, bbest, bbest1;
+			isize fbest, fbest1, bbest, bbest1;
 
 			fbest = fbest1 = -1;
 			for (d = fmax; d >= fmin; d -= 2) {
@@ -238,13 +238,13 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
 			if ((lim1 + lim2) - bbest < fbest - (off1 + off2)) {
 				spl->i1 = fbest1;
 				spl->i2 = fbest - fbest1;
-				spl->min_lo = 1;
-				spl->min_hi = 0;
+				spl->min_lo = true;
+				spl->min_hi = false;
 			} else {
 				spl->i1 = bbest1;
 				spl->i2 = bbest - bbest1;
-				spl->min_lo = 0;
-				spl->min_hi = 1;
+				spl->min_lo = false;
+				spl->min_hi = true;
 			}
 			return ec;
 		}
@@ -257,9 +257,9 @@ static long xdl_split(struct xd_file_context *ctx1, long off1, long lim1,
  * sub-boxes by calling the box splitting function. Note that the real job
  * (marking changed lines) is done in the two boundary reaching checks.
  */
-int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
-		 struct xd_file_context *ctx2, long off2, long lim2,
-		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv) {
+i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
+		 struct xd_file_context *ctx2, isize off2, isize lim2,
+		 isize *kvdf, isize *kvdb, bool need_min, xdalgoenv_t *xenv) {
 
 	/*
 	 * Shrink the box by walking through each diagonal snake (SW and NE).
