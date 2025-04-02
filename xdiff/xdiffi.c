@@ -48,7 +48,7 @@ static u64 get_mph(struct xd_file_context *ctx, usize index) {
  */
 static isize xdl_split(struct xd_file_context *ctx1, isize off1, isize lim1,
 		       struct xd_file_context *ctx2, isize off2, isize lim2,
-		       isize *kvdf, isize *kvdb,
+		       usize kvd_off, struct ivec_isize *_kvdf, struct ivec_isize *_kvdb,
 		       bool need_min, struct xdpsplit *spl, struct xdalgoenv *xenv) {
 	isize dmin = off1 - lim2, dmax = lim1 - off2;
 	isize fmid = off1 - off2, bmid = lim1 - lim2;
@@ -56,6 +56,9 @@ static isize xdl_split(struct xd_file_context *ctx1, isize off1, isize lim1,
 	isize fmin = fmid, fmax = fmid;
 	isize bmin = bmid, bmax = bmid;
 	isize ec, d, i1, i2, prev1, best, dd, v, k;
+
+	isize *kvdf = _kvdf->ptr + kvd_off;
+	isize *kvdb = _kvdb->ptr + kvd_off;
 
 	/*
 	 * Set initial diagonal values for both forward and backward path.
@@ -259,7 +262,7 @@ static isize xdl_split(struct xd_file_context *ctx1, isize off1, isize lim1,
  */
 i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 		 struct xd_file_context *ctx2, isize off2, isize lim2,
-		 isize *kvdf, isize *kvdb,
+		 usize kvd_off, struct ivec_isize *kvdf, struct ivec_isize *kvdb,
 		 bool need_min, struct xdalgoenv *xenv) {
 
 	/*
@@ -285,7 +288,7 @@ i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 		/*
 		 * Divide ...
 		 */
-		if (xdl_split(ctx1, off1, lim1, ctx2, off2, lim2, kvdf, kvdb,
+		if (xdl_split(ctx1, off1, lim1, ctx2, off2, lim2, kvd_off, kvdf, kvdb,
 			      need_min, &spl, xenv) < 0) {
 
 			return -1;
@@ -295,9 +298,9 @@ i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 		 * ... et Impera.
 		 */
 		if (xdl_recs_cmp(ctx1, off1, spl.i1, ctx2, off2, spl.i2,
-				 kvdf, kvdb, spl.min_lo, xenv) < 0 ||
+				 kvd_off, kvdf, kvdb, spl.min_lo, xenv) < 0 ||
 		    xdl_recs_cmp(ctx1, spl.i1, lim1, ctx2, spl.i2, lim2,
-				 kvdf, kvdb, spl.min_hi, xenv) < 0) {
+				 kvd_off,  kvdf, kvdb, spl.min_hi, xenv) < 0) {
 
 			return -1;
 		}
@@ -309,8 +312,8 @@ i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 
 i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	isize ndiags;
-	struct ivec_isize _kvdf, _kvdb;
-	isize *kvdf, *kvdb;
+	usize kvd_off;
+	struct ivec_isize kvdf, kvdb;
 	struct xdalgoenv xenv;
 	i32 res;
 
@@ -331,14 +334,13 @@ i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	 * One is to store the forward path and one to store the backward path.
 	 */
 	ndiags = pair->lhs.rindex.length + pair->rhs.rindex.length + 3;
-	IVEC_INIT(_kvdf);
-	ivec_zero(&_kvdf, ndiags);
+	IVEC_INIT(kvdf);
+	ivec_zero(&kvdf, ndiags);
 
-	IVEC_INIT(_kvdb);
-	ivec_zero(&_kvdb, 2 * ndiags + 2 - ndiags);
+	IVEC_INIT(kvdb);
+	ivec_zero(&kvdb, 2 * ndiags + 2 - ndiags);
 
-	kvdf = _kvdf.ptr + pair->rhs.rindex.length + 1;
-	kvdb = _kvdb.ptr + pair->rhs.rindex.length + 1;
+	kvd_off = pair->rhs.rindex.length + 1;
 
 	xenv.mxcost = xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -347,10 +349,10 @@ i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.rindex.length, &pair->rhs, 0, pair->rhs.rindex.length,
-			   kvdf, kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
+			   kvd_off, &kvdf, &kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
-	ivec_free(&_kvdf);
-	ivec_free(&_kvdb);
+	ivec_free(&kvdf);
+	ivec_free(&kvdb);
  out:
 
 	return res;
