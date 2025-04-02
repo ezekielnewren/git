@@ -368,7 +368,7 @@ static struct xdchange *xdl_add_change(struct xdchange *xscr, long i1, long i2, 
 	xch->i2 = i2;
 	xch->chg1 = chg1;
 	xch->chg2 = chg2;
-	xch->ignore = 0;
+	xch->ignore = false;
 
 	return xch;
 }
@@ -972,7 +972,7 @@ static void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair,
 	struct xdchange *xch;
 
 	for (xch = xscr; xch; xch = xch->next) {
-		int ignore = 1;
+		bool ignore = true;
 		struct xrecord *rec;
 		long i;
 

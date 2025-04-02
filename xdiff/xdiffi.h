@@ -26,16 +26,16 @@
 
 
 struct xdalgoenv {
-	long mxcost;
-	long snake_cnt;
-	long heur_min;
+	isize mxcost;
+	isize snake_cnt;
+	isize heur_min;
 };
 
 struct xdchange {
 	struct xdchange *next;
-	long i1, i2;
-	long chg1, chg2;
-	int ignore;
+	isize i1, i2;
+	isize chg1, chg2;
+	bool ignore;
 };
 
 
