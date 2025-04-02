@@ -1028,39 +1028,38 @@ static void xdl_mark_ignorable_regex(xdchange_t *xscr, const struct xdpair *pair
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
 	xdchange_t *xscr;
-	struct xdfile fs1, fs2;
-	struct xdpair pair;
+	struct xd2way two_way;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
 
-	xdl_prepare_env(mf1, mf2, xpp, &fs1, &fs2, &pair);
+	xdl_prepare_env(mf1, mf2, xpp, &two_way.lhs, &two_way.rhs, &two_way.pair);
 
-	if (xdl_do_diff(xpp, &pair) < 0) {
+	if (xdl_do_diff(xpp, &two_way.pair) < 0) {
 
 		return -1;
 	}
-	if (xdl_change_compact(&pair.lhs, &pair.rhs, xpp->flags) < 0 ||
-	    xdl_change_compact(&pair.rhs, &pair.lhs, xpp->flags) < 0 ||
-	    xdl_build_script(&pair, &xscr) < 0) {
+	if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
+	    xdl_change_compact(&two_way.pair.rhs, &two_way.pair.lhs, xpp->flags) < 0 ||
+	    xdl_build_script(&two_way.pair, &xscr) < 0) {
 
-		xdl_free_env(&fs1, &fs2, &pair);
+		xdl_2way_free(&two_way);
 		return -1;
 	}
 	if (xscr) {
 		if (xpp->flags & XDF_IGNORE_BLANK_LINES)
-			xdl_mark_ignorable_lines(xscr, &pair, xpp->flags);
+			xdl_mark_ignorable_lines(xscr, &two_way.pair, xpp->flags);
 
 		if (xpp->ignore_regex)
-			xdl_mark_ignorable_regex(xscr, &pair, xpp);
+			xdl_mark_ignorable_regex(xscr, &two_way.pair, xpp);
 
-		if (ef(&pair, xscr, ecb, xecfg) < 0) {
+		if (ef(&two_way.pair, xscr, ecb, xecfg) < 0) {
 
 			xdl_free_script(xscr);
-			xdl_free_env(&fs1, &fs2, &pair);
+			xdl_2way_free(&two_way);
 			return -1;
 		}
 		xdl_free_script(xscr);
 	}
-	xdl_free_env(&fs1, &fs2, &pair);
+	xdl_2way_free(&two_way);
 
 	return 0;
 }
