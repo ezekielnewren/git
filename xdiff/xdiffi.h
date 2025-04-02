@@ -40,11 +40,11 @@ struct xdchange {
 
 
 
-int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
-		 struct xd_file_context *ctx2, long off2, long lim2,
-		 long *kvdf, long *kvdb, bool need_min, struct xdalgoenv *xenv);
+int xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
+		 struct xd_file_context *ctx2, isize off2, isize lim2,
+		 isize *kvdf, isize *kvdb, bool need_min, struct xdalgoenv *xenv);
 int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair);
-int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, long flags);
+int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, u64 flags);
 int xdl_build_script(struct xdpair *pair, struct xdchange **xscr);
 void xdl_free_script(struct xdchange *xscr);
 int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,

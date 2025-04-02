@@ -307,12 +307,12 @@ i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 }
 
 
-int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
-	long ndiags;
+i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
+	isize ndiags;
 	struct ivec_isize _kvdf, _kvdb;
 	isize *kvdf, *kvdb;
 	struct xdalgoenv xenv;
-	int res;
+	i32 res;
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
 		res = xdl_do_patience_diff(xpp, pair);
@@ -357,7 +357,7 @@ int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 }
 
 
-static struct xdchange *xdl_add_change(struct xdchange *xscr, long i1, long i2, long chg1, long chg2) {
+static struct xdchange *xdl_add_change(struct xdchange *xscr, isize i1, isize i2, isize chg1, isize chg2) {
 	struct xdchange *xch;
 
 	if (!(xch = (struct xdchange *) xdl_malloc(sizeof(struct xdchange))))
@@ -777,7 +777,7 @@ static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
  * This also helps in finding joinable change groups and reducing the diff
  * size.
  */
-int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, long flags) {
+int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, u64 flags) {
 	struct xdlgroup g, go;
 	long earliest_end, end_matching_other;
 	long groupsize;
