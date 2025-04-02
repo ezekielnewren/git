@@ -86,30 +86,7 @@ extern void xdl_cleanup_records(struct xdpair *pair);
 /*
  * Early trim initial and terminal matching records.
  */
-static void xdl_trim_ends(struct xdpair *pair) {
-	usize lim = XDL_MIN(pair->lhs.minimal_perfect_hash->length, pair->rhs.minimal_perfect_hash->length);
-
-	for (usize i = 0; i < lim; i++) {
-		u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[i];
-		u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[i];
-		if (mph1 != mph2) {
-			pair->delta_start = i;
-			lim -= i;
-			break;
-		}
-	}
-
-	for (usize i = 0; i < lim; i++) {
-		usize i1 = pair->lhs.minimal_perfect_hash->length - 1 - i;
-		usize i2 = pair->rhs.minimal_perfect_hash->length - 1 - i;
-		u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[i1];
-		u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[i2];
-		if (mph1 != mph2) {
-			pair->delta_end = i;
-			break;
-		}
-	}
-}
+extern void xdl_trim_ends(struct xdpair *pair);
 
 
 static void xdl_optimize_ctxs(struct xdpair *pair) {

@@ -24,6 +24,12 @@ unsafe extern "C" fn xdl_cleanup_records(pair: *mut xdpair) {
 }
 
 
+#[no_mangle]
+unsafe extern "C" fn xdl_trim_ends(pair: *mut xdpair) {
+	let pair = xdpair::from_raw_mut(pair);
+	trim_ends(pair)
+}
+
 
 fn clean_mmatch(dis: &mut IVec<u8>, i: usize, mut start: usize, mut end: usize) -> bool {
 	/*
@@ -174,7 +180,7 @@ fn cleanup_records(pair: &mut xdpair) {
 	rhs.rindex.shrink_to_fit();
 }
 
-fn xdl_trim_ends(pair: &mut xdpair) {
+fn trim_ends(pair: &mut xdpair) {
 	let (lhs, rhs) = get_file_context!(pair);
 
 	let mut lim = std::cmp::min(lhs.record.len(), rhs.record.len());
@@ -199,8 +205,8 @@ fn xdl_trim_ends(pair: &mut xdpair) {
 	}
 }
 
-fn xdl_optimize_ctxs(pair: &mut xdpair) {
-	xdl_trim_ends(pair);
+fn optimize_ctxs(pair: &mut xdpair) {
+	trim_ends(pair);
 	cleanup_records(pair);
 }
 
@@ -225,7 +231,7 @@ fn xdl_pair_prepare(
 	xdl_setup_ctx(rhs, &mut pair.rhs);
 
 	if (flags & (XDF_PATIENCE_DIFF | XDF_HISTOGRAM_DIFF)) == 0 {
-		xdl_optimize_ctxs(pair);
+		optimize_ctxs(pair);
 	}
 }
 
