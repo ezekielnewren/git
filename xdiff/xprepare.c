@@ -72,62 +72,7 @@ void xdl_free_env(struct xdfile *fs1, struct xdfile *fs2, struct xdpair *pair) {
 }
 
 
-static bool xdl_clean_mmatch(struct ivec_u8* dis, usize i, usize start, usize end) {
-	usize r, rdis0, rpdis0, rdis1, rpdis1;
-
-	/*
-	 * Limits the window the is examined during the similar-lines
-	 * scan. The loops below stops when dis[i - r] == 1 (line that
-	 * has no match), but there are corner cases where the loop
-	 * proceed all the way to the extremities by causing huge
-	 * performance penalties in case of big files.
-	 */
-	if (i - start > XDL_SIMSCAN_WINDOW)
-		start = i - XDL_SIMSCAN_WINDOW;
-	if (end - i > XDL_SIMSCAN_WINDOW)
-		end = i + XDL_SIMSCAN_WINDOW;
-
-	/*
-	 * Scans the lines before 'i' to find a run of lines that either
-	 * have no match (dis[j] == 0) or have multiple matches (dis[j] > 1).
-	 * Note that we always call this function with dis[i] > 1, so the
-	 * current line (i) is already a multimatch line.
-	 */
-	for (r = 1, rdis0 = 0, rpdis0 = 1; (i - r) >= start; r++) {
-		if (dis->ptr[i - r] == NO)
-			rdis0++;
-		else if (dis->ptr[i - r] == TOO_MANY)
-			rpdis0++;
-		else
-			break;
-	}
-	/*
-	 * If the run before the line 'i' found only multimatch lines, we
-	 * return 0 and hence we don't make the current line (i) discarded.
-	 * We want to discard multimatch lines only when they appear in the
-	 * middle of runs with nomatch lines (dis[j] == 0).
-	 */
-	if (rdis0 == 0)
-		return false;
-	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < end; r++) {
-		if (dis->ptr[i + r] == NO)
-			rdis1++;
-		else if (dis->ptr[i + r] == TOO_MANY)
-			rpdis1++;
-		else
-			break;
-	}
-	/*
-	 * If the run after the line 'i' found only multimatch lines, we
-	 * return 0 and hence we don't make the current line (i) discarded.
-	 */
-	if (rdis1 == 0)
-		return false;
-	rdis1 += rdis0;
-	rpdis1 += rpdis0;
-
-	return rpdis1 * XDL_KPDIS_RUN < rpdis1 + rdis1;
-}
+extern bool xdl_clean_mmatch(struct ivec_u8* dis, usize i, usize start, usize end);
 
 
 /*

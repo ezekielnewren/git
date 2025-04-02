@@ -10,7 +10,14 @@ const XDL_MAX_EQLIMIT: u64 = 1024;
 const XDL_SIMSCAN_WINDOW: usize = 100;
 
 
-fn xdl_clean_mmatch(dis: &mut Vec<u8>, i: usize, mut start: usize, mut end: usize) -> bool {
+#[no_mangle]
+unsafe extern "C" fn xdl_clean_mmatch(dis: *mut IVec<u8>, i: usize, mut start: usize, mut end: usize) -> bool {
+	let dis = IVec::from_raw_mut(dis);
+	clean_mmatch(dis, i, start, end)
+}
+
+
+fn clean_mmatch(dis: &mut IVec<u8>, i: usize, mut start: usize, mut end: usize) -> bool {
 	/*
 	 * Limits the window the is examined during the similar-lines
 	 * scan. The loops below stops when dis[i - r] == 1 (line that
@@ -34,7 +41,7 @@ fn xdl_clean_mmatch(dis: &mut Vec<u8>, i: usize, mut start: usize, mut end: usiz
 	let mut rdis0 = 0;
 	let mut rpdis0 = 1;
 	for i0 in (start..i).rev() {
-		if dis[i0] != NO {
+		if dis[i0] == NO {
 			rdis0 += 1;
 		} else if dis[i0] == TOO_MANY {
 			rpdis0 += 1;
@@ -54,7 +61,7 @@ fn xdl_clean_mmatch(dis: &mut Vec<u8>, i: usize, mut start: usize, mut end: usiz
 	let mut rdis1 = 0;
 	let mut rpdis1 = 1;
 	for i1 in i + 1..end {
-		if dis[i1] != NO {
+		if dis[i1] == NO {
 			rdis1 += 1;
 		} else if dis[i1] == TOO_MANY {
 			rpdis1 += 1;
@@ -97,9 +104,9 @@ fn xdl_cleanup_records(pair: &mut xdpair) {
 	 * everywhere else uses the sentinel values to stop
 	 * iteration
 	 */
-	let mut dis1 = Vec::new();
+	let mut dis1 = IVec::new();
 	dis1.resize(lhs.record.len(), NO);
-	let mut dis2 = Vec::new();
+	let mut dis2 = IVec::new();
 	dis2.resize(rhs.record.len(), NO);
 	let mut occurrence = Vec::new();
 	occurrence.resize_with(pair.minimal_perfect_hash_size, || Occurrence::default());
@@ -140,7 +147,7 @@ fn xdl_cleanup_records(pair: &mut xdpair) {
 
 	for i in pair.delta_start..end1 {
 		if dis1[i] == YES ||
-		    (dis1[i] == TOO_MANY && !xdl_clean_mmatch(&mut dis1, i, pair.delta_start, end1)) {
+		    (dis1[i] == TOO_MANY && !clean_mmatch(&mut dis1, i, pair.delta_start, end1)) {
 			lhs.rindex.push(i);
 		} else {
 			lhs.consider[SENTINEL + i] = YES;
@@ -150,7 +157,7 @@ fn xdl_cleanup_records(pair: &mut xdpair) {
 
 	for i in pair.delta_start..end2 {
 		if dis2[i] == YES ||
-		    (dis2[i] == TOO_MANY && !xdl_clean_mmatch(&mut dis2, i, pair.delta_start, end2)) {
+		    (dis2[i] == TOO_MANY && !clean_mmatch(&mut dis2, i, pair.delta_start, end2)) {
 			rhs.rindex.push(i);
 		} else {
 			rhs.consider[SENTINEL + i] = YES;
