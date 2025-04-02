@@ -13,7 +13,7 @@ pub mod xprepare;
 pub mod maps;
 #[cfg(test)]
 pub(crate) mod mock;
-
+pub(crate) mod xdiffi;
 
 #[no_mangle]
 unsafe extern "C" fn xdl_mphb_new(max_unique_keys: usize, flags: u64) -> *mut libc::c_void {
