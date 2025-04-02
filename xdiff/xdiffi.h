@@ -25,29 +25,29 @@
 
 
 
-typedef struct s_xdalgoenv {
+struct xdalgoenv {
 	long mxcost;
 	long snake_cnt;
 	long heur_min;
-} xdalgoenv_t;
+};
 
-typedef struct s_xdchange {
-	struct s_xdchange *next;
+struct xdchange {
+	struct xdchange *next;
 	long i1, i2;
 	long chg1, chg2;
 	int ignore;
-} xdchange_t;
+};
 
 
 
 int xdl_recs_cmp(struct xd_file_context *ctx1, long off1, long lim1,
 		 struct xd_file_context *ctx2, long off2, long lim2,
-		 long *kvdf, long *kvdb, bool need_min, xdalgoenv_t *xenv);
+		 long *kvdf, long *kvdb, bool need_min, struct xdalgoenv *xenv);
 int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair);
 int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, long flags);
-int xdl_build_script(struct xdpair *pair, xdchange_t **xscr);
-void xdl_free_script(xdchange_t *xscr);
-int xdl_emit_diff(struct xdpair *pair, xdchange_t *xscr, xdemitcb_t *ecb,
+int xdl_build_script(struct xdpair *pair, struct xdchange **xscr);
+void xdl_free_script(struct xdchange *xscr);
+int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
 		  xdemitconf_t const *xecfg);
 int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair);
 int xdl_do_histogram_diff(xpparam_t const *xpp, struct xdpair *pair);

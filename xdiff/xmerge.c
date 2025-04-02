@@ -365,7 +365,7 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 	for (; m; m = m->next) {
 		mmfile_t t1, t2;
 		struct xd2way two_way;
-		xdchange_t *xscr, *x;
+		struct xdchange *xscr, *x;
 		int i1 = m->i1, i2 = m->i2;
 
 		/* let's handle just the conflicts */
@@ -502,8 +502,8 @@ static int xdl_simplify_non_conflicts(struct xdpair *pair1, xdmerge_t *m,
  *
  * returns < 0 on error, == 0 for no conflicts, else number of conflicts
  */
-static int xdl_do_merge(struct xdpair *pair1, xdchange_t *xscr1,
-		struct xdpair *pair2, xdchange_t *xscr2,
+static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
+		struct xdpair *pair2, struct xdchange *xscr2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
 	xdmerge_t *changes, *c;
@@ -684,7 +684,7 @@ static int xdl_do_merge(struct xdpair *pair1, xdchange_t *xscr1,
 int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
-	xdchange_t *xscr1 = NULL, *xscr2 = NULL;
+	struct xdchange *xscr1 = NULL, *xscr2 = NULL;
 	struct xd3way three_way;
 	int status = -1;
 	xpparam_t const *xpp = &xmp->xpp;
