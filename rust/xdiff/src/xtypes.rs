@@ -143,6 +143,25 @@ impl Default for xd_file_context {
 }
 
 
+impl xd_file_context {
+
+    pub(crate) unsafe fn from_raw_mut<'a>(ctx: *mut xd_file_context) -> &'a mut xd_file_context {
+        if ctx.is_null() {
+            panic!("null pointer");
+        }
+
+        let out = &mut *ctx;
+        (*out.minimal_perfect_hash).test_invariants();
+        (*out.record).test_invariants();
+        out.consider.test_invariants();
+        out.rindex.test_invariants();
+
+        out
+    }
+
+}
+
+
 pub struct FileContext<'a> {
     pub minimal_perfect_hash: &'a IVec<u64>,
     pub record: &'a IVec<xrecord>,
