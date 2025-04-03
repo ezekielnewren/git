@@ -24,7 +24,6 @@
 #define XDIFFI_H
 
 
-
 struct xdalgoenv {
 	isize mxcost;
 	isize snake_cnt;
@@ -39,12 +38,7 @@ struct xdchange {
 };
 
 
-
-extern i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
-		 struct xd_file_context *ctx2, isize off2, isize lim2,
-		 isize kvd_off, struct ivec_isize *kvdf, struct ivec_isize *kvdb,
-		 bool need_min, struct xdalgoenv *xenv);
-i32 xdl_do_classic_diff(u64 flags, struct xdpair *pair);
+extern i32 xdl_do_classic_diff(u64 flags, struct xdpair *pair);
 int xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair);
 int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, u64 flags);
 int xdl_build_script(struct xdpair *pair, struct xdchange **xscr);

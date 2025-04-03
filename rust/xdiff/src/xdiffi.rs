@@ -1,7 +1,7 @@
 use interop::ivec::IVec;
 use crate::xdiff::*;
-use crate::xtypes::{xd_file_context, FileContext};
-
+use crate::xtypes::{xd_file_context, xdpair, FileContext};
+use crate::xutils::xdl_bogosqrt;
 
 const XDL_MAX_COST_MIN: isize = 256;
 const XDL_HEUR_MIN_COST: isize = 256;
@@ -420,6 +420,41 @@ unsafe extern "C" fn xdl_recs_cmp(
 
 	return 0;
 }
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_do_classic_diff(flags: u64, pair: *mut xdpair) -> i32 {
+	let pair = xdpair::from_raw_mut(pair);
+	let mut xenv = xdalgoenv {
+		mxcost: 0,
+		snake_cnt: 0,
+		heur_min: 0,
+	};
+
+	/*
+	 * Allocate and setup K vectors to be used by the differential
+	 * algorithm.
+	 *
+	 * One is to store the forward path and one to store the backward path.
+	 */
+	let ndiags = pair.lhs.rindex.len() + pair.rhs.rindex.len() + 3;
+	let mut kvdf = IVec::<isize>::zero(ndiags);
+	let mut kvdb = IVec::<isize>::zero(2 * ndiags + 2 - ndiags);
+
+	let kvd_off = (pair.rhs.rindex.len() + 1) as isize;
+
+	xenv.mxcost = xdl_bogosqrt(ndiags as u64) as isize;
+	if xenv.mxcost < XDL_MAX_COST_MIN {
+		xenv.mxcost = XDL_MAX_COST_MIN;
+	}
+	xenv.snake_cnt = XDL_SNAKE_CNT;
+	xenv.heur_min = XDL_HEUR_MIN_COST;
+
+	xdl_recs_cmp(&mut pair.lhs, 0, pair.lhs.rindex.len() as isize, &mut pair.rhs, 0, pair.rhs.rindex.len() as isize,
+			   kvd_off, &mut kvdf, &mut kvdb, (flags & XDF_NEED_MINIMAL) != 0,
+			   &mut xenv)
+}
+
 
 
 

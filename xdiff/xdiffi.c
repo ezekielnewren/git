@@ -33,43 +33,6 @@ struct xdpsplit {
 	bool min_lo, min_hi;
 };
 
-i32 xdl_do_classic_diff(u64 flags, struct xdpair *pair) {
-	i32 res;
-	isize ndiags;
-	isize kvd_off;
-	struct ivec_isize kvdf, kvdb;
-	struct xdalgoenv xenv;
-
-	/*
-	 * Allocate and setup K vectors to be used by the differential
-	 * algorithm.
-	 *
-	 * One is to store the forward path and one to store the backward path.
-	 */
-	ndiags = pair->lhs.rindex.length + pair->rhs.rindex.length + 3;
-	IVEC_INIT(kvdf);
-	ivec_zero(&kvdf, ndiags);
-
-	IVEC_INIT(kvdb);
-	ivec_zero(&kvdb, 2 * ndiags + 2 - ndiags);
-
-	kvd_off = pair->rhs.rindex.length + 1;
-
-	xenv.mxcost = xdl_bogosqrt(ndiags);
-	if (xenv.mxcost < XDL_MAX_COST_MIN)
-		xenv.mxcost = XDL_MAX_COST_MIN;
-	xenv.snake_cnt = XDL_SNAKE_CNT;
-	xenv.heur_min = XDL_HEUR_MIN_COST;
-
-	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.rindex.length, &pair->rhs, 0, pair->rhs.rindex.length,
-			   kvd_off, &kvdf, &kvdb, (flags & XDF_NEED_MINIMAL) != 0,
-			   &xenv);
-	ivec_free(&kvdf);
-	ivec_free(&kvdb);
-
-	return res;
-}
-
 
 i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
