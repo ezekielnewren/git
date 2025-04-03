@@ -33,23 +33,12 @@ struct xdpsplit {
 	bool min_lo, min_hi;
 };
 
-
-i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
+i32 xdl_do_classic_diff(xpparam_t const *xpp, struct xdpair *pair) {
+	i32 res;
 	isize ndiags;
 	isize kvd_off;
 	struct ivec_isize kvdf, kvdb;
 	struct xdalgoenv xenv;
-	i32 res;
-
-	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
-		res = xdl_do_patience_diff(xpp, pair);
-		goto out;
-	}
-
-	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
-		res = xdl_do_histogram_diff(xpp, pair);
-		goto out;
-	}
 
 	/*
 	 * Allocate and setup K vectors to be used by the differential
@@ -77,9 +66,21 @@ i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 			   &xenv);
 	ivec_free(&kvdf);
 	ivec_free(&kvdb);
- out:
 
 	return res;
+}
+
+
+i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
+	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
+		return xdl_do_patience_diff(xpp, pair);
+	}
+
+	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
+		return xdl_do_histogram_diff(xpp, pair);
+	}
+
+	return xdl_do_classic_diff(xpp, pair);
 }
 
 
