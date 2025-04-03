@@ -33,7 +33,7 @@ struct xdpsplit {
 	bool min_lo, min_hi;
 };
 
-i32 xdl_do_classic_diff(xpparam_t const *xpp, struct xdpair *pair) {
+i32 xdl_do_classic_diff(u64 flags, struct xdpair *pair) {
 	i32 res;
 	isize ndiags;
 	isize kvd_off;
@@ -62,7 +62,7 @@ i32 xdl_do_classic_diff(xpparam_t const *xpp, struct xdpair *pair) {
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 	res = xdl_recs_cmp(&pair->lhs, 0, pair->lhs.rindex.length, &pair->rhs, 0, pair->rhs.rindex.length,
-			   kvd_off, &kvdf, &kvdb, (xpp->flags & XDF_NEED_MINIMAL) != 0,
+			   kvd_off, &kvdf, &kvdb, (flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 	ivec_free(&kvdf);
 	ivec_free(&kvdb);
@@ -80,7 +80,7 @@ i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
 		return xdl_do_histogram_diff(xpp, pair);
 	}
 
-	return xdl_do_classic_diff(xpp, pair);
+	return xdl_do_classic_diff(xpp->flags, pair);
 }
 
 
