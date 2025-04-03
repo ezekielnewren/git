@@ -1,4 +1,5 @@
 use interop::ivec::IVec;
+use crate::xdiff::*;
 use crate::xtypes::{xd_file_context, FileContext};
 
 
@@ -334,6 +335,93 @@ unsafe extern "C" fn xdl_split(ctx1: *mut xd_file_context, off1: isize, lim1: is
 
 	unreachable!();
 }
+
+
+/// Rule: "Divide et Impera" (divide & conquer). Recursively split the box in
+/// sub-boxes by calling the box splitting function. Note that the real job
+/// (marking changed lines) is done in the two boundary reaching checks.
+#[no_mangle]
+unsafe extern "C" fn xdl_recs_cmp(
+	_ctx1: *mut xd_file_context, mut off1: isize, mut lim1: isize,
+	_ctx2: *mut xd_file_context, mut off2: isize, mut lim2: isize,
+	kvd_off: isize, kvdf: *mut IVec<isize>, kvdb: *mut IVec<isize>,
+	need_min: bool, xenv: *mut xdalgoenv
+) -> i32 {
+	let ctx1 = xd_file_context::from_raw_mut(_ctx1);
+	let ctx1 = FileContext::new(ctx1);
+	let ctx2 = xd_file_context::from_raw_mut(_ctx2);
+	let ctx2 = FileContext::new(ctx2);
+
+	let kvdf = IVec::from_raw_mut(kvdf);
+	let kvdb = IVec::from_raw_mut(kvdb);
+	let xenv = xdalgoenv::from_raw_mut(xenv);
+
+	/*
+	 * Shrink the box by walking through each diagonal snake (SW and NE).
+	 */
+	while off1 < lim1 && off2 < lim2 {
+		if get_mph(&ctx1, off1 as usize) != get_mph(&ctx2, off2 as usize) {
+			break;
+		}
+		off1 += 1;
+		off2 += 1;
+	}
+
+	while off1 < lim1 && off2 < lim2 {
+		if get_mph(&ctx1, (lim1 - 1) as usize) != get_mph(&ctx2, (lim2 - 1) as usize) {
+			break;
+		}
+		lim1 -= 1;
+		lim2 -= 1;
+	}
+
+	/*
+	 * If one dimension is empty, then all records on the other one must
+	 * be obviously changed.
+	 */
+	if off1 == lim1 {
+		while off2 < lim2 {
+			ctx2.consider[SENTINEL + ctx2.rindex[off2 as usize]] = YES;
+			off2 += 1;
+		}
+	} else if off2 == lim2 {
+		while off1 < lim1 {
+			ctx1.consider[SENTINEL + ctx1.rindex[off1 as usize]] = YES;
+			off1 += 1;
+		}
+	} else {
+		let mut spl = xdpsplit {
+			i1: 0,
+			i2: 0,
+			min_lo: false,
+			min_hi: false,
+		};
+
+		/*
+		 * Divide ...
+		 */
+		if xdl_split(_ctx1, off1, lim1, _ctx2, off2, lim2, kvd_off, kvdf, kvdb,
+			      need_min, &mut spl, xenv) < 0 {
+
+			return -1;
+		}
+
+		/*
+		 * ... et Impera.
+		 */
+		if xdl_recs_cmp(_ctx1, off1, spl.i1, _ctx2, off2, spl.i2,
+				 kvd_off, kvdf, kvdb, spl.min_lo, xenv) < 0 ||
+		    xdl_recs_cmp(_ctx1, spl.i1, lim1, _ctx2, spl.i2, lim2,
+				 kvd_off,  kvdf, kvdb, spl.min_hi, xenv) < 0 {
+
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+
 
 #[cfg(test)]
 mod tests {

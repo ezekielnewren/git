@@ -40,7 +40,7 @@ struct xdchange {
 
 
 
-i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
+extern i32 xdl_recs_cmp(struct xd_file_context *ctx1, isize off1, isize lim1,
 		 struct xd_file_context *ctx2, isize off2, isize lim2,
 		 isize kvd_off, struct ivec_isize *kvdf, struct ivec_isize *kvdb,
 		 bool need_min, struct xdalgoenv *xenv);
