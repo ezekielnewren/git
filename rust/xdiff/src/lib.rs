@@ -2,6 +2,7 @@ use std::hash::Hasher;
 use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
 use interop::ivec::IVec;
 use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
+use crate::xdiffi::classic_diff;
 use crate::xprepare::{safe_2way_prepare, safe_3way_prepare};
 use crate::xtypes::{parse_lines, xd2way, xd3way, xdfile, xdpair, xrecord};
 use crate::xutils::{chunked_iter_equal, LineReader, MinimalPerfectHashBuilder, WhitespaceIter};
@@ -43,6 +44,13 @@ unsafe extern "C" fn xdl_parse_lines(file: *const mmfile, record: *mut IVec<xrec
     let record = IVec::from_raw_mut(record);
 
     parse_lines(file, record);
+}
+
+#[no_mangle]
+unsafe extern "C" fn xdl_do_classic_diff(flags: u64, pair: *mut xdpair) -> i32 {
+    let pair = xdpair::from_raw_mut(pair);
+
+    classic_diff(flags, pair)
 }
 
 

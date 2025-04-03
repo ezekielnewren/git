@@ -1,6 +1,5 @@
-use interop::ivec::IVec;
 use crate::xdiff::*;
-use crate::xtypes::{xd_file_context, xdpair, FileContext};
+use crate::xtypes::{xdpair, FileContext};
 use crate::xutils::xdl_bogosqrt;
 
 const XDL_MAX_COST_MIN: isize = 256;
@@ -65,22 +64,10 @@ fn get_mph(ctx: &FileContext, index: usize) -> u64 {
 /// returns the furthest point of reach. We might encounter expensive edge cases
 /// using this algorithm, so a little bit of heuristic is needed to cut the
 /// search and to return a suboptimal point.
-#[no_mangle]
-unsafe extern "C" fn xdl_split(ctx1: *mut xd_file_context, off1: isize, lim1: isize,
-		       ctx2: *mut xd_file_context, off2: isize, lim2: isize,
-		       kvd_off: isize, kvdf: *mut IVec<isize>, kvdb: *mut IVec<isize>,
-		       need_min: bool, spl: *mut xdpsplit, xenv: *mut xdalgoenv) -> isize {
-	let ctx1 = xd_file_context::from_raw_mut(ctx1);
-	let ctx1 = FileContext::new(ctx1);
-	let ctx2 = xd_file_context::from_raw_mut(ctx2);
-	let ctx2 = FileContext::new(ctx2);
-
-	let kvdf = IVec::from_raw_mut(kvdf);
-	let kvdb = IVec::from_raw_mut(kvdb);
-
-	let spl = xdpsplit::from_raw_mut(spl);
-	let xenv = xdalgoenv::from_raw_mut(xenv);
-
+fn split(ctx1: &mut FileContext, off1: isize, lim1: isize,
+		       ctx2: &mut FileContext, off2: isize, lim2: isize,
+		       kvd_off: isize, kvdf: &mut Vec<isize>, kvdb: &mut Vec<isize>,
+		       need_min: bool, spl: &mut xdpsplit, xenv: &mut xdalgoenv) -> isize {
 	let dmin = off1 - lim2;
     let dmax = lim1 - off2;
 	let fmid = off1 - off2;
@@ -340,21 +327,12 @@ unsafe extern "C" fn xdl_split(ctx1: *mut xd_file_context, off1: isize, lim1: is
 /// Rule: "Divide et Impera" (divide & conquer). Recursively split the box in
 /// sub-boxes by calling the box splitting function. Note that the real job
 /// (marking changed lines) is done in the two boundary reaching checks.
-#[no_mangle]
-unsafe extern "C" fn xdl_recs_cmp(
-	_ctx1: *mut xd_file_context, mut off1: isize, mut lim1: isize,
-	_ctx2: *mut xd_file_context, mut off2: isize, mut lim2: isize,
-	kvd_off: isize, kvdf: *mut IVec<isize>, kvdb: *mut IVec<isize>,
-	need_min: bool, xenv: *mut xdalgoenv
+pub(crate) fn recs_cmp(
+	ctx1: &mut FileContext, mut off1: isize, mut lim1: isize,
+	ctx2: &mut FileContext, mut off2: isize, mut lim2: isize,
+	kvd_off: isize, kvdf: &mut Vec<isize>, kvdb: &mut Vec<isize>,
+	need_min: bool, xenv: &mut xdalgoenv
 ) -> i32 {
-	let ctx1 = xd_file_context::from_raw_mut(_ctx1);
-	let ctx1 = FileContext::new(ctx1);
-	let ctx2 = xd_file_context::from_raw_mut(_ctx2);
-	let ctx2 = FileContext::new(ctx2);
-
-	let kvdf = IVec::from_raw_mut(kvdf);
-	let kvdb = IVec::from_raw_mut(kvdb);
-	let xenv = xdalgoenv::from_raw_mut(xenv);
 
 	/*
 	 * Shrink the box by walking through each diagonal snake (SW and NE).
@@ -400,7 +378,7 @@ unsafe extern "C" fn xdl_recs_cmp(
 		/*
 		 * Divide ...
 		 */
-		if xdl_split(_ctx1, off1, lim1, _ctx2, off2, lim2, kvd_off, kvdf, kvdb,
+		if split(ctx1, off1, lim1, ctx2, off2, lim2, kvd_off, kvdf, kvdb,
 			      need_min, &mut spl, xenv) < 0 {
 
 			return -1;
@@ -409,9 +387,9 @@ unsafe extern "C" fn xdl_recs_cmp(
 		/*
 		 * ... et Impera.
 		 */
-		if xdl_recs_cmp(_ctx1, off1, spl.i1, _ctx2, off2, spl.i2,
+		if recs_cmp(ctx1, off1, spl.i1, ctx2, off2, spl.i2,
 				 kvd_off, kvdf, kvdb, spl.min_lo, xenv) < 0 ||
-		    xdl_recs_cmp(_ctx1, spl.i1, lim1, _ctx2, spl.i2, lim2,
+		    recs_cmp(ctx1, spl.i1, lim1, ctx2, spl.i2, lim2,
 				 kvd_off,  kvdf, kvdb, spl.min_hi, xenv) < 0 {
 
 			return -1;
@@ -422,9 +400,7 @@ unsafe extern "C" fn xdl_recs_cmp(
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn xdl_do_classic_diff(flags: u64, pair: *mut xdpair) -> i32 {
-	let pair = xdpair::from_raw_mut(pair);
+pub(crate) fn classic_diff(flags: u64, pair: &mut xdpair) -> i32 {
 	let mut xenv = xdalgoenv {
 		mxcost: 0,
 		snake_cnt: 0,
@@ -438,8 +414,8 @@ unsafe extern "C" fn xdl_do_classic_diff(flags: u64, pair: *mut xdpair) -> i32 {
 	 * One is to store the forward path and one to store the backward path.
 	 */
 	let ndiags = pair.lhs.rindex.len() + pair.rhs.rindex.len() + 3;
-	let mut kvdf = IVec::<isize>::zero(ndiags);
-	let mut kvdb = IVec::<isize>::zero(2 * ndiags + 2 - ndiags);
+	let mut kvdf = vec![0isize; ndiags];
+	let mut kvdb = vec![0isize; 2 * ndiags + 2 - ndiags];
 
 	let kvd_off = (pair.rhs.rindex.len() + 1) as isize;
 
@@ -450,12 +426,16 @@ unsafe extern "C" fn xdl_do_classic_diff(flags: u64, pair: *mut xdpair) -> i32 {
 	xenv.snake_cnt = XDL_SNAKE_CNT;
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
-	xdl_recs_cmp(&mut pair.lhs, 0, pair.lhs.rindex.len() as isize, &mut pair.rhs, 0, pair.rhs.rindex.len() as isize,
+	let mut lhs = FileContext::new(&mut pair.lhs);
+	let mut rhs = FileContext::new(&mut pair.rhs);
+
+	let a = lhs.rindex.len() as isize;
+	let b = rhs.rindex.len() as isize;
+
+	recs_cmp(&mut lhs, 0, a, &mut rhs, 0, b,
 			   kvd_off, &mut kvdf, &mut kvdb, (flags & XDF_NEED_MINIMAL) != 0,
 			   &mut xenv)
 }
-
-
 
 
 #[cfg(test)]
