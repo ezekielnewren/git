@@ -95,8 +95,11 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 	usize b_next = b_ptr + 1;
 	usize tbl_idx = MPH(pair, rhs, b_ptr);
 	struct record *rec = index->record.ptr[tbl_idx];
-	usize as, ae, bs, be, np, rc;
-	bool should_break;
+	struct xrange range_a = {.start = 0, .end = 0};
+	struct xrange range_b = {.start = 0, .end = 0};
+	usize np = 0;
+	usize rc = 0;
+	bool should_break = false;
 
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
@@ -106,45 +109,45 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 			continue;
 		}
 
-		as = rec->ptr;
-		if (!CMP(lhs, as, rhs, b_ptr)) {
+		range_a.start = rec->ptr;
+		if (!CMP(lhs, range_a.start, rhs, b_ptr)) {
 			continue;
 		}
 
 		index->has_common = true;
 		for (;;) {
 			should_break = false;
-			np = NEXT_PTR(index, as);
-			bs = b_ptr;
-			ae = as;
-			be = bs;
+			np = NEXT_PTR(index, range_a.start);
+			range_b.start = b_ptr;
+			range_a.end = range_a.start;
+			range_b.end = range_b.start;
 			rc = rec->cnt;
 
-			while (line1 < as && line2 < bs
-				&& CMP(lhs, as - 1, rhs, bs - 1)) {
-				as--;
-				bs--;
+			while (line1 < range_a.start && line2 < range_b.start
+				&& CMP(lhs, range_a.start - 1, rhs, range_b.start - 1)) {
+				range_a.start--;
+				range_b.start--;
 				if (1 < rc) {
-					rc = XDL_MIN(rc, CNT(index, as));
+					rc = XDL_MIN(rc, CNT(index, range_a.start));
 				}
 			}
-			while (ae < LINE_END(1) && be < LINE_END(2)
-				&& CMP(lhs, ae + 1, rhs, be + 1)) {
-				ae++;
-				be++;
+			while (range_a.end < LINE_END(1) && range_b.end < LINE_END(2)
+				&& CMP(lhs, range_a.end + 1, rhs, range_b.end + 1)) {
+				range_a.end++;
+				range_b.end++;
 				if (1 < rc) {
-					rc = XDL_MIN(rc, CNT(index, ae));
+					rc = XDL_MIN(rc, CNT(index, range_a.end));
 				}
 			}
 
-			if (b_next <= be) {
-				b_next = be + 1;
+			if (b_next <= range_b.end) {
+				b_next = range_b.end + 1;
 			}
-			if (lcs->end1 - lcs->begin1 < ae - as || rc < index->cnt) {
-				lcs->begin1 = as;
-				lcs->begin2 = bs;
-				lcs->end1 = ae;
-				lcs->end2 = be;
+			if (lcs->end1 - lcs->begin1 < range_a.end - range_a.start || rc < index->cnt) {
+				lcs->begin1 = range_a.start;
+				lcs->begin2 = range_b.start;
+				lcs->end1 = range_a.end;
+				lcs->end2 = range_b.end;
 				index->cnt = rc;
 			}
 
@@ -152,7 +155,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				break;
 			}
 
-			while (np <= ae) {
+			while (np <= range_a.end) {
 				np = NEXT_PTR(index, np);
 				if (np == 0) {
 					should_break = 1;
@@ -164,7 +167,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				break;
 			}
 
-			as = np;
+			range_a.start = np;
 		}
 	}
 	return b_next;
