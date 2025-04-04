@@ -69,9 +69,6 @@ struct histindex {
 
 	unsigned int cnt;
 	bool has_common;
-
-	struct xdpair *env;
-	xpparam_t const *xpp;
 };
 
 struct region {
@@ -87,17 +84,16 @@ struct region {
 #define CNT(index, ptr) \
 	((LINE_MAP(index, ptr))->cnt)
 
-#define MPH(env, s, l) \
-	(env->s.minimal_perfect_hash->ptr[l - LINE_SHIFT])
+#define MPH(pair, s, l) \
+	(pair->s.minimal_perfect_hash->ptr[l - LINE_SHIFT])
 
 #define CMP(i, s1, l1, s2, l2) \
-	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
+	(MPH(pair, s1, l1) == MPH(pair, s2, l2))
 
 #define TABLE_HASH(index, side, line) \
-	XDL_HASHLONG((MPH(index->env, side, line)), index->table_bits)
+	XDL_HASHLONG((MPH(pair, side, line)), index->table_bits)
 
-static int scanA(struct histindex *index, int line1, int count1)
-{
+static int scanA(struct histindex *index, struct xdpair *pair, int line1, int count1) {
 	unsigned int ptr, tbl_idx;
 	unsigned int chain_len;
 	struct record **rec_chain, *rec;
@@ -148,7 +144,7 @@ continue_scan:
 	return 0;
 }
 
-static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
+static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, int b_ptr,
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
@@ -251,9 +247,6 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 
 	memset(&index, 0, sizeof(index));
 
-	index.env = pair;
-	index.xpp = xpp;
-
 	index.table_bits = xdl_hashbits(count1);
 	IVEC_INIT(index.record);
 	ivec_zero(&index.record, 1 << index.table_bits);
@@ -265,18 +258,18 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 	ivec_zero(&index.next_ptrs, count1);
 
 	IVEC_INIT(index.record_storage);
-	ivec_reserve_exact(&index.record_storage, (index.env->lhs.record->length + index.env->rhs.record->length)*10);
+	ivec_reserve_exact(&index.record_storage, (pair->lhs.record->length + pair->rhs.record->length)*10);
 
 	index.ptr_shift = line1;
 	index.max_chain_length = 64;
 
-	if (scanA(&index, line1, count1))
+	if (scanA(&index, pair, line1, count1))
 		goto cleanup;
 
 	index.cnt = index.max_chain_length + 1;
 
 	for (b_ptr = line2; b_ptr <= LINE_END(2); )
-		b_ptr = try_lcs(&index, lcs, b_ptr, line1, count1, line2, count2);
+		b_ptr = try_lcs(&index, pair, lcs, b_ptr, line1, count1, line2, count2);
 
 	if (index.has_common && index.max_chain_length < index.cnt)
 		ret = 1;
@@ -333,7 +326,7 @@ redo:
 			if (result)
 				goto out;
 			/*
-			 * result = histogram_diff(xpp, env,
+			 * result = histogram_diff(xpp, pair,
 			 *            lcs.end1 + 1, LINE_END(1) - lcs.end1,
 			 *            lcs.end2 + 1, LINE_END(2) - lcs.end2);
 			 * but let's optimize tail recursion ourself:
