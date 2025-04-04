@@ -67,8 +67,8 @@ struct histindex {
 	unsigned int max_chain_length,
 		     ptr_shift;
 
-	unsigned int cnt,
-		     has_common;
+	unsigned int cnt;
+	bool has_common;
 
 	struct xdpair *env;
 	xpparam_t const *xpp;
@@ -167,7 +167,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 		if (!CMP(index, lhs, as, rhs, b_ptr))
 			continue;
 
-		index->has_common = 1;
+		index->has_common = true;
 		for (;;) {
 			should_break = 0;
 			np = NEXT_PTR(index, as);
