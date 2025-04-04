@@ -43,11 +43,7 @@
 
 #include "xinclude.h"
 
-#define MAX_PTR	UINT_MAX
-#define MAX_CNT	UINT_MAX
-
 #define LINE_END(n) (line##n + count##n - 1)
-#define LINE_END_PTR(n) (*line##n + *count##n - 1)
 
 struct record {
 	usize ptr, cnt;
@@ -77,9 +73,6 @@ struct region {
 
 #define NEXT_PTR(index, _ptr) \
 	(index->next_ptrs.ptr[(_ptr) - index->ptr_shift])
-
-#define CNT(index, ptr) \
-	((LINE_MAP(index, ptr))->cnt)
 
 #define MPH(pair, s, l) \
 	(pair->s.minimal_perfect_hash->ptr[l - LINE_SHIFT])
@@ -128,7 +121,8 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				range_a.start--;
 				range_b.start--;
 				if (1 < rc) {
-					rc = XDL_MIN(rc, CNT(index, range_a.start));
+					usize cnt = LINE_MAP(index, range_a.start)->cnt;
+					rc = XDL_MIN(rc, cnt);
 				}
 			}
 			while (range_a.end < LINE_END(1) && range_b.end < LINE_END(2)
@@ -136,7 +130,8 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				range_a.end++;
 				range_b.end++;
 				if (1 < rc) {
-					rc = XDL_MIN(rc, CNT(index, range_a.end));
+					usize cnt = LINE_MAP(index, range_a.end)->cnt;
+					rc = XDL_MIN(rc, cnt);
 				}
 			}
 
@@ -248,9 +243,6 @@ redo:
 
 	if (count1 <= 0 && count2 <= 0)
 		return 0;
-
-	if ((unsigned int)LINE_END(1) >= MAX_PTR)
-		return -1;
 
 	if (!count1) {
 		while(count2--)
