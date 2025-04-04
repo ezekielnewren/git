@@ -89,52 +89,57 @@ struct region {
 
 extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
 
-static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, int b_ptr,
-	int line1, int count1, int line2, int count2)
+static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, usize b_ptr,
+	usize line1, usize count1, usize line2, usize count2)
 {
-	unsigned int b_next = b_ptr + 1;
+	usize b_next = b_ptr + 1;
 	usize tbl_idx = MPH(pair, rhs, b_ptr);
 	struct record *rec = index->record.ptr[tbl_idx];
-	unsigned int as, ae, bs, be, np, rc;
-	int should_break;
+	usize as, ae, bs, be, np, rc;
+	bool should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
-			if (!index->has_common)
+			if (!index->has_common) {
 				index->has_common = CMP(lhs, rec->ptr, rhs, b_ptr);
+			}
 			continue;
 		}
 
 		as = rec->ptr;
-		if (!CMP(lhs, as, rhs, b_ptr))
+		if (!CMP(lhs, as, rhs, b_ptr)) {
 			continue;
+		}
 
 		index->has_common = true;
 		for (;;) {
-			should_break = 0;
+			should_break = false;
 			np = NEXT_PTR(index, as);
 			bs = b_ptr;
 			ae = as;
 			be = bs;
 			rc = rec->cnt;
 
-			while ((unsigned int)line1 < as && (unsigned int)line2 < bs
+			while (line1 < as && line2 < bs
 				&& CMP(lhs, as - 1, rhs, bs - 1)) {
 				as--;
 				bs--;
-				if (1 < rc)
+				if (1 < rc) {
 					rc = XDL_MIN(rc, CNT(index, as));
+				}
 			}
-			while (ae < (unsigned int)LINE_END(1) && be < (unsigned int)LINE_END(2)
+			while (ae < LINE_END(1) && be < LINE_END(2)
 				&& CMP(lhs, ae + 1, rhs, be + 1)) {
 				ae++;
 				be++;
-				if (1 < rc)
+				if (1 < rc) {
 					rc = XDL_MIN(rc, CNT(index, ae));
+				}
 			}
 
-			if (b_next <= be)
+			if (b_next <= be) {
 				b_next = be + 1;
+			}
 			if (lcs->end1 - lcs->begin1 < ae - as || rc < index->cnt) {
 				lcs->begin1 = as;
 				lcs->begin2 = bs;
@@ -143,8 +148,9 @@ static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				index->cnt = rc;
 			}
 
-			if (np == 0)
+			if (np == 0) {
 				break;
+			}
 
 			while (np <= ae) {
 				np = NEXT_PTR(index, np);
@@ -154,8 +160,9 @@ static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				}
 			}
 
-			if (should_break)
+			if (should_break) {
 				break;
+			}
 
 			as = np;
 		}
