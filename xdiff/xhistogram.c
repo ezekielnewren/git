@@ -87,59 +87,7 @@ struct region {
 #define CMP(s1, l1, s2, l2) \
 	(MPH(pair, s1, l1) == MPH(pair, s2, l2))
 
-// extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
-static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1) {
-	for (usize ptr = line1 + count1 - 1; line1 <= ptr; ptr--) {
-		bool continue_scan = false;
-		usize tbl_idx = pair->lhs.minimal_perfect_hash->ptr[ptr - LINE_SHIFT];
-		struct record **rec_chain = &index->record.ptr[tbl_idx];
-		struct record *rec = *rec_chain;
-
-		usize chain_len = 0;
-		while (rec != NULL) {
-			continue_scan = false;
-			u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[rec->ptr - LINE_SHIFT];
-			u64 mph2 = pair->lhs.minimal_perfect_hash->ptr[ptr - LINE_SHIFT];
-			if (mph1 == mph2) {
-				/*
-				 * ptr is identical to another element. Insert
-				 * it onto the front of the existing element
-				 * chain.
-				 */
-				index->next_ptrs.ptr[ptr - index->ptr_shift] = rec->ptr;
-				rec->ptr = ptr;
-				rec->cnt = XDL_MIN(MAX_CNT, rec->cnt + 1);
-				index->line_map.ptr[ptr - index->ptr_shift] = rec;
-				continue_scan = true;
-				break;
-			}
-
-			rec = rec->next;
-			chain_len++;
-		}
-
-		if (continue_scan) {
-			continue;
-		}
-
-		if (chain_len == index->max_chain_length) {
-			return -1;
-		}
-
-		/*
-		 * This is the first time we have ever seen this particular
-		 * element in the sequence. Construct a new chain for it.
-		 */
-		rec = &index->record_storage.ptr[index->record_storage.length++];
-		rec->ptr = ptr;
-		rec->cnt = 1;
-		rec->next = *rec_chain;
-		*rec_chain = rec;
-		index->line_map.ptr[ptr - index->ptr_shift] = rec;
-	}
-
-	return 0;
-}
+extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
 
 static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, int b_ptr,
 	int line1, int count1, int line2, int count2)
