@@ -69,99 +69,10 @@ struct region {
 
 extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
 
-bool record_equal(struct xdpair *pair, usize i1, usize i2) {
-	u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[i1 - LINE_SHIFT];
-	u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[i2 - LINE_SHIFT];
-	return mph1 == mph2;
-}
 
-static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, usize b_ptr,
-	usize line1, usize count1, usize line2, usize count2)
-{
-	usize b_next = b_ptr + 1;
-	usize tbl_idx = pair->rhs.minimal_perfect_hash->ptr[b_ptr - LINE_SHIFT];
-	struct record *rec = index->record.ptr[tbl_idx];
-	struct xrange range_a = {.start = 0, .end = 0};
-	struct xrange range_b = {.start = 0, .end = 0};
-	usize np = 0;
-	usize rc = 0;
-	bool should_break = false;
-
-	for (; rec; rec = rec->next) {
-		if (rec->cnt > index->cnt) {
-			if (!index->has_common) {
-				index->has_common = record_equal(pair, rec->ptr, b_ptr);
-			}
-			continue;
-		}
-
-		range_a.start = rec->ptr;
-		if (!record_equal(pair, range_a.start, b_ptr)) {
-			continue;
-		}
-
-		index->has_common = true;
-		for (;;) {
-			should_break = false;
-			np = index->next_ptrs.ptr[range_a.start - index->ptr_shift];
-			range_b.start = b_ptr;
-			range_a.end = range_a.start;
-			range_b.end = range_b.start;
-			rc = rec->cnt;
-
-			while (line1 < range_a.start && line2 < range_b.start
-				&& record_equal(pair, range_a.start - 1, range_b.start - 1)) {
-				range_a.start--;
-				range_b.start--;
-				if (1 < rc) {
-					struct record *t_rec = index->line_map.ptr[range_a.start - index->ptr_shift];
-					usize cnt = t_rec->cnt;
-					rc = XDL_MIN(rc, cnt);
-				}
-			}
-			while (range_a.end < line1 + count1 - 1 && range_b.end < line2 + count2 - 1
-				&& record_equal(pair, range_a.end + 1, range_b.end + 1)) {
-				range_a.end++;
-				range_b.end++;
-				if (1 < rc) {
-					struct record *t_rec = index->line_map.ptr[range_a.end - index->ptr_shift];
-					usize cnt = t_rec->cnt;
-					rc = XDL_MIN(rc, cnt);
-				}
-			}
-
-			if (b_next <= range_b.end) {
-				b_next = range_b.end + 1;
-			}
-			if (lcs->end1 - lcs->begin1 < range_a.end - range_a.start || rc < index->cnt) {
-				lcs->begin1 = range_a.start;
-				lcs->begin2 = range_b.start;
-				lcs->end1 = range_a.end;
-				lcs->end2 = range_b.end;
-				index->cnt = rc;
-			}
-
-			if (np == 0) {
-				break;
-			}
-
-			while (np <= range_a.end) {
-				np = index->next_ptrs.ptr[np - index->ptr_shift];
-				if (np == 0) {
-					should_break = 1;
-					break;
-				}
-			}
-
-			if (should_break) {
-				break;
-			}
-
-			range_a.start = np;
-		}
-	}
-	return b_next;
-}
+extern usize try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, usize b_ptr,
+	usize line1, usize count1, usize line2, usize count2
+);
 
 static int fall_back_to_classic_diff(xpparam_t const *xpp, struct xdpair *pair,
 		int line1, int count1, int line2, int count2)

@@ -20,6 +20,32 @@ impl Default for record {
 }
 
 
+struct RecordIter {
+	cur: *mut record,
+}
+
+impl Iterator for RecordIter {
+	type Item = *mut record;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if self.cur.is_null() {
+			return None;
+		}
+		let t = self.cur;
+		self.cur = unsafe { (*self.cur).next };
+		Some(t)
+	}
+}
+
+impl RecordIter {
+	fn new(start: *mut record) -> Self {
+		Self {
+			cur: start,
+		}
+	}
+}
+
+
 #[repr(C)]
 struct histindex {
 	record_storage: IVec<record>,
@@ -104,5 +130,107 @@ unsafe extern "C" fn scanA(index: *mut histindex, pair: *mut xdpair, line1: usiz
 	0
 }
 
+fn record_equal(pair: &xdpair, i1: usize, i2: usize) -> bool {
+	let mph1 = unsafe { (*pair.lhs.minimal_perfect_hash)[i1 - LINE_SHIFT] };
+	let mph2 = unsafe { (*pair.rhs.minimal_perfect_hash)[i2 - LINE_SHIFT] };
+	mph1 == mph2
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn try_lcs(index: *mut histindex, pair: *mut xdpair, lcs: *mut region, b_ptr: usize,
+	line1: usize, count1: usize, line2: usize, count2: usize
+) -> usize {
+	let index = &mut *index;
+	let pair = xdpair::from_raw_mut(pair);
+	let lcs = &mut *lcs;
+
+	let rhs = FileContext::new(&mut pair.rhs);
+
+	let mut b_next = b_ptr + 1;
+	let tbl_idx = rhs.minimal_perfect_hash[b_ptr - LINE_SHIFT] as usize;
+	let mut range_a = 0..0;
+	let mut range_b = 0..0;
+	let mut np;
+	let mut rc;
+	let mut should_break;
+
+	// for (; rec; rec = rec->next) {
+	for rec in RecordIter::new(index.record[tbl_idx]) {
+		if (*rec).cnt > index.cnt {
+			if !index.has_common {
+				index.has_common = record_equal(pair, (*rec).ptr, b_ptr);
+			}
+			continue;
+		}
+
+		range_a.start = (*rec).ptr;
+		if !record_equal(pair, range_a.start, b_ptr) {
+			continue;
+		}
+
+		index.has_common = true;
+		loop {
+			should_break = false;
+			np = index.next_ptrs[range_a.start - index.ptr_shift];
+			range_b.start = b_ptr;
+			range_a.end = range_a.start;
+			range_b.end = range_b.start;
+			rc = (*rec).cnt;
+
+			while line1 < range_a.start && line2 < range_b.start
+				&& record_equal(pair, range_a.start - 1, range_b.start - 1) {
+				range_a.start -= 1;
+				range_b.start -= 1;
+				if 1 < rc {
+					let t_rec: *mut record = index.line_map[range_a.start - index.ptr_shift];
+					let cnt = (*t_rec).cnt;
+					rc = std::cmp::min(rc, cnt);
+				}
+			}
+			while range_a.end < line1 + count1 - 1 && range_b.end < line2 + count2 - 1
+				&& record_equal(pair, range_a.end + 1, range_b.end + 1) {
+				range_a.end += 1;
+				range_b.end += 1;
+				if 1 < rc {
+					let t_rec: *mut record = index.line_map[range_a.end - index.ptr_shift];
+					let cnt = (*t_rec).cnt;
+					rc = std::cmp::min(rc, cnt);
+				}
+			}
+
+			if b_next <= range_b.end {
+				b_next = range_b.end + 1;
+			}
+			if lcs.end1 - lcs.begin1 < range_a.end - range_a.start || rc < index.cnt {
+				lcs.begin1 = range_a.start;
+				lcs.begin2 = range_b.start;
+				lcs.end1 = range_a.end;
+				lcs.end2 = range_b.end;
+				index.cnt = rc;
+			}
+
+			if np == 0 {
+				break;
+			}
+
+			while np <= range_a.end {
+				np = index.next_ptrs[np - index.ptr_shift];
+				if np == 0 {
+					should_break = true;
+					break;
+				}
+			}
+
+			if should_break {
+				break;
+			}
+
+			range_a.start = np;
+		}
+	}
+
+	b_next
+}
 
 
