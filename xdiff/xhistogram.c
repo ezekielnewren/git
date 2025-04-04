@@ -65,7 +65,6 @@ struct histindex {
 	unsigned int table_bits;
 
 	unsigned int max_chain_length,
-		     key_shift,
 		     ptr_shift;
 
 	unsigned int cnt,
