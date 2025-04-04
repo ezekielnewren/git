@@ -49,12 +49,14 @@
 #define LINE_END(n) (line##n + count##n - 1)
 #define LINE_END_PTR(n) (*line##n + *count##n - 1)
 
+struct record {
+	unsigned int ptr, cnt;
+	struct record *next;
+};
+
 struct histindex {
-	struct record {
-		unsigned int ptr, cnt;
-		struct record *next;
-	} **records, /* an occurrence */
-	  **line_map; /* map of line to record chain */
+	struct record **records;  /* an occurrence */
+	struct record **line_map; /* map of line to record chain */
 	chastore_t rcha;
 	unsigned int *next_ptrs;
 	unsigned int table_bits,
