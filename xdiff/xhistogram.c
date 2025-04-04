@@ -93,12 +93,14 @@ static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usiz
 	struct record **rec_chain, *rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
+		bool continue_scan = false;
 		tbl_idx = MPH(pair, lhs, ptr);
 		rec_chain = index->record.ptr + tbl_idx;
 		rec = *rec_chain;
 
 		chain_len = 0;
 		while (rec) {
+			continue_scan = false;
 			if (CMP(index, lhs, rec->ptr, lhs, ptr)) {
 				/*
 				 * ptr is identical to another element. Insert
@@ -110,12 +112,16 @@ static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usiz
 				/* cap rec->cnt at MAX_CNT */
 				rec->cnt = XDL_MIN(MAX_CNT, rec->cnt + 1);
 				LINE_MAP(index, ptr) = rec;
-				goto continue_scan;
+				continue_scan = true;
+				break;
 			}
 
 			rec = rec->next;
 			chain_len++;
 		}
+
+		if (continue_scan)
+			continue;
 
 		if (chain_len == index->max_chain_length)
 			return -1;
@@ -130,9 +136,6 @@ static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usiz
 		rec->next = *rec_chain;
 		*rec_chain = rec;
 		LINE_MAP(index, ptr) = rec;
-
-continue_scan:
-		; /* no op */
 	}
 
 	return 0;
