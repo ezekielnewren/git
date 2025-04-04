@@ -43,8 +43,6 @@
 
 #include "xinclude.h"
 
-#define LINE_END(n) (line##n + count##n - 1)
-
 struct record {
 	usize ptr, cnt;
 	struct record *next;
@@ -121,7 +119,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
-			while (range_a.end < LINE_END(1) && range_b.end < LINE_END(2)
+			while (range_a.end < line1 + count1 - 1 && range_b.end < line2 + count2 - 1
 				&& record_equal(pair, range_a.end + 1, range_b.end + 1)) {
 				range_a.end++;
 				range_b.end++;
@@ -216,7 +214,7 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 
 	index.cnt = index.max_chain_length + 1;
 
-	for (b_ptr = line2; b_ptr <= LINE_END(2); )
+	for (b_ptr = line2; b_ptr <= line2 + count2 - 1; )
 		b_ptr = try_lcs(&index, pair, lcs, b_ptr, line1, count1, line2, count2);
 
 	if (index.has_common && index.max_chain_length < index.cnt)
@@ -276,9 +274,9 @@ redo:
 			 *            lcs.end2 + 1, LINE_END(2) - lcs.end2);
 			 * but let's optimize tail recursion ourself:
 			*/
-			count1 = LINE_END(1) - lcs.end1;
+			count1 = line1 + count1 - 1 - lcs.end1;
 			line1 = lcs.end1 + 1;
-			count2 = LINE_END(2) - lcs.end2;
+			count2 = line2 + count2 - 1 - lcs.end2;
 			line2 = lcs.end2 + 1;
 			goto redo;
 		}
