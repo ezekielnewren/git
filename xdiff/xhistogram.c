@@ -84,34 +84,32 @@ struct region {
 #define MPH(pair, s, l) \
 	(pair->s.minimal_perfect_hash->ptr[l - LINE_SHIFT])
 
-#define CMP(i, s1, l1, s2, l2) \
+#define CMP(s1, l1, s2, l2) \
 	(MPH(pair, s1, l1) == MPH(pair, s2, l2))
 
+// extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
 static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1) {
-	usize ptr, tbl_idx;
-	usize chain_len;
-	struct record **rec_chain, *rec;
-
-	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
+	for (usize ptr = line1 + count1 - 1; line1 <= ptr; ptr--) {
 		bool continue_scan = false;
-		tbl_idx = MPH(pair, lhs, ptr);
-		rec_chain = index->record.ptr + tbl_idx;
-		rec = *rec_chain;
+		usize tbl_idx = pair->lhs.minimal_perfect_hash->ptr[ptr - LINE_SHIFT];
+		struct record **rec_chain = &index->record.ptr[tbl_idx];
+		struct record *rec = *rec_chain;
 
-		chain_len = 0;
-		while (rec) {
+		usize chain_len = 0;
+		while (rec != NULL) {
 			continue_scan = false;
-			if (CMP(index, lhs, rec->ptr, lhs, ptr)) {
+			u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[rec->ptr - LINE_SHIFT];
+			u64 mph2 = pair->lhs.minimal_perfect_hash->ptr[ptr - LINE_SHIFT];
+			if (mph1 == mph2) {
 				/*
 				 * ptr is identical to another element. Insert
 				 * it onto the front of the existing element
 				 * chain.
 				 */
-				NEXT_PTR(index, ptr) = rec->ptr;
+				index->next_ptrs.ptr[ptr - index->ptr_shift] = rec->ptr;
 				rec->ptr = ptr;
-				/* cap rec->cnt at MAX_CNT */
 				rec->cnt = XDL_MIN(MAX_CNT, rec->cnt + 1);
-				LINE_MAP(index, ptr) = rec;
+				index->line_map.ptr[ptr - index->ptr_shift] = rec;
 				continue_scan = true;
 				break;
 			}
@@ -120,11 +118,13 @@ static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usiz
 			chain_len++;
 		}
 
-		if (continue_scan)
+		if (continue_scan) {
 			continue;
+		}
 
-		if (chain_len == index->max_chain_length)
+		if (chain_len == index->max_chain_length) {
 			return -1;
+		}
 
 		/*
 		 * This is the first time we have ever seen this particular
@@ -135,7 +135,7 @@ static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usiz
 		rec->cnt = 1;
 		rec->next = *rec_chain;
 		*rec_chain = rec;
-		LINE_MAP(index, ptr) = rec;
+		index->line_map.ptr[ptr - index->ptr_shift] = rec;
 	}
 
 	return 0;
@@ -153,12 +153,12 @@ static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
 			if (!index->has_common)
-				index->has_common = CMP(index, lhs, rec->ptr, rhs, b_ptr);
+				index->has_common = CMP(lhs, rec->ptr, rhs, b_ptr);
 			continue;
 		}
 
 		as = rec->ptr;
-		if (!CMP(index, lhs, as, rhs, b_ptr))
+		if (!CMP(lhs, as, rhs, b_ptr))
 			continue;
 
 		index->has_common = true;
@@ -171,14 +171,14 @@ static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 			rc = rec->cnt;
 
 			while ((unsigned int)line1 < as && (unsigned int)line2 < bs
-				&& CMP(index, lhs, as - 1, rhs, bs - 1)) {
+				&& CMP(lhs, as - 1, rhs, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc)
 					rc = XDL_MIN(rc, CNT(index, as));
 			}
 			while (ae < (unsigned int)LINE_END(1) && be < (unsigned int)LINE_END(2)
-				&& CMP(index, lhs, ae + 1, rhs, be + 1)) {
+				&& CMP(lhs, ae + 1, rhs, be + 1)) {
 				ae++;
 				be++;
 				if (1 < rc)
