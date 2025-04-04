@@ -61,7 +61,7 @@ struct histindex {
 	struct ivec_record record_storage;
 	struct ivec_record_ptr record;
 	struct ivec_record_ptr line_map; /* map of line to record chain */
-	unsigned int *next_ptrs;
+	struct ivec_u32 next_ptrs;
 	unsigned int table_bits;
 
 	unsigned int max_chain_length,
@@ -82,8 +82,8 @@ struct region {
 
 #define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
 
-#define NEXT_PTR(index, ptr) \
-	(index->next_ptrs[(ptr) - index->ptr_shift])
+#define NEXT_PTR(index, _ptr) \
+	(index->next_ptrs.ptr[(_ptr) - index->ptr_shift])
 
 #define CNT(index, ptr) \
 	((LINE_MAP(index, ptr))->cnt)
@@ -239,7 +239,7 @@ static inline void free_index(struct histindex *index)
 	ivec_free(&index->record_storage);
 	ivec_free(&index->record);
 	ivec_free(&index->line_map);
-	xdl_free(index->next_ptrs);
+	ivec_free(&index->next_ptrs);
 }
 
 static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
@@ -262,8 +262,8 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 	IVEC_INIT(index.line_map);
 	ivec_zero(&index.line_map, count1);
 
-	if (!XDL_CALLOC_ARRAY(index.next_ptrs, count1))
-		goto cleanup;
+	IVEC_INIT(index.next_ptrs);
+	ivec_zero(&index.next_ptrs, count1);
 
 	IVEC_INIT(index.record_storage);
 	ivec_reserve_exact(&index.record_storage, (index.env->lhs.record->length + index.env->rhs.record->length)*10);
