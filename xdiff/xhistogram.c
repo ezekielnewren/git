@@ -43,36 +43,10 @@
 
 #include "xinclude.h"
 
-struct record {
-	usize ptr, cnt;
-	struct record *next;
-};
-
-DEFINE_IVEC_TYPE(struct record, record);
-DEFINE_IVEC_TYPE(struct record*, record_ptr);
-
-struct histindex {
-	struct ivec_record record_storage;
-	struct ivec_record_ptr record;
-	struct ivec_record_ptr line_map; /* map of line to record chain */
-	struct ivec_usize next_ptrs;
-	usize max_chain_length;
-	usize ptr_shift;
-	usize cnt;
-	bool has_common;
-};
-
 struct region {
 	usize begin1, end1;
 	usize begin2, end2;
 };
-
-extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
-
-
-extern usize try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, usize b_ptr,
-	usize line1, usize count1, usize line2, usize count2
-);
 
 static int fall_back_to_classic_diff(xpparam_t const *xpp, struct xdpair *pair,
 		int line1, int count1, int line2, int count2)
