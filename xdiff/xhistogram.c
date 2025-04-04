@@ -61,7 +61,7 @@ struct histindex {
 	struct ivec_record record_storage;
 	struct ivec_record_ptr record;
 	struct ivec_record_ptr line_map; /* map of line to record chain */
-	struct ivec_u32 next_ptrs;
+	struct ivec_usize next_ptrs;
 	usize max_chain_length;
 	usize ptr_shift;
 	usize cnt;
