@@ -94,11 +94,9 @@ static inline void free_index(struct histindex *index)
 	ivec_free(&index->next_ptrs);
 }
 
-static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
-		    struct region *lcs,
-		    int line1, int count1, int line2, int count2)
+static int find_lcs(struct xdpair *pair, struct region *lcs,
+		    usize line1, usize count1, usize line2, usize count2)
 {
-	int b_ptr;
 	int ret = -1;
 	struct histindex index;
 	usize fudge = (pair->lhs.record->length + pair->rhs.record->length) * 10;
@@ -125,14 +123,11 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 
 	index.cnt = index.max_chain_length + 1;
 
-	for (b_ptr = line2; b_ptr <= line2 + count2 - 1; )
+	for (usize b_ptr = line2; b_ptr <= line2 + count2 - 1; ) {
 		b_ptr = try_lcs(&index, pair, lcs, b_ptr, line1, count1, line2, count2);
+	}
 
-	if (index.has_common && index.max_chain_length < index.cnt)
-		ret = 1;
-	else
-		ret = 0;
-
+	ret = index.has_common && index.max_chain_length < index.cnt;
 cleanup:
 	free_index(&index);
 	return ret;
@@ -161,7 +156,7 @@ redo:
 	}
 
 	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(xpp, pair, &lcs, line1, count1, line2, count2);
+	lcs_found = find_lcs(pair, &lcs, line1, count1, line2, count2);
 	if (lcs_found < 0)
 		goto out;
 	else if (lcs_found)
