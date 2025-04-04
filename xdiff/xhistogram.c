@@ -62,7 +62,6 @@ struct histindex {
 	struct ivec_record_ptr record;
 	struct ivec_record_ptr line_map; /* map of line to record chain */
 	struct ivec_u32 next_ptrs;
-	usize table_bits;
 	usize max_chain_length;
 	usize ptr_shift;
 	usize cnt;
@@ -88,16 +87,13 @@ struct region {
 #define CMP(i, s1, l1, s2, l2) \
 	(MPH(pair, s1, l1) == MPH(pair, s2, l2))
 
-#define TABLE_HASH(index, side, line) \
-	XDL_HASHLONG((MPH(pair, side, line)), index->table_bits)
-
 static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1) {
 	usize ptr, tbl_idx;
 	usize chain_len;
 	struct record **rec_chain, *rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(index, lhs, ptr);
+		tbl_idx = MPH(pair, lhs, ptr);
 		rec_chain = index->record.ptr + tbl_idx;
 		rec = *rec_chain;
 
@@ -146,7 +142,8 @@ static int try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
-	struct record *rec = index->record.ptr[TABLE_HASH(index, rhs, b_ptr)];
+	usize tbl_idx = MPH(pair, rhs, b_ptr);
+	struct record *rec = index->record.ptr[tbl_idx];
 	unsigned int as, ae, bs, be, np, rc;
 	int should_break;
 
@@ -242,12 +239,12 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 	int b_ptr;
 	int ret = -1;
 	struct histindex index;
+	usize fudge = (pair->lhs.record->length + pair->rhs.record->length) * 10;
 
 	memset(&index, 0, sizeof(index));
 
-	index.table_bits = xdl_hashbits(count1);
 	IVEC_INIT(index.record);
-	ivec_zero(&index.record, 1 << index.table_bits);
+	ivec_zero(&index.record, pair->minimal_perfect_hash_size);
 
 	IVEC_INIT(index.line_map);
 	ivec_zero(&index.line_map, count1);
@@ -256,7 +253,7 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 	ivec_zero(&index.next_ptrs, count1);
 
 	IVEC_INIT(index.record_storage);
-	ivec_reserve_exact(&index.record_storage, (pair->lhs.record->length + pair->rhs.record->length)*10);
+	ivec_reserve_exact(&index.record_storage, fudge);
 
 	index.ptr_shift = line1;
 	index.max_chain_length = 64;
