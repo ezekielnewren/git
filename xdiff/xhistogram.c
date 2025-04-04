@@ -54,9 +54,12 @@ struct record {
 	struct record *next;
 };
 
+DEFINE_IVEC_TYPE(struct record, record);
+
 struct histindex {
 	struct record **records;  /* an occurrence */
 	struct record **line_map; /* map of line to record chain */
+	struct ivec_record record_storage;
 	chastore_t rcha;
 	unsigned int *next_ptrs;
 	unsigned int table_bits,
@@ -239,7 +242,7 @@ static inline void free_index(struct histindex *index)
 	xdl_free(index->records);
 	xdl_free(index->line_map);
 	xdl_free(index->next_ptrs);
-	xdl_cha_free(&index->rcha);
+	ivec_free(&index->record_storage);
 }
 
 static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
@@ -271,6 +274,9 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 
 	if (!XDL_CALLOC_ARRAY(index.next_ptrs, index.line_map_size))
 		goto cleanup;
+
+	IVEC_INIT(index.record_storage);
+	ivec_reserve_exact(&index.record_storage, (index.env->lhs.record->length + index.env->rhs.record->length)*10);
 
 	/* lines / 4 + 1 comes from xprepare.c:xdl_prepare_ctx() */
 	if (xdl_cha_init(&index.rcha, sizeof(struct record), count1 / 4 + 1) < 0)
