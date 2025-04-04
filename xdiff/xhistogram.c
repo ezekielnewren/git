@@ -69,14 +69,6 @@ struct region {
 	usize begin2, end2;
 };
 
-#define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
-
-#define NEXT_PTR(index, _ptr) \
-	(index->next_ptrs.ptr[(_ptr) - index->ptr_shift])
-
-#define MPH(pair, s, l) \
-	(pair->s.minimal_perfect_hash->ptr[l - LINE_SHIFT])
-
 extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
 
 bool record_equal(struct xdpair *pair, usize i1, usize i2) {
@@ -89,7 +81,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 	usize line1, usize count1, usize line2, usize count2)
 {
 	usize b_next = b_ptr + 1;
-	usize tbl_idx = MPH(pair, rhs, b_ptr);
+	usize tbl_idx = pair->rhs.minimal_perfect_hash->ptr[b_ptr - LINE_SHIFT];
 	struct record *rec = index->record.ptr[tbl_idx];
 	struct xrange range_a = {.start = 0, .end = 0};
 	struct xrange range_b = {.start = 0, .end = 0};
@@ -113,7 +105,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 		index->has_common = true;
 		for (;;) {
 			should_break = false;
-			np = NEXT_PTR(index, range_a.start);
+			np = index->next_ptrs.ptr[range_a.start - index->ptr_shift];
 			range_b.start = b_ptr;
 			range_a.end = range_a.start;
 			range_b.end = range_b.start;
@@ -124,7 +116,8 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				range_a.start--;
 				range_b.start--;
 				if (1 < rc) {
-					usize cnt = LINE_MAP(index, range_a.start)->cnt;
+					struct record *t_rec = index->line_map.ptr[range_a.start - index->ptr_shift];
+					usize cnt = t_rec->cnt;
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
@@ -133,7 +126,8 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				range_a.end++;
 				range_b.end++;
 				if (1 < rc) {
-					usize cnt = LINE_MAP(index, range_a.end)->cnt;
+					struct record *t_rec = index->line_map.ptr[range_a.end - index->ptr_shift];
+					usize cnt = t_rec->cnt;
 					rc = XDL_MIN(rc, cnt);
 				}
 			}
@@ -154,7 +148,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 			}
 
 			while (np <= range_a.end) {
-				np = NEXT_PTR(index, np);
+				np = index->next_ptrs.ptr[np - index->ptr_shift];
 				if (np == 0) {
 					should_break = 1;
 					break;
