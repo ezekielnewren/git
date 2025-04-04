@@ -77,10 +77,13 @@ struct region {
 #define MPH(pair, s, l) \
 	(pair->s.minimal_perfect_hash->ptr[l - LINE_SHIFT])
 
-#define CMP(s1, l1, s2, l2) \
-	(MPH(pair, s1, l1) == MPH(pair, s2, l2))
-
 extern i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1);
+
+bool record_equal(struct xdpair *pair, usize i1, usize i2) {
+	u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[i1 - LINE_SHIFT];
+	u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[i2 - LINE_SHIFT];
+	return mph1 == mph2;
+}
 
 static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *lcs, usize b_ptr,
 	usize line1, usize count1, usize line2, usize count2)
@@ -97,13 +100,13 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
 			if (!index->has_common) {
-				index->has_common = CMP(lhs, rec->ptr, rhs, b_ptr);
+				index->has_common = record_equal(pair, rec->ptr, b_ptr);
 			}
 			continue;
 		}
 
 		range_a.start = rec->ptr;
-		if (!CMP(lhs, range_a.start, rhs, b_ptr)) {
+		if (!record_equal(pair, range_a.start, b_ptr)) {
 			continue;
 		}
 
@@ -117,7 +120,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 			rc = rec->cnt;
 
 			while (line1 < range_a.start && line2 < range_b.start
-				&& CMP(lhs, range_a.start - 1, rhs, range_b.start - 1)) {
+				&& record_equal(pair, range_a.start - 1, range_b.start - 1)) {
 				range_a.start--;
 				range_b.start--;
 				if (1 < rc) {
@@ -126,7 +129,7 @@ static i32 try_lcs(struct histindex *index, struct xdpair *pair, struct region *
 				}
 			}
 			while (range_a.end < LINE_END(1) && range_b.end < LINE_END(2)
-				&& CMP(lhs, range_a.end + 1, rhs, range_b.end + 1)) {
+				&& record_equal(pair, range_a.end + 1, range_b.end + 1)) {
 				range_a.end++;
 				range_b.end++;
 				if (1 < rc) {
