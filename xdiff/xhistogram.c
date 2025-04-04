@@ -55,14 +55,14 @@ struct record {
 };
 
 DEFINE_IVEC_TYPE(struct record, record);
+DEFINE_IVEC_TYPE(struct record*, record_ptr);
 
 struct histindex {
-	struct record **records;  /* an occurrence */
-	struct record **line_map; /* map of line to record chain */
 	struct ivec_record record_storage;
+	struct ivec_record_ptr record;
+	struct record **line_map; /* map of line to record chain */
 	unsigned int *next_ptrs;
 	unsigned int table_bits,
-		     records_size,
 		     line_map_size;
 
 	unsigned int max_chain_length,
@@ -106,7 +106,7 @@ static int scanA(struct histindex *index, int line1, int count1)
 
 	for (ptr = LINE_END(1); (unsigned int)line1 <= ptr; ptr--) {
 		tbl_idx = TABLE_HASH(index, lhs, ptr);
-		rec_chain = index->records + tbl_idx;
+		rec_chain = index->record.ptr + tbl_idx;
 		rec = *rec_chain;
 
 		chain_len = 0;
@@ -154,7 +154,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 	int line1, int count1, int line2, int count2)
 {
 	unsigned int b_next = b_ptr + 1;
-	struct record *rec = index->records[TABLE_HASH(index, rhs, b_ptr)];
+	struct record *rec = index->record.ptr[TABLE_HASH(index, rhs, b_ptr)];
 	unsigned int as, ae, bs, be, np, rc;
 	int should_break;
 
@@ -237,10 +237,10 @@ static int fall_back_to_classic_diff(xpparam_t const *xpp, struct xdpair *pair,
 
 static inline void free_index(struct histindex *index)
 {
-	xdl_free(index->records);
+	ivec_free(&index->record_storage);
+	ivec_free(&index->record);
 	xdl_free(index->line_map);
 	xdl_free(index->next_ptrs);
-	ivec_free(&index->record_storage);
 }
 
 static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
@@ -256,13 +256,11 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 	index.env = pair;
 	index.xpp = xpp;
 
-	index.records = NULL;
 	index.line_map = NULL;
 
 	index.table_bits = xdl_hashbits(count1);
-	index.records_size = 1 << index.table_bits;
-	if (!XDL_CALLOC_ARRAY(index.records, index.records_size))
-		goto cleanup;
+	IVEC_INIT(index.record);
+	ivec_zero(&index.record, 1 << index.table_bits);
 
 	index.line_map_size = count1;
 	if (!XDL_CALLOC_ARRAY(index.line_map, index.line_map_size))
