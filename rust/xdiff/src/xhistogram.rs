@@ -234,3 +234,47 @@ unsafe extern "C" fn try_lcs(index: *mut histindex, pair: *mut xdpair, lcs: *mut
 }
 
 
+#[no_mangle]
+unsafe extern "C" fn find_lcs(pair: *mut xdpair, lcs: *mut region,
+	line1: usize, count1: usize, line2: usize, count2: usize
+) -> i32 {
+	let mut ret = -1;
+
+	let pair = xdpair::from_raw_mut(pair);
+	let lcs = &mut *lcs;
+
+	let lhs = FileContext::new(&mut pair.lhs);
+	let rhs = FileContext::new(&mut pair.rhs);
+
+	let fudge = (lhs.record.len() + rhs.record.len()) * 10;
+
+	let mut index = histindex {
+		record_storage: IVec::with_capacity(fudge),
+		record: IVec::zero(pair.minimal_perfect_hash_size),
+		line_map: IVec::zero(count1),
+		next_ptrs: IVec::zero(count1),
+		max_chain_length: 64,
+		ptr_shift: line1,
+		cnt: 0,
+		has_common: false,
+	};
+
+	if scanA(&mut index, pair, line1, count1) != 0 {
+		return ret;
+	}
+
+	index.cnt = index.max_chain_length + 1;
+
+	let mut b_ptr = line2;
+	while b_ptr <= line2 + count2 - 1 {
+		b_ptr = try_lcs(&mut index, pair, lcs, b_ptr, line1, count1, line2, count2);
+	}
+
+	if index.has_common && index.max_chain_length < index.cnt {
+		1
+	} else {
+		0
+	}
+}
+
+

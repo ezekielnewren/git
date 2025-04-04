@@ -86,52 +86,8 @@ static int fall_back_to_classic_diff(xpparam_t const *xpp, struct xdpair *pair,
 				  line1, count1, line2, count2);
 }
 
-static inline void free_index(struct histindex *index)
-{
-	ivec_free(&index->record_storage);
-	ivec_free(&index->record);
-	ivec_free(&index->line_map);
-	ivec_free(&index->next_ptrs);
-}
-
-static int find_lcs(struct xdpair *pair, struct region *lcs,
-		    usize line1, usize count1, usize line2, usize count2)
-{
-	int ret = -1;
-	struct histindex index;
-	usize fudge = (pair->lhs.record->length + pair->rhs.record->length) * 10;
-
-	memset(&index, 0, sizeof(index));
-
-	IVEC_INIT(index.record);
-	ivec_zero(&index.record, pair->minimal_perfect_hash_size);
-
-	IVEC_INIT(index.line_map);
-	ivec_zero(&index.line_map, count1);
-
-	IVEC_INIT(index.next_ptrs);
-	ivec_zero(&index.next_ptrs, count1);
-
-	IVEC_INIT(index.record_storage);
-	ivec_reserve_exact(&index.record_storage, fudge);
-
-	index.ptr_shift = line1;
-	index.max_chain_length = 64;
-
-	if (scanA(&index, pair, line1, count1))
-		goto cleanup;
-
-	index.cnt = index.max_chain_length + 1;
-
-	for (usize b_ptr = line2; b_ptr <= line2 + count2 - 1; ) {
-		b_ptr = try_lcs(&index, pair, lcs, b_ptr, line1, count1, line2, count2);
-	}
-
-	ret = index.has_common && index.max_chain_length < index.cnt;
-cleanup:
-	free_index(&index);
-	return ret;
-}
+extern int find_lcs(struct xdpair *pair, struct region *lcs,
+		    usize line1, usize count1, usize line2, usize count2);
 
 static int histogram_diff(xpparam_t const *xpp, struct xdpair *pair,
 	int line1, int count1, int line2, int count2)
