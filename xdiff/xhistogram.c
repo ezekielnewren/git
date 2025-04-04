@@ -60,7 +60,6 @@ struct histindex {
 	struct record **records;  /* an occurrence */
 	struct record **line_map; /* map of line to record chain */
 	struct ivec_record record_storage;
-	chastore_t rcha;
 	unsigned int *next_ptrs;
 	unsigned int table_bits,
 		     records_size,
@@ -137,8 +136,7 @@ static int scanA(struct histindex *index, int line1, int count1)
 		 * This is the first time we have ever seen this particular
 		 * element in the sequence. Construct a new chain for it.
 		 */
-		if (!(rec = xdl_cha_alloc(&index->rcha)))
-			return -1;
+		rec = &index->record_storage.ptr[index->record_storage.length++];
 		rec->ptr = ptr;
 		rec->cnt = 1;
 		rec->next = *rec_chain;
@@ -260,8 +258,6 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 
 	index.records = NULL;
 	index.line_map = NULL;
-	/* in case of early xdl_cha_free() */
-	index.rcha.head = NULL;
 
 	index.table_bits = xdl_hashbits(count1);
 	index.records_size = 1 << index.table_bits;
@@ -277,10 +273,6 @@ static int find_lcs(xpparam_t const *xpp, struct xdpair *pair,
 
 	IVEC_INIT(index.record_storage);
 	ivec_reserve_exact(&index.record_storage, (index.env->lhs.record->length + index.env->rhs.record->length)*10);
-
-	/* lines / 4 + 1 comes from xprepare.c:xdl_prepare_ctx() */
-	if (xdl_cha_init(&index.rcha, sizeof(struct record), count1 / 4 + 1) < 0)
-		goto cleanup;
 
 	index.ptr_shift = line1;
 	index.max_chain_length = 64;
