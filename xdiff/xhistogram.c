@@ -50,7 +50,7 @@
 #define LINE_END_PTR(n) (*line##n + *count##n - 1)
 
 struct record {
-	unsigned int ptr, cnt;
+	u32 ptr, cnt;
 	struct record *next;
 };
 
@@ -62,18 +62,16 @@ struct histindex {
 	struct ivec_record_ptr record;
 	struct ivec_record_ptr line_map; /* map of line to record chain */
 	struct ivec_u32 next_ptrs;
-	unsigned int table_bits;
-
-	unsigned int max_chain_length,
-		     ptr_shift;
-
-	unsigned int cnt;
+	u32 table_bits;
+	u32 max_chain_length;
+	u32 ptr_shift;
+	u32 cnt;
 	bool has_common;
 };
 
 struct region {
-	unsigned int begin1, end1;
-	unsigned int begin2, end2;
+	u32 begin1, end1;
+	u32 begin2, end2;
 };
 
 #define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
