@@ -91,12 +91,12 @@ struct region {
 #define TABLE_HASH(index, side, line) \
 	XDL_HASHLONG((MPH(pair, side, line)), index->table_bits)
 
-static int scanA(struct histindex *index, struct xdpair *pair, int line1, int count1) {
-	unsigned int ptr, tbl_idx;
-	unsigned int chain_len;
+static i32 scanA(struct histindex *index, struct xdpair *pair, usize line1, usize count1) {
+	usize ptr, tbl_idx;
+	usize chain_len;
 	struct record **rec_chain, *rec;
 
-	for (ptr = LINE_END(1); (unsigned int)line1 <= ptr; ptr--) {
+	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
 		tbl_idx = TABLE_HASH(index, lhs, ptr);
 		rec_chain = index->record.ptr + tbl_idx;
 		rec = *rec_chain;
