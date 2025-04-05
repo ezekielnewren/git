@@ -1,3 +1,6 @@
+#![allow(non_camel_case_types)]
+
+use std::marker::PhantomData;
 use interop::ivec::IVec;
 use crate::xdiff::LINE_SHIFT;
 use crate::xtypes::{xdpair, FileContext};
@@ -24,12 +27,13 @@ impl Default for record {
 }
 
 
-struct RecordIter {
+struct RecordIter<'a> {
 	cur: *mut record,
+	_marker: PhantomData<&'a record>,
 }
 
-impl Iterator for RecordIter {
-	type Item = *mut record;
+impl<'a> Iterator for RecordIter<'a> {
+	type Item = &'a mut record;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		if self.cur.is_null() {
@@ -37,14 +41,15 @@ impl Iterator for RecordIter {
 		}
 		let t = self.cur;
 		self.cur = unsafe { (*self.cur).next };
-		Some(t)
+		Some(unsafe { &mut *t })
 	}
 }
 
-impl RecordIter {
+impl<'a> RecordIter<'a> {
 	fn new(start: *mut record) -> Self {
 		Self {
 			cur: start,
+			_marker: PhantomData,
 		}
 	}
 }
@@ -71,24 +76,17 @@ struct region {
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn scanA(index: *mut histindex, pair: *mut xdpair, line1: usize, count1: usize) -> i32 {
-    let index = &mut *index;
-    let pair = xdpair::from_raw_mut(pair);
-
+fn scan_a(index: &mut histindex, pair: &mut xdpair, line1: usize, count1: usize) -> i32 {
     let lhs = FileContext::new(&mut pair.lhs);
 
-	// for (usize ptr = line1 + count1 - 1; line1 <= ptr; ptr--) {
     for ptr in (line1..=line1 + count1 - 1).rev() {
 		let mut continue_scan = false;
 		let tbl_idx = lhs.minimal_perfect_hash[ptr - LINE_SHIFT] as usize;
-		let rec_chain: *mut *mut record = &mut index.record[tbl_idx];
-		let mut rec: *mut record = *rec_chain;
 
 		let mut chain_len = 0;
-		while !rec.is_null() {
+		for rec in RecordIter::new(index.record[tbl_idx]) {
 			continue_scan = false;
-			let mph1 = lhs.minimal_perfect_hash[(*rec).ptr - LINE_SHIFT];
+			let mph1 = lhs.minimal_perfect_hash[rec.ptr - LINE_SHIFT];
 			let mph2 = lhs.minimal_perfect_hash[ptr - LINE_SHIFT];
 			if mph1 == mph2 {
 				/*
@@ -96,16 +94,18 @@ unsafe extern "C" fn scanA(index: *mut histindex, pair: *mut xdpair, line1: usiz
 				 * it onto the front of the existing element
 				 * chain.
 				 */
-				index.next_ptrs[ptr - index.ptr_shift] = (*rec).ptr;
-				(*rec).ptr = ptr;
-				(*rec).cnt = (*rec).cnt + 1;
+				index.next_ptrs[ptr - index.ptr_shift] = rec.ptr;
+				rec.ptr = ptr;
+				rec.cnt = rec.cnt + 1;
 				index.line_map[ptr - index.ptr_shift] = rec;
 				continue_scan = true;
 				break;
 			}
 
-			rec = (*rec).next;
 			chain_len += 1;
+			if rec.next.is_null() {
+				break;
+			}
 		}
 
 		if continue_scan {
@@ -122,11 +122,11 @@ unsafe extern "C" fn scanA(index: *mut histindex, pair: *mut xdpair, line1: usiz
 		 */
 		let last = index.record_storage.len();
 		index.record_storage.push(record::default());
-		rec = &mut index.record_storage[last];
-		(*rec).ptr = ptr;
-		(*rec).cnt = 1;
-		(*rec).next = *rec_chain;
-		*rec_chain = rec;
+		let rec = &mut index.record_storage[last];
+		rec.ptr = ptr;
+		rec.cnt = 1;
+		rec.next = index.record[tbl_idx];
+		index.record[tbl_idx] = rec;
 		index.line_map[ptr - index.ptr_shift] = rec;
 	}
 
@@ -241,8 +241,6 @@ unsafe extern "C" fn try_lcs(index: *mut histindex, pair: *mut xdpair, lcs: *mut
 unsafe extern "C" fn find_lcs(pair: *mut xdpair, lcs: *mut region,
 	line1: usize, count1: usize, line2: usize, count2: usize
 ) -> i32 {
-	let mut ret = -1;
-
 	let pair = xdpair::from_raw_mut(pair);
 	let lcs = &mut *lcs;
 
@@ -261,8 +259,8 @@ unsafe extern "C" fn find_lcs(pair: *mut xdpair, lcs: *mut region,
 		has_common: false,
 	};
 
-	if scanA(&mut index, pair, line1, count1) != 0 {
-		return ret;
+	if scan_a(&mut index, pair, line1, count1) != 0 {
+		return -1;
 	}
 
 	index.cnt = MAX_CHAIN_LENGTH + 1;
