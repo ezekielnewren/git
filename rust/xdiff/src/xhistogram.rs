@@ -2,6 +2,10 @@ use interop::ivec::IVec;
 use crate::xdiff::LINE_SHIFT;
 use crate::xtypes::{xdpair, FileContext};
 
+
+const MAX_CHAIN_LENGTH: usize = 64;
+
+
 #[repr(C)]
 struct record {
 	ptr: usize,
@@ -52,7 +56,6 @@ struct histindex {
 	record: IVec<*mut record>,
 	line_map: IVec<*mut record>,
 	next_ptrs: IVec<usize>,
-	max_chain_length: usize,
 	ptr_shift: usize,
 	cnt: usize,
 	has_common: bool,
@@ -109,7 +112,7 @@ unsafe extern "C" fn scanA(index: *mut histindex, pair: *mut xdpair, line1: usiz
 			continue;
 		}
 
-		if chain_len == index.max_chain_length {
+		if chain_len == MAX_CHAIN_LENGTH {
 			return -1;
 		}
 
@@ -253,7 +256,6 @@ unsafe extern "C" fn find_lcs(pair: *mut xdpair, lcs: *mut region,
 		record: IVec::zero(pair.minimal_perfect_hash_size),
 		line_map: IVec::zero(count1),
 		next_ptrs: IVec::zero(count1),
-		max_chain_length: 64,
 		ptr_shift: line1,
 		cnt: 0,
 		has_common: false,
@@ -263,14 +265,14 @@ unsafe extern "C" fn find_lcs(pair: *mut xdpair, lcs: *mut region,
 		return ret;
 	}
 
-	index.cnt = index.max_chain_length + 1;
+	index.cnt = MAX_CHAIN_LENGTH + 1;
 
 	let mut b_ptr = line2;
 	while b_ptr <= line2 + count2 - 1 {
 		b_ptr = try_lcs(&mut index, pair, lcs, b_ptr, line1, count1, line2, count2);
 	}
 
-	if index.has_common && index.max_chain_length < index.cnt {
+	if index.has_common && MAX_CHAIN_LENGTH < index.cnt {
 		1
 	} else {
 		0
