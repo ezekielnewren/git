@@ -2,7 +2,8 @@
 
 use std::marker::PhantomData;
 use interop::ivec::IVec;
-use crate::xdiff::LINE_SHIFT;
+use crate::get_file_context;
+use crate::xdiff::{LINE_SHIFT, SENTINEL, YES};
 use crate::xtypes::{xdpair, FileContext};
 
 
@@ -75,6 +76,10 @@ struct region {
 	end2: usize,
 }
 
+fn fall_back_to_classic_diff(_: u64, _: &mut xdpair, _: usize, _: usize, _: usize, _: usize) -> i32 {
+	unimplemented!();
+}
+
 
 fn scan_a(index: &mut histindex, pair: &mut xdpair, line1: usize, count1: usize) -> i32 {
     let lhs = FileContext::new(&mut pair.lhs);
@@ -140,14 +145,9 @@ fn record_equal(pair: &xdpair, i1: usize, i2: usize) -> bool {
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn try_lcs(index: *mut histindex, pair: *mut xdpair, lcs: *mut region, b_ptr: usize,
+unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_ptr: usize,
 	line1: usize, count1: usize, line2: usize, count2: usize
 ) -> usize {
-	let index = &mut *index;
-	let pair = xdpair::from_raw_mut(pair);
-	let lcs = &mut *lcs;
-
 	let rhs = FileContext::new(&mut pair.rhs);
 
 	let mut b_next = b_ptr + 1;
@@ -238,16 +238,19 @@ unsafe extern "C" fn try_lcs(index: *mut histindex, pair: *mut xdpair, lcs: *mut
 
 
 #[no_mangle]
-unsafe extern "C" fn find_lcs(pair: *mut xdpair, lcs: *mut region,
-	line1: usize, count1: usize, line2: usize, count2: usize
+unsafe extern "C" fn xdl_find_lcs(pair: *mut xdpair, lcs: *mut region,
+				   line1: usize, count1: usize, line2: usize, count2: usize
 ) -> i32 {
 	let pair = xdpair::from_raw_mut(pair);
 	let lcs = &mut *lcs;
 
-	let lhs = FileContext::new(&mut pair.lhs);
-	let rhs = FileContext::new(&mut pair.rhs);
+	find_lcs(pair, lcs, line1, count1, line2, count2)
+}
 
-	let fudge = (lhs.record.len() + rhs.record.len()) * 10;
+unsafe fn find_lcs(pair: &mut xdpair, lcs: &mut region,
+	line1: usize, count1: usize, line2: usize, count2: usize
+) -> i32 {
+	let fudge = ((*pair.lhs.record).len() + (*pair.rhs.record).len()) * 10;
 
 	let mut index = histindex {
 		record_storage: IVec::with_capacity(fudge),

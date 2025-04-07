@@ -46,6 +46,6 @@ void xdl_free_script(struct xdchange *xscr);
 int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
 		  xdemitconf_t const *xecfg);
 int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair);
-int xdl_do_histogram_diff(xpparam_t const *xpp, struct xdpair *pair);
+extern int xdl_do_histogram_diff(u64 flags, struct xdpair *pair);
 
 #endif /* #if !defined(XDIFFI_H) */

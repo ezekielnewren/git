@@ -48,64 +48,85 @@ struct region {
 	usize begin2, end2;
 };
 
-static int fall_back_to_classic_diff(xpparam_t const *xpp, struct xdpair *pair,
-		int line1, int count1, int line2, int count2)
+static i32 fall_back_to_classic_diff(u64 flags, struct xdpair *pair,
+		usize line1, usize count1, usize line2, usize count2)
 {
 	xpparam_t xpparam;
 
 	memset(&xpparam, 0, sizeof(xpparam));
-	xpparam.flags = xpp->flags & ~XDF_DIFF_ALGORITHM_MASK;
+	xpparam.flags = flags & ~XDF_DIFF_ALGORITHM_MASK;
 
 	return xdl_fall_back_diff(pair, &xpparam,
 				  line1, count1, line2, count2);
 }
 
-extern int find_lcs(struct xdpair *pair, struct region *lcs,
+extern i32 xdl_find_lcs(struct xdpair *pair, struct region *lcs,
 		    usize line1, usize count1, usize line2, usize count2);
 
-static int histogram_diff(xpparam_t const *xpp, struct xdpair *pair,
-	int line1, int count1, int line2, int count2)
+static i32 histogram_diff(u64 flags, struct xdpair *pair,
+	usize line1, usize count1, usize line2, usize count2)
 {
 	struct region lcs;
-	int lcs_found;
-	int result;
-redo:
-	result = -1;
+	i32 lcs_found;
+	i32 result;
+	while (1) {
+		result = -1;
 
-	if (count1 <= 0 && count2 <= 0)
-		return 0;
+		if (count1 <= 0 && count2 <= 0) {
+			return 0;
+		}
 
-	if (!count1) {
-		while(count2--)
-			pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
-		return 0;
-	} else if (!count2) {
-		while(count1--)
-			pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
-		return 0;
-	}
+		if (count1 == 0) {
+			while (count2 > 0) {
+				count2 -= 1;
+				pair->rhs.consider.ptr[SENTINEL + line2 - LINE_SHIFT] = YES;
+				line2 += 1;
+			}
+			return 0;
+		}
+		if (count2 == 0) {
+			while (count1 > 0) {
+				count1 -= 1;
+				pair->lhs.consider.ptr[SENTINEL + line1 - LINE_SHIFT] = YES;
+				line1 += 1;
+			}
+			return 0;
+		}
 
-	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(pair, &lcs, line1, count1, line2, count2);
-	if (lcs_found < 0)
-		goto out;
-	else if (lcs_found)
-		result = fall_back_to_classic_diff(xpp, pair, line1, count1, line2, count2);
-	else {
+		lcs.begin1 = 0;
+		lcs.end1 = 0;
+		lcs.begin2 = 0;
+		lcs.end2 = 0;
+		lcs_found = xdl_find_lcs(pair, &lcs, line1, count1, line2, count2);
+		if (lcs_found < 0) {
+			return result;
+		}
+
+		if (lcs_found != 0) {
+			return fall_back_to_classic_diff(flags, pair, line1, count1, line2, count2);
+		}
+
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
-			while (count1--)
-				pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
-			while (count2--)
-				pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
+			while (count1 > 0) {
+				count1 -= 1;
+				pair->lhs.consider.ptr[SENTINEL + line1 - 1] = YES;
+				line1 += 1;
+			}
+			while (count2 > 0) {
+				count2 -= 1;
+				pair->rhs.consider.ptr[SENTINEL + line2 - 1] = YES;
+				line2 += 1;
+			}
 			result = 0;
 		} else {
-			result = histogram_diff(xpp, pair,
+			result = histogram_diff(flags, pair,
 						line1, lcs.begin1 - line1,
 						line2, lcs.begin2 - line2);
-			if (result)
-				goto out;
+			if (result != 0) {
+				return result;
+			}
 			/*
-			 * result = histogram_diff(xpp, pair,
+			 * result = histogram_diff(flags, pair,
 			 *            lcs.end1 + 1, LINE_END(1) - lcs.end1,
 			 *            lcs.end2 + 1, LINE_END(2) - lcs.end2);
 			 * but let's optimize tail recursion ourself:
@@ -114,19 +135,20 @@ redo:
 			line1 = lcs.end1 + 1;
 			count2 = line2 + count2 - 1 - lcs.end2;
 			line2 = lcs.end2 + 1;
-			goto redo;
+			continue;
 		}
+		break;
 	}
-out:
+
 	return result;
 }
 
-int xdl_do_histogram_diff(xpparam_t const *xpp, struct xdpair *pair) {
+int xdl_do_histogram_diff(u64 flags, struct xdpair *pair) {
 	int result = -1;
 	usize end1 = pair->lhs.record->length - pair->delta_end;
 	usize end2 = pair->rhs.record->length - pair->delta_end;
 
-	result = histogram_diff(xpp, pair,
+	result = histogram_diff(flags, pair,
 		LINE_SHIFT + pair->delta_start, LINE_SHIFT + (end1 - 1) - pair->delta_start,
 		LINE_SHIFT + pair->delta_start, LINE_SHIFT + (end2 - 1) - pair->delta_start);
 
