@@ -66,14 +66,4 @@ extern i32 xdl_find_lcs(struct xdpair *pair, struct region *lcs,
 extern i32 histogram_diff(u64 flags, struct xdpair *pair,
 	usize line1, usize count1, usize line2, usize count2);
 
-int xdl_do_histogram_diff(u64 flags, struct xdpair *pair) {
-	int result = -1;
-	usize end1 = pair->lhs.record->length - pair->delta_end;
-	usize end2 = pair->rhs.record->length - pair->delta_end;
-
-	result = histogram_diff(flags, pair,
-		LINE_SHIFT + pair->delta_start, LINE_SHIFT + (end1 - 1) - pair->delta_start,
-		LINE_SHIFT + pair->delta_start, LINE_SHIFT + (end2 - 1) - pair->delta_start);
-
-	return result;
-}
+extern i32 xdl_do_histogram_diff(u64 flags, struct xdpair *pair);

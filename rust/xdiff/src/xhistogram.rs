@@ -361,3 +361,16 @@ unsafe extern "C" fn histogram_diff(flags: u64, pair: *mut xdpair,
 	result
 }
 
+
+#[no_mangle]
+unsafe extern "C" fn xdl_do_histogram_diff(flags: u64, pair: *mut xdpair) -> i32 {
+	let pair = xdpair::from_raw_mut(pair);
+
+	let end1 = (*pair.lhs.record).len() - pair.delta_end;
+	let end2 = (*pair.rhs.record).len() - pair.delta_end;
+
+	histogram_diff(flags, pair,
+		LINE_SHIFT + pair.delta_start, LINE_SHIFT + end1 - 1 - pair.delta_start,
+		LINE_SHIFT + pair.delta_start, LINE_SHIFT + end2 - 1 - pair.delta_start)
+}
+
