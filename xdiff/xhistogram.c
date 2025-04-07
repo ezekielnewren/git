@@ -43,11 +43,6 @@
 
 #include "xinclude.h"
 
-struct region {
-	usize begin1, end1;
-	usize begin2, end2;
-};
-
 static i32 fall_back_to_classic_diff(u64 flags, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2)
 {
@@ -59,11 +54,5 @@ static i32 fall_back_to_classic_diff(u64 flags, struct xdpair *pair,
 	return xdl_fall_back_diff(pair, &xpparam,
 				  line1, count1, line2, count2);
 }
-
-extern i32 xdl_find_lcs(struct xdpair *pair, struct region *lcs,
-		    usize line1, usize count1, usize line2, usize count2);
-
-extern i32 histogram_diff(u64 flags, struct xdpair *pair,
-	usize line1, usize count1, usize line2, usize count2);
 
 extern i32 xdl_do_histogram_diff(u64 flags, struct xdpair *pair);
