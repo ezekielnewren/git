@@ -36,6 +36,11 @@ unsigned int xdl_hashbits(unsigned int size);
 int xdl_num_out(char *out, long val);
 int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 		      const char *func, long funclen, xdemitcb_t *ecb);
+void xdl_2way_slice(
+	struct xd_file_context *lhs, struct xrange lhs_range,
+	struct xd_file_context *rhs, struct xrange rhs_range,
+	usize mph_size, struct xd2way *two_way
+);
 int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 		       int line1, int count1, int line2, int count2);
 

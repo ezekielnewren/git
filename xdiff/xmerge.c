@@ -363,9 +363,9 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		xpparam_t const *xpp)
 {
 	for (; m; m = m->next) {
-		mmfile_t t1, t2;
 		struct xd2way two_way;
 		struct xdchange *xscr, *x;
+		struct xrange range1, range2;
 		int i1 = m->i1, i2 = m->i2;
 
 		/* let's handle just the conflicts */
@@ -376,17 +376,13 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		if (m->chg1 == 0 || m->chg2 == 0)
 			continue;
 
-		/*
-		 * This probably does not work outside git, since
-		 * we have a very simple mmfile structure.
-		 */
-		t1.ptr = (char *) pair1->rhs.record->ptr[m->i1].ptr;
-		t1.size = (char *) pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].ptr
-			+ pair1->rhs.record->ptr[m->i1 + m->chg1 - 1].size - t1.ptr;
-		t2.ptr = (char *) pair2->rhs.record->ptr[m->i2].ptr;
-		t2.size = (char *) pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].ptr
-			+ pair2->rhs.record->ptr[m->i2 + m->chg2 - 1].size - t2.ptr;
-		xdl_2way_prepare(&t1, &t2, xpp->flags, &two_way);
+		range1.start = m->i1;
+		range1.end = m->i1 + m->chg1;
+
+		range2.start = m->i2;
+		range2.end = m->i2 + m->chg2;
+
+		xdl_2way_slice(&pair1->rhs, range1, &pair2->rhs, range2, pair2->minimal_perfect_hash_size, &two_way);
 		if (xdl_do_diff(xpp, &two_way.pair) < 0)
 			return -1;
 		if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
