@@ -1,10 +1,11 @@
 use std::hash::Hasher;
+use std::ops::Range;
 use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
 use interop::ivec::IVec;
 use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
 use crate::xdiffi::classic_diff;
-use crate::xprepare::{safe_2way_prepare, safe_3way_prepare};
-use crate::xtypes::{parse_lines, xd2way, xd3way, xdfile, xdpair, xrecord};
+use crate::xprepare::{safe_2way_prepare, safe_2way_slice, safe_3way_prepare};
+use crate::xtypes::{parse_lines, xd2way, xd3way, xd_file_context, xdfile, xdpair, xrange, xrecord, FileContext};
 use crate::xutils::{chunked_iter_equal, LineReader, MinimalPerfectHashBuilder, WhitespaceIter};
 
 pub mod xtypes;
@@ -88,6 +89,29 @@ unsafe extern "C" fn xdl_line_equal(line1: *const u8, size1: usize, line2: *cons
         chunked_iter_equal(lhs, rhs)
     }
 }
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_2way_slice(lhs: *mut xd_file_context, lhs_range: xrange,
+                                    rhs: *mut xd_file_context, rhs_range: xrange,
+                                    mph_size: usize, two_way: *mut xd2way) {
+    /* initialize memory of two_way */
+    std::ptr::write(two_way, xd2way {
+        lhs: xdfile::default(),
+        rhs: xdfile::default(),
+        pair: xdpair::default(),
+        minimal_perfect_hash_size: 0,
+    });
+    let two_way = &mut *two_way;
+
+    let lhs = &mut *lhs;
+    let lhs = FileContext::new(lhs);
+    let rhs = &mut *rhs;
+    let rhs = FileContext::new(rhs);
+
+    safe_2way_slice(&lhs, lhs_range.into(), &rhs, rhs_range.into(), mph_size, two_way);
+}
+
 
 #[no_mangle]
 unsafe extern "C" fn xdl_2way_prepare(mf1: *const mmfile, mf2: *const mmfile, flags: u64, two_way: *mut xd2way) {

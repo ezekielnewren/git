@@ -1,10 +1,26 @@
 #![allow(non_camel_case_types)]
 
 use std::hash::Hasher;
+use std::ops::Range;
 use interop::ivec::IVec;
 use crate::maps::HashEq;
 use crate::xdiff::{XDF_WHITESPACE_FLAGS};
 use crate::xutils::{chunked_iter_equal, LineReader, WhitespaceIter};
+
+
+#[repr(C)]
+pub struct xrange {
+    pub start: usize,
+    pub end: usize,
+}
+
+
+impl Into<Range<usize>> for xrange {
+    fn into(self) -> Range<usize> {
+        self.start..self.end
+    }
+}
+
 
 #[repr(C)]
 pub struct xrecord {

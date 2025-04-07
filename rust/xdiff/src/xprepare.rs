@@ -1,6 +1,7 @@
+use std::ops::Range;
 use interop::ivec::IVec;
 use crate::xdiff::*;
-use crate::xtypes::{parse_lines, xd2way, xd3way, xd_file_context, xdfile, xdpair, xrecord};
+use crate::xtypes::{parse_lines, xd2way, xd3way, xd_file_context, xdfile, xdpair, xrecord, FileContext};
 use crate::xutils::{MinimalPerfectHashBuilder};
 
 
@@ -24,6 +25,27 @@ fn xdl_pair_prepare(
 
 	xdl_setup_ctx(lhs, &mut pair.lhs);
 	xdl_setup_ctx(rhs, &mut pair.rhs);
+}
+
+
+pub fn safe_2way_slice(
+	lhs: &FileContext, lhs_range: Range<usize>,
+	rhs: &FileContext, rhs_range: Range<usize>,
+	mph_size: usize, two_way: &mut xd2way
+) {
+	for i in lhs_range {
+		two_way.lhs.minimal_perfect_hash.push(lhs.minimal_perfect_hash[i]);
+		two_way.lhs.record.push(lhs.record[i].clone());
+	}
+
+	for i in rhs_range {
+		two_way.rhs.minimal_perfect_hash.push(rhs.minimal_perfect_hash[i]);
+		two_way.rhs.record.push(rhs.record[i].clone());
+	}
+
+	xdl_pair_prepare(&mut two_way.lhs, &mut two_way.rhs,
+					 mph_size, &mut two_way.pair);
+
 }
 
 

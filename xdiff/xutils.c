@@ -178,42 +178,6 @@ int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 }
 
 
-void xdl_2way_slice(
-	struct xd_file_context *lhs, struct xrange lhs_range,
-	struct xd_file_context *rhs, struct xrange rhs_range,
-	usize mph_size, struct xd2way *two_way
-) {
-	IVEC_INIT(two_way->lhs.minimal_perfect_hash);
-	IVEC_INIT(two_way->lhs.record);
-	for (usize i = lhs_range.start; i < lhs_range.end; i++) {
-		ivec_push(&two_way->lhs.minimal_perfect_hash, &lhs->minimal_perfect_hash->ptr[i]);
-		ivec_push(&two_way->lhs.record, &lhs->record->ptr[i]);
-	}
-	two_way->pair.lhs.minimal_perfect_hash = &two_way->lhs.minimal_perfect_hash;
-	two_way->pair.lhs.record = &two_way->lhs.record;
-	IVEC_INIT(two_way->pair.lhs.consider);
-	ivec_zero(&two_way->pair.lhs.consider, SENTINEL + two_way->lhs.record.length + SENTINEL);
-	IVEC_INIT(two_way->pair.lhs.rindex);
-
-	IVEC_INIT(two_way->rhs.minimal_perfect_hash);
-	IVEC_INIT(two_way->rhs.record);
-	for (usize i = rhs_range.start; i < rhs_range.end; i++) {
-		ivec_push(&two_way->rhs.minimal_perfect_hash, &rhs->minimal_perfect_hash->ptr[i]);
-		ivec_push(&two_way->rhs.record, &rhs->record->ptr[i]);
-	}
-	two_way->pair.rhs.minimal_perfect_hash = &two_way->rhs.minimal_perfect_hash;
-	two_way->pair.rhs.record = &two_way->rhs.record;
-	IVEC_INIT(two_way->pair.rhs.consider);
-	ivec_zero(&two_way->pair.rhs.consider, SENTINEL + two_way->rhs.record.length + SENTINEL);
-	IVEC_INIT(two_way->pair.rhs.rindex);
-
-	two_way->pair.delta_start = 0;
-	two_way->pair.delta_end = 0;
-	two_way->pair.minimal_perfect_hash_size = mph_size;
-	two_way->minimal_perfect_hash_size = mph_size;
-}
-
-
 int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
 		int line1, int count1, int line2, int count2)
 {
