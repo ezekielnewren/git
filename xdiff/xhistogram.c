@@ -63,85 +63,8 @@ static i32 fall_back_to_classic_diff(u64 flags, struct xdpair *pair,
 extern i32 xdl_find_lcs(struct xdpair *pair, struct region *lcs,
 		    usize line1, usize count1, usize line2, usize count2);
 
-static i32 histogram_diff(u64 flags, struct xdpair *pair,
-	usize line1, usize count1, usize line2, usize count2)
-{
-	struct region lcs;
-	i32 lcs_found;
-	i32 result;
-	while (1) {
-		result = -1;
-
-		if (count1 <= 0 && count2 <= 0) {
-			return 0;
-		}
-
-		if (count1 == 0) {
-			while (count2 > 0) {
-				count2 -= 1;
-				pair->rhs.consider.ptr[SENTINEL + line2 - LINE_SHIFT] = YES;
-				line2 += 1;
-			}
-			return 0;
-		}
-		if (count2 == 0) {
-			while (count1 > 0) {
-				count1 -= 1;
-				pair->lhs.consider.ptr[SENTINEL + line1 - LINE_SHIFT] = YES;
-				line1 += 1;
-			}
-			return 0;
-		}
-
-		lcs.begin1 = 0;
-		lcs.end1 = 0;
-		lcs.begin2 = 0;
-		lcs.end2 = 0;
-		lcs_found = xdl_find_lcs(pair, &lcs, line1, count1, line2, count2);
-		if (lcs_found < 0) {
-			return result;
-		}
-
-		if (lcs_found != 0) {
-			return fall_back_to_classic_diff(flags, pair, line1, count1, line2, count2);
-		}
-
-		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
-			while (count1 > 0) {
-				count1 -= 1;
-				pair->lhs.consider.ptr[SENTINEL + line1 - 1] = YES;
-				line1 += 1;
-			}
-			while (count2 > 0) {
-				count2 -= 1;
-				pair->rhs.consider.ptr[SENTINEL + line2 - 1] = YES;
-				line2 += 1;
-			}
-			result = 0;
-		} else {
-			result = histogram_diff(flags, pair,
-						line1, lcs.begin1 - line1,
-						line2, lcs.begin2 - line2);
-			if (result != 0) {
-				return result;
-			}
-			/*
-			 * result = histogram_diff(flags, pair,
-			 *            lcs.end1 + 1, LINE_END(1) - lcs.end1,
-			 *            lcs.end2 + 1, LINE_END(2) - lcs.end2);
-			 * but let's optimize tail recursion ourself:
-			*/
-			count1 = line1 + count1 - 1 - lcs.end1;
-			line1 = lcs.end1 + 1;
-			count2 = line2 + count2 - 1 - lcs.end2;
-			line2 = lcs.end2 + 1;
-			continue;
-		}
-		break;
-	}
-
-	return result;
-}
+extern i32 histogram_diff(u64 flags, struct xdpair *pair,
+	usize line1, usize count1, usize line2, usize count2);
 
 int xdl_do_histogram_diff(u64 flags, struct xdpair *pair) {
 	int result = -1;

@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use interop::ivec::IVec;
 use crate::get_file_context;
 use crate::xdiff::{LINE_SHIFT, SENTINEL, YES};
+use crate::xdiffi::classic_diff_with_range;
 use crate::xtypes::{xdpair, FileContext};
 
 
@@ -276,4 +277,87 @@ unsafe fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 	}
 }
 
+
+#[no_mangle]
+unsafe extern "C" fn histogram_diff(flags: u64, pair: *mut xdpair,
+	mut line1: usize, mut count1: usize, mut line2: usize, mut count2: usize
+) -> i32 {
+	let pair = xdpair::from_raw_mut(pair);
+
+	let mut result;
+	loop {
+		result = -1;
+
+		if count1 <= 0 && count2 <= 0 {
+			return 0;
+		}
+
+		if count1 == 0 {
+			while count2 > 0 {
+				count2 -= 1;
+				pair.rhs.consider[SENTINEL + line2 - LINE_SHIFT] = YES;
+				line2 += 1;
+			}
+			return 0;
+		}
+		if count2 == 0 {
+			while count1 > 0 {
+				count1 -= 1;
+				pair.lhs.consider[SENTINEL + line1 - LINE_SHIFT] = YES;
+				line1 += 1;
+			}
+			return 0;
+		}
+
+		let mut lcs = region {
+			begin1: 0,
+			end1: 0,
+			begin2: 0,
+			end2: 0,
+		};
+		let lcs_found = xdl_find_lcs(pair, &mut lcs, line1, count1, line2, count2);
+		if lcs_found < 0 {
+			return result;
+		}
+
+		if lcs_found != 0 {
+			return classic_diff_with_range(flags, pair, line1..line1 + count1, line2..line2 + count2);
+		}
+
+		if lcs.begin1 == 0 && lcs.begin2 == 0 {
+			while count1 > 0 {
+				count1 -= 1;
+				pair.lhs.consider[SENTINEL + line1 - 1] = YES;
+				line1 += 1;
+			}
+			while count2 > 0 {
+				count2 -= 1;
+				pair.rhs.consider[SENTINEL + line2 - 1] = YES;
+				line2 += 1;
+			}
+			result = 0;
+		} else {
+			result = histogram_diff(flags, pair,
+						line1, lcs.begin1 - line1,
+						line2, lcs.begin2 - line2);
+			if result != 0 {
+				return result;
+			}
+			/*
+			 * result = histogram_diff(flags, pair,
+			 *            lcs.end1 + 1, LINE_END(1) - lcs.end1,
+			 *            lcs.end2 + 1, LINE_END(2) - lcs.end2);
+			 * but let's optimize tail recursion ourself:
+			*/
+			count1 = line1 + count1 - 1 - lcs.end1;
+			line1 = lcs.end1 + 1;
+			count2 = line2 + count2 - 1 - lcs.end2;
+			line2 = lcs.end2 + 1;
+			continue;
+		}
+		break;
+	}
+
+	result
+}
 
