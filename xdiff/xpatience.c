@@ -75,7 +75,6 @@ struct hashmap {
 	struct entry *first, *last;
 	/* were common records found? */
 	bool has_matches;
-	struct xdpair *pair;
 };
 
 static bool is_anchor(xpparam_t const *xpp, const char *line)
@@ -89,11 +88,11 @@ static bool is_anchor(xpparam_t const *xpp, const char *line)
 }
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
-static void insert_record(xpparam_t const *xpp, usize line, struct hashmap *map,
-			  i32 pass)
-{
+static void insert_record(xpparam_t const *xpp, struct xdpair *pair,
+	usize line, struct hashmap *map, i32 pass
+) {
 	u64* mph_vec = pass == 1 ?
-		map->pair->lhs.minimal_perfect_hash->ptr : map->pair->rhs.minimal_perfect_hash->ptr;
+		pair->lhs.minimal_perfect_hash->ptr : pair->rhs.minimal_perfect_hash->ptr;
 	u64 mph = mph_vec[line - 1];
 	/*
 	 * After xdl_prepare_env() (or more precisely, due to
@@ -125,7 +124,7 @@ static void insert_record(xpparam_t const *xpp, usize line, struct hashmap *map,
 		return;
 	map->entries.ptr[index].line1 = line;
 	map->entries.ptr[index].minimal_perfect_hash = mph;
-	map->entries.ptr[index].anchor = is_anchor(xpp, (const char*) map->pair->lhs.record->ptr[line - 1].ptr);
+	map->entries.ptr[index].anchor = is_anchor(xpp, (const char*) pair->lhs.record->ptr[line - 1].ptr);
 	if (!map->first)
 		map->first = &map->entries.ptr[index];
 	if (map->last) {
@@ -147,8 +146,6 @@ static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 		struct hashmap *result,
 		usize line1, usize count1, usize line2, usize count2)
 {
-	result->pair = pair;
-
 	/* We know exactly how large we want the hash map */
 	result->alloc = count1 * 2;
 	IVEC_INIT(result->entries);
@@ -156,11 +153,11 @@ static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 
 	/* First, fill with entries from the first file */
 	while (count1--)
-		insert_record(xpp, line1++, result, 1);
+		insert_record(xpp, pair, line1++, result, 1);
 
 	/* Then search for matches in the second file */
 	while (count2--)
-		insert_record(xpp, line2++, result, 2);
+		insert_record(xpp, pair, line2++, result, 2);
 
 	return 0;
 }
@@ -248,18 +245,19 @@ static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	return 0;
 }
 
-static bool match(struct hashmap *map, usize line1, usize line2) {
-	u64 mph1 = map->pair->lhs.minimal_perfect_hash->ptr[line1 - LINE_SHIFT];
-	u64 mph2 = map->pair->rhs.minimal_perfect_hash->ptr[line2 - LINE_SHIFT];
+static bool match(struct xdpair *pair, usize line1, usize line2) {
+	u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[line1 - LINE_SHIFT];
+	u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[line2 - LINE_SHIFT];
 	return mph1 == mph2;
 }
 
 static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2);
 
-static i32 walk_common_sequence(xpparam_t const *xpp, struct hashmap *map, struct entry *first,
-		usize line1, usize count1, usize line2, usize count2)
-{
+static i32 walk_common_sequence(xpparam_t const *xpp, struct xdpair *pair,
+	struct hashmap *map, struct entry *first,
+	usize line1, usize count1, usize line2, usize count2
+) {
 	usize end1 = line1 + count1, end2 = line2 + count2;
 	usize next1, next2;
 
@@ -269,7 +267,7 @@ static i32 walk_common_sequence(xpparam_t const *xpp, struct hashmap *map, struc
 			next1 = first->line1;
 			next2 = first->line2;
 			while (next1 > line1 && next2 > line2 &&
-					match(map, next1 - 1, next2 - 1)) {
+					match(pair, next1 - 1, next2 - 1)) {
 				next1--;
 				next2--;
 			}
@@ -278,14 +276,14 @@ static i32 walk_common_sequence(xpparam_t const *xpp, struct hashmap *map, struc
 			next2 = end2;
 		}
 		while (line1 < next1 && line2 < next2 &&
-				match(map, line1, line2)) {
+				match(pair, line1, line2)) {
 			line1++;
 			line2++;
 		}
 
 		/* Recurse */
 		if (next1 > line1 || next2 > line2) {
-			if (patience_diff(xpp, map->pair,
+			if (patience_diff(xpp, pair,
 					line1, next1 - line1,
 					line2, next2 - line2))
 				return -1;
@@ -306,7 +304,7 @@ static i32 walk_common_sequence(xpparam_t const *xpp, struct hashmap *map, struc
 	}
 }
 
-static i32 fall_back_to_classic_diff(u64 flags, struct hashmap *map,
+static i32 fall_back_to_classic_diff(u64 flags, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2)
 {
 	xpparam_t xpp;
@@ -314,7 +312,7 @@ static i32 fall_back_to_classic_diff(u64 flags, struct hashmap *map,
 	memset(&xpp, 0, sizeof(xpp));
 	xpp.flags = flags & ~XDF_DIFF_ALGORITHM_MASK;
 
-	return xdl_fall_back_diff(map->pair, &xpp,
+	return xdl_fall_back_diff(pair, &xpp,
 				  line1, count1, line2, count2);
 }
 
@@ -361,10 +359,10 @@ static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	if (result)
 		goto out;
 	if (first)
-		result = walk_common_sequence(xpp, &map, first,
+		result = walk_common_sequence(xpp, pair, &map, first,
 			line1, count1, line2, count2);
 	else
-		result = fall_back_to_classic_diff(xpp->flags, &map,
+		result = fall_back_to_classic_diff(xpp->flags, pair,
 			line1, count1, line2, count2);
  out:
 	ivec_free(&map.entries);
