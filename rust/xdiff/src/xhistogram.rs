@@ -152,14 +152,14 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 	let mut should_break;
 
 	for rec in RecordIter::new(index.record[b_line_number_mph]) {
-		if (*rec).count > index.count {
+		if rec.count > index.count {
 			if !index.has_common {
-				index.has_common = record_equal(pair, (*rec).line_number, b_line_number);
+				index.has_common = record_equal(pair, rec.line_number, b_line_number);
 			}
 			continue;
 		}
 
-		range_a.start = (*rec).line_number;
+		range_a.start = rec.line_number;
 		if !record_equal(pair, range_a.start, b_line_number) {
 			continue;
 		}
@@ -171,7 +171,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 			range_b.start = b_line_number;
 			range_a.end = range_a.start;
 			range_b.end = range_b.start;
-			let mut record_count = (*rec).count;
+			let mut record_count = rec.count;
 
 			while range1.start < range_a.start && range2.start < range_b.start
 				&& record_equal(pair, range_a.start - 1, range_b.start - 1) {
