@@ -79,13 +79,11 @@ struct region {
 fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32 {
     let lhs = FileContext::new(&mut pair.lhs);
 
-    for line_number in range1.rev() {
-		let mut continue_scan = false;
+    'outer: for line_number in range1.rev() {
 		let mph1 = lhs.minimal_perfect_hash[line_number - LINE_SHIFT] as usize;
 
 		let mut chain_len = 0;
 		for rec in RecordIter::new(index.record[mph1]) {
-			continue_scan = false;
 			let mph2 = lhs.minimal_perfect_hash[line_number - LINE_SHIFT] as usize;
 			if mph1 == mph2 {
 				/*
@@ -97,18 +95,13 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 				rec.line_number = line_number;
 				rec.count = rec.count + 1;
 				index.line_map[line_number - index.line_number_shift] = rec;
-				continue_scan = true;
-				break;
+				continue 'outer;
 			}
 
 			chain_len += 1;
 			if rec.next.is_null() {
 				break;
 			}
-		}
-
-		if continue_scan {
-			continue;
 		}
 
 		if chain_len == MAX_CHAIN_LENGTH {
