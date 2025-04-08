@@ -149,8 +149,6 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 	let b_line_number_mph = rhs.minimal_perfect_hash[b_line_number - LINE_SHIFT] as usize;
 	let mut range_a = Range::default();
 	let mut range_b = Range::default();
-	let mut np;
-	let mut rc;
 	let mut should_break;
 
 	for rec in RecordIter::new(index.record[b_line_number_mph]) {
@@ -169,51 +167,51 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 		index.has_common = true;
 		loop {
 			should_break = false;
-			np = index.next_line_numbers[range_a.start - index.line_number_shift];
+			let mut next_line = index.next_line_numbers[range_a.start - index.line_number_shift];
 			range_b.start = b_line_number;
 			range_a.end = range_a.start;
 			range_b.end = range_b.start;
-			rc = (*rec).count;
+			let mut record_count = (*rec).count;
 
 			while range1.start < range_a.start && range2.start < range_b.start
 				&& record_equal(pair, range_a.start - 1, range_b.start - 1) {
 				range_a.start -= 1;
 				range_b.start -= 1;
-				if 1 < rc {
+				if 1 < record_count {
 					let t_rec: *mut record = index.line_map[range_a.start - index.line_number_shift];
 					let count = unsafe { (*t_rec).count };
-					rc = std::cmp::min(rc, count);
+					record_count = std::cmp::min(record_count, count);
 				}
 			}
 			while range_a.end < range1.end - 1 && range_b.end < range2.end - 1
 				&& record_equal(pair, range_a.end + 1, range_b.end + 1) {
 				range_a.end += 1;
 				range_b.end += 1;
-				if 1 < rc {
+				if 1 < record_count {
 					let t_rec: *mut record = index.line_map[range_a.end - index.line_number_shift];
 					let count = unsafe { (*t_rec).count };
-					rc = std::cmp::min(rc, count);
+					record_count = std::cmp::min(record_count, count);
 				}
 			}
 
 			if b_next <= range_b.end {
 				b_next = range_b.end + 1;
 			}
-			if lcs.range1.end - lcs.range1.start < range_a.end - range_a.start || rc < index.count {
+			if lcs.range1.end - lcs.range1.start < range_a.end - range_a.start || record_count < index.count {
 				lcs.range1.start = range_a.start;
 				lcs.range2.start = range_b.start;
 				lcs.range1.end = range_a.end;
 				lcs.range2.end = range_b.end;
-				index.count = rc;
+				index.count = record_count;
 			}
 
-			if np == 0 {
+			if next_line == 0 {
 				break;
 			}
 
-			while np <= range_a.end {
-				np = index.next_line_numbers[np - index.line_number_shift];
-				if np == 0 {
+			while next_line <= range_a.end {
+				next_line = index.next_line_numbers[next_line - index.line_number_shift];
+				if next_line == 0 {
 					should_break = true;
 					break;
 				}
@@ -223,7 +221,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				break;
 			}
 
-			range_a.start = np;
+			range_a.start = next_line;
 		}
 	}
 
