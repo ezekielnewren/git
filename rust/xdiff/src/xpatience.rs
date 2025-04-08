@@ -189,18 +189,13 @@ fn insert_record(
  *
  * It is assumed that env has been prepared using xdl_prepare().
  */
-#[no_mangle]
-unsafe extern "C" fn fill_hashmap(
-    xpp: *const xpparam_t, pair: *mut xdpair,
-    result: *mut hashmap,
+fn fill_hashmap(
+    xpp: &xpparam_t, pair: &mut xdpair,
+    result: &mut hashmap,
     line1: usize, count1: usize, line2: usize, count2: usize
 ) -> i32 {
-    let xpp = &*xpp;
-    let pair = xdpair::from_raw_mut(pair);
-    let result = &mut *result;
-
 	/* We know exactly how large we want the hash map */
-    result.entries = IVec::zero(count1 * 2);
+    result.entries = unsafe { IVec::zero(count1 * 2) };
 
 	/* First, fill with entries from the first file */
     for i in line1..line1 + count1 {
