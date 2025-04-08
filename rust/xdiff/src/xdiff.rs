@@ -50,6 +50,20 @@ pub const XDL_MERGE_ZEALOUS_DIFF3: usize = 2;
 
 
 #[repr(C)]
+pub struct xpparam_t {
+	pub flags: u64,
+
+	/* -I<regex> */
+    pub ignore_regex: *mut *mut libc::regex_t,
+    pub ignore_regex_nr: usize,
+
+	/* See Documentation/diff-options.adoc. */
+    pub anchors: *mut *mut libc::c_char,
+    pub anchors_nr: usize,
+}
+
+
+#[repr(C)]
 pub struct mmfile {
     pub ptr: *const libc::c_char,
     pub size: libc::c_long,
