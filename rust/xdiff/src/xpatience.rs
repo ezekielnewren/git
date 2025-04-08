@@ -423,3 +423,12 @@ unsafe extern "C" fn patience_diff(xpp: *const xpparam_t, pair: *mut xdpair,
 	result
 }
 
+
+#[no_mangle]
+unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
+	let xpp = &*xpp;
+	let pair = xdpair::from_raw_mut(pair);
+
+	patience_diff(xpp, pair, LINE_SHIFT, (*pair.lhs.record).len(), LINE_SHIFT, (*pair.rhs.record).len())
+}
+

@@ -106,59 +106,6 @@ static bool record_equal(struct xdpair *pair, usize line1, usize line2) {
 	return mph1 == mph2;
 }
 
-static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
-		usize line1, usize count1, usize line2, usize count2);
-
-static i32 walk_common_sequence(xpparam_t const *xpp, struct xdpair *pair,
-	struct entry *first,
-	usize line1, usize count1, usize line2, usize count2
-) {
-	usize end1 = line1 + count1, end2 = line2 + count2;
-	usize next1, next2;
-
-	for (;;) {
-		/* Try to grow the line ranges of common lines */
-		if (first) {
-			next1 = first->line1;
-			next2 = first->line2;
-			while (next1 > line1 && next2 > line2 &&
-					record_equal(pair, next1 - 1, next2 - 1)) {
-				next1--;
-				next2--;
-			}
-		} else {
-			next1 = end1;
-			next2 = end2;
-		}
-		while (line1 < next1 && line2 < next2 &&
-				record_equal(pair, line1, line2)) {
-			line1++;
-			line2++;
-		}
-
-		/* Recurse */
-		if (next1 > line1 || next2 > line2) {
-			if (patience_diff(xpp, pair,
-					line1, next1 - line1,
-					line2, next2 - line2))
-				return -1;
-		}
-
-		if (!first)
-			return 0;
-
-		while (first->next &&
-				first->next->line1 == first->line1 + 1 &&
-				first->next->line2 == first->line2 + 1)
-			first = first->next;
-
-		line1 = first->line1 + 1;
-		line2 = first->line2 + 1;
-
-		first = first->next;
-	}
-}
-
 static i32 fall_back_to_classic_diff(u64 flags, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2)
 {
@@ -171,59 +118,15 @@ static i32 fall_back_to_classic_diff(u64 flags, struct xdpair *pair,
 				  line1, count1, line2, count2);
 }
 
-/*
- * Recursively find the longest common sequence of unique lines,
- * and if none was found, ask xdl_do_diff() to do the job.
- *
- * This function assumes that env was prepared with xdl_prepare_env().
- */
 static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
-		usize line1, usize count1, usize line2, usize count2)
-{
-	struct hashmap map;
-	struct entry *first;
-	i32 result = 0;
+		usize line1, usize count1, usize line2, usize count2);
 
-	/* trivial case: one side is empty */
-	if (!count1) {
-		while(count2--)
-			pair->rhs.consider.ptr[SENTINEL + line2++ - LINE_SHIFT] = YES;
-		return 0;
-	} else if (!count2) {
-		while(count1--)
-			pair->lhs.consider.ptr[SENTINEL + line1++ - LINE_SHIFT] = YES;
-		return 0;
-	}
+extern i32 walk_common_sequence(xpparam_t const *xpp, struct xdpair *pair,
+	struct entry *first,
+	usize line1, usize count1, usize line2, usize count2
+);
 
-	memset(&map, 0, sizeof(map));
-	if (fill_hashmap(xpp, pair, &map,
-			line1, count1, line2, count2))
-		return -1;
+extern i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
+		usize line1, usize count1, usize line2, usize count2
+);
 
-	/* are there any matching lines at all? */
-	if (!map.has_matches) {
-		while(count1--)
-			pair->lhs.consider.ptr[SENTINEL + line1++ - LINE_SHIFT] = YES;
-		while(count2--)
-			pair->rhs.consider.ptr[SENTINEL + line2++ - LINE_SHIFT] = YES;
-		ivec_free(&map.entries);
-		return 0;
-	}
-
-	result = find_longest_common_sequence(&map, &first);
-	if (result)
-		goto out;
-	if (first)
-		result = walk_common_sequence(xpp, pair, first,
-			line1, count1, line2, count2);
-	else
-		result = fall_back_to_classic_diff(xpp->flags, pair,
-			line1, count1, line2, count2);
- out:
-	ivec_free(&map.entries);
-	return result;
-}
-
-i32 xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair) {
-	return patience_diff(xpp, pair, LINE_SHIFT, pair->lhs.record->length, LINE_SHIFT, pair->rhs.record->length);
-}
