@@ -100,7 +100,7 @@ extern isize binary_search(struct ivec_entry_ptr *sequence, isize longest,
 extern i32 find_longest_common_sequence(struct hashmap *map, struct entry **res);
 
 
-static bool match(struct xdpair *pair, usize line1, usize line2) {
+static bool record_equal(struct xdpair *pair, usize line1, usize line2) {
 	u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[line1 - LINE_SHIFT];
 	u64 mph2 = pair->rhs.minimal_perfect_hash->ptr[line2 - LINE_SHIFT];
 	return mph1 == mph2;
@@ -122,7 +122,7 @@ static i32 walk_common_sequence(xpparam_t const *xpp, struct xdpair *pair,
 			next1 = first->line1;
 			next2 = first->line2;
 			while (next1 > line1 && next2 > line2 &&
-					match(pair, next1 - 1, next2 - 1)) {
+					record_equal(pair, next1 - 1, next2 - 1)) {
 				next1--;
 				next2--;
 			}
@@ -131,7 +131,7 @@ static i32 walk_common_sequence(xpparam_t const *xpp, struct xdpair *pair,
 			next2 = end2;
 		}
 		while (line1 < next1 && line2 < next2 &&
-				match(pair, line1, line2)) {
+				record_equal(pair, line1, line2)) {
 			line1++;
 			line2++;
 		}
