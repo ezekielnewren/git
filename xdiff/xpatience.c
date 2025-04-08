@@ -77,11 +77,11 @@ struct hashmap {
 	bool has_matches;
 };
 
-static bool is_anchor(xpparam_t const *xpp, const char *line)
+static bool is_anchor(xpparam_t const *xpp, u8 const *line)
 {
 	size_t i;
 	for (i = 0; i < xpp->anchors_nr; i++) {
-		if (!strncmp(line, xpp->anchors[i], strlen(xpp->anchors[i])))
+		if (!strncmp((const char*) line, xpp->anchors[i], strlen(xpp->anchors[i])))
 			return true;
 	}
 	return false;
@@ -124,7 +124,7 @@ static void insert_record(xpparam_t const *xpp, struct xdpair *pair,
 		return;
 	map->entries.ptr[index].line1 = line;
 	map->entries.ptr[index].minimal_perfect_hash = mph;
-	map->entries.ptr[index].anchor = is_anchor(xpp, (const char*) pair->lhs.record->ptr[line - 1].ptr);
+	map->entries.ptr[index].anchor = is_anchor(xpp, pair->lhs.record->ptr[line - 1].ptr);
 	if (!map->first)
 		map->first = &map->entries.ptr[index];
 	if (map->last) {
