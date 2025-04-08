@@ -332,11 +332,11 @@ static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	/* trivial case: one side is empty */
 	if (!count1) {
 		while(count2--)
-			pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
+			pair->rhs.consider.ptr[SENTINEL + line2++ - LINE_SHIFT] = YES;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
+			pair->lhs.consider.ptr[SENTINEL + line1++ - LINE_SHIFT] = YES;
 		return 0;
 	}
 
@@ -348,9 +348,9 @@ static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	/* are there any matching lines at all? */
 	if (!map.has_matches) {
 		while(count1--)
-			pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
+			pair->lhs.consider.ptr[SENTINEL + line1++ - LINE_SHIFT] = YES;
 		while(count2--)
-			pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
+			pair->rhs.consider.ptr[SENTINEL + line2++ - LINE_SHIFT] = YES;
 		ivec_free(&map.entries);
 		return 0;
 	}
@@ -369,7 +369,6 @@ static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	return result;
 }
 
-i32 xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair)
-{
-	return patience_diff(xpp, pair, 1, pair->lhs.record->length, 1, pair->rhs.record->length);
+i32 xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair) {
+	return patience_diff(xpp, pair, LINE_SHIFT, pair->lhs.record->length, LINE_SHIFT, pair->rhs.record->length);
 }
