@@ -2,9 +2,10 @@
 
 use std::marker::PhantomData;
 use interop::ivec::IVec;
+use crate::get_file_context;
 use crate::xdiff::*;
+use crate::xtypes::*;
 use crate::xdiffi::classic_diff_with_range;
-use crate::xtypes::xdpair;
 
 const NON_UNIQUE: usize = usize::MAX;
 
@@ -103,13 +104,16 @@ impl Default for hashmap {
 	}
 }
 
-#[no_mangle]
-unsafe extern "C" fn is_anchor(xpp: *const xpparam_t, line: *const u8) -> bool {
-    let xpp = &*xpp;
+fn is_anchor(xpp: &xpparam_t, line: &[u8]) -> bool {
     for i in 0..xpp.anchors_nr {
-        if 0 == libc::strncmp(line as *const libc::c_char, *xpp.anchors.add(i), libc::strlen(*xpp.anchors.add(i))) {
-            return true;
-        }
+		let anchor = unsafe {
+			let t = *xpp.anchors.add(i);
+			let len = libc::strlen(t);
+			std::slice::from_raw_parts(t as *const u8, len)
+		};
+		if line.starts_with(anchor) {
+			return true;
+		}
     }
 
     false
@@ -117,19 +121,16 @@ unsafe extern "C" fn is_anchor(xpp: *const xpparam_t, line: *const u8) -> bool {
 
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
-#[no_mangle]
-unsafe extern "C" fn insert_record(
-    xpp: *const xpparam_t, pair: *mut xdpair,
-	line: usize, map: *mut hashmap, pass: i32
+fn insert_record(
+    xpp: &xpparam_t, pair: &mut xdpair,
+	line: usize, map: &mut hashmap, pass: i32
 ) {
-    let xpp = &*xpp;
-    let pair = xdpair::from_raw_mut(pair);
-    let map = &mut *map;
+	let (lhs, rhs) = get_file_context!(pair);
 
-	let mph_vec = &mut *if pass == 1 {
-        pair.lhs.minimal_perfect_hash
+	let mph_vec = if pass == 1 {
+        lhs.minimal_perfect_hash
     } else {
-        pair.rhs.minimal_perfect_hash
+        rhs.minimal_perfect_hash
     };
 	let mph = mph_vec[line - 1];
 
@@ -168,12 +169,12 @@ unsafe extern "C" fn insert_record(
     }
 	map.entries[index].line1 = line;
 	map.entries[index].minimal_perfect_hash = mph;
-	map.entries[index].anchor = is_anchor(xpp, (*pair.lhs.record)[line - 1].as_ptr());
+	map.entries[index].anchor = is_anchor(xpp, lhs.record[line - 1].as_ref());
 	if map.first.is_null() {
 		map.first = &mut map.entries[index];
     }
 	if !map.last.is_null() {
-        (*map.last).next = &mut map.entries[index];
+        unsafe { (*map.last).next = &mut map.entries[index] };
 		map.entries[index].previous = map.last;
 	}
 	map.last = &mut map.entries[index];
@@ -376,7 +377,7 @@ unsafe extern "C" fn patience_diff(xpp: *const xpparam_t, pair: *mut xdpair,
 	let pair = &mut *pair;
 
 	let mut map = hashmap::default();
-	let mut result = 0i32;
+	let mut result;
 
 	/* trivial case: one side is empty */
 	if count1 == 0 {
