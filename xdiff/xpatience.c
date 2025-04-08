@@ -46,7 +46,7 @@
  * second file.
  */
 struct hashmap {
-	int nr, alloc;
+	usize nr, alloc;
 	struct entry {
 		u64 minimal_perfect_hash;
 		/*
@@ -54,7 +54,7 @@ struct hashmap {
 		 * line2 is NON_UNIQUE if the line is not unique
 		 * in either the first or the second file.
 		 */
-		unsigned long line1, line2;
+		usize line1, line2;
 		/*
 		 * "next" & "previous" are used for the longest common
 		 * sequence;
@@ -66,27 +66,27 @@ struct hashmap {
 		 * If 1, this entry can serve as an anchor. See
 		 * Documentation/diff-options.adoc for more information.
 		 */
-		unsigned anchor : 1;
+		bool anchor : 1;
 	} *entries, *first, *last;
 	/* were common records found? */
-	unsigned long has_matches;
+	bool has_matches;
 	struct xdpair *pair;
 	xpparam_t const *xpp;
 };
 
-static int is_anchor(xpparam_t const *xpp, const char *line)
+static bool is_anchor(xpparam_t const *xpp, const char *line)
 {
 	size_t i;
 	for (i = 0; i < xpp->anchors_nr; i++) {
 		if (!strncmp(line, xpp->anchors[i], strlen(xpp->anchors[i])))
-			return 1;
+			return true;
 	}
-	return 0;
+	return false;
 }
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
-static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
-			  int pass)
+static void insert_record(xpparam_t const *xpp, usize line, struct hashmap *map,
+			  i32 pass)
 {
 	u64* mph_vec = pass == 1 ?
 		map->pair->lhs.minimal_perfect_hash->ptr : map->pair->rhs.minimal_perfect_hash->ptr;
@@ -101,7 +101,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	 * So we multiply ha by 2 in the hope that the hashing was
 	 * "unique enough".
 	 */
-	int index = (int)((mph << 1) % map->alloc);
+	usize index = ((mph << 1) % map->alloc);
 
 	while (map->entries[index].line1) {
 		if (map->entries[index].minimal_perfect_hash != mph) {
@@ -110,7 +110,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 			continue;
 		}
 		if (pass == 2)
-			map->has_matches = 1;
+			map->has_matches = true;
 		if (pass == 1 || map->entries[index].line2)
 			map->entries[index].line2 = NON_UNIQUE;
 		else
@@ -139,9 +139,9 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
  *
  * It is assumed that env has been prepared using xdl_prepare().
  */
-static int fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
+static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 		struct hashmap *result,
-		int line1, int count1, int line2, int count2)
+		usize line1, usize count1, usize line2, usize count2)
 {
 	result->xpp = xpp;
 	result->pair = pair;
@@ -166,7 +166,7 @@ static int fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
  * Find the longest sequence with a smaller last element (meaning a smaller
  * line2, as we construct the sequence with entries ordered by line1).
  */
-static int binary_search(struct entry **sequence, int longest,
+static i32 binary_search(struct entry **sequence, int longest,
 		struct entry *entry)
 {
 	int left = -1, right = longest;
