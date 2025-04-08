@@ -70,7 +70,7 @@ DEFINE_IVEC_TYPE(struct entry, entry);
  * second file.
  */
 struct hashmap {
-	usize nr, alloc;
+	usize nr;
 	struct ivec_entry entries;
 	struct entry *first, *last;
 	/* were common records found? */
@@ -104,11 +104,11 @@ static void insert_record(xpparam_t const *xpp, struct xdpair *pair,
 	 * So we multiply ha by 2 in the hope that the hashing was
 	 * "unique enough".
 	 */
-	usize index = ((mph << 1) % map->alloc);
+	usize index = ((mph << 1) % map->entries.capacity);
 
 	while (map->entries.ptr[index].line1) {
 		if (map->entries.ptr[index].minimal_perfect_hash != mph) {
-			if (++index >= map->alloc)
+			if (++index >= map->entries.capacity)
 				index = 0;
 			continue;
 		}
@@ -147,9 +147,8 @@ static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2)
 {
 	/* We know exactly how large we want the hash map */
-	result->alloc = count1 * 2;
 	IVEC_INIT(result->entries);
-	ivec_zero(&result->entries, result->alloc);
+	ivec_zero(&result->entries, count1 * 2);
 
 	/* First, fill with entries from the first file */
 	while (count1--)
@@ -193,9 +192,11 @@ static isize binary_search(struct entry **sequence, usize longest,
  * item per sequence length: the sequence with the smallest last
  * element (in terms of line2).
  */
-static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
-{
-	struct entry **sequence;
+static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res) {
+	DEFINE_IVEC_TYPE(struct entry*, entry_ptr);
+	struct ivec_entry_ptr sequence;
+	IVEC_INIT(sequence);
+
 	isize longest = 0, i;
 	struct entry *entry;
 
@@ -206,18 +207,17 @@ static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	 */
 	isize anchor_i = -1;
 
-	if (!XDL_ALLOC_ARRAY(sequence, map->nr))
-		return -1;
+	ivec_reserve_exact(&sequence, map->entries.length);
 
 	for (entry = map->first; entry; entry = entry->next) {
 		if (!entry->line2 || entry->line2 == NON_UNIQUE)
 			continue;
-		i = binary_search(sequence, longest, entry);
-		entry->previous = i < 0 ? NULL : sequence[i];
+		i = binary_search(sequence.ptr, longest, entry);
+		entry->previous = i < 0 ? NULL : sequence.ptr[i];
 		++i;
 		if (i <= anchor_i)
 			continue;
-		sequence[i] = entry;
+		sequence.ptr[i] = entry;
 		if (entry->anchor) {
 			anchor_i = i;
 			longest = anchor_i + 1;
@@ -229,19 +229,19 @@ static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	/* No common unique lines were found */
 	if (!longest) {
 		*res = NULL;
-		xdl_free(sequence);
+		ivec_free(&sequence);
 		return 0;
 	}
 
 	/* Iterate starting at the last element, adjusting the "next" members */
-	entry = sequence[longest - 1];
+	entry = sequence.ptr[longest - 1];
 	entry->next = NULL;
 	while (entry->previous) {
 		entry->previous->next = entry;
 		entry = entry->previous;
 	}
 	*res = entry;
-	xdl_free(sequence);
+	ivec_free(&sequence);
 	return 0;
 }
 
