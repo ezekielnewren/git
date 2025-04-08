@@ -138,7 +138,6 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 	let b_line_number_mph = rhs.minimal_perfect_hash[b_line_number - LINE_SHIFT] as usize;
 	let mut range_a = Range::default();
 	let mut range_b = Range::default();
-	let mut should_break;
 
 	for rec in RecordIter::new(index.record[b_line_number_mph]) {
 		if rec.count > index.count {
@@ -154,8 +153,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 		}
 
 		index.has_common = true;
-		loop {
-			should_break = false;
+		'middle_loop: loop {
 			let mut next_line = index.next_line_numbers[range_a.start - index.line_number_shift];
 			range_b.start = b_line_number;
 			range_a.end = range_a.start;
@@ -201,13 +199,8 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 			while next_line <= range_a.end {
 				next_line = index.next_line_numbers[next_line - index.line_number_shift];
 				if next_line == 0 {
-					should_break = true;
-					break;
+					break 'middle_loop;
 				}
-			}
-
-			if should_break {
-				break;
 			}
 
 			range_a.start = next_line;
