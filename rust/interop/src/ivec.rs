@@ -232,6 +232,10 @@ impl<T> IVec<T> {
         self.length
     }
 
+    pub unsafe fn set_len(&mut self, new_length: usize) {
+        self.length = new_length;
+    }
+
     pub fn capacity(&self) -> usize {
         self.capacity
     }
