@@ -14,7 +14,7 @@ const MAX_CHAIN_LENGTH: usize = 64;
 #[repr(C)]
 struct record {
 	line_number: usize,
-    cnt: usize,
+    count: usize,
 	next: *mut record,
 }
 
@@ -22,7 +22,7 @@ impl Default for record {
 	fn default() -> Self {
 		Self {
 			line_number: 0,
-			cnt: 0,
+			count: 0,
 			next: std::ptr::null_mut(),
 		}
 	}
@@ -64,7 +64,7 @@ struct histindex {
 	line_map: Vec<*mut record>,
 	next_line_numbers: Vec<usize>,
 	line_number_shift: usize,
-	cnt: usize,
+	count: usize,
 	has_common: bool,
 }
 
@@ -96,7 +96,7 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 				 */
 				index.next_line_numbers[line_number - index.line_number_shift] = rec.line_number;
 				rec.line_number = line_number;
-				rec.cnt = rec.cnt + 1;
+				rec.count = rec.count + 1;
 				index.line_map[line_number - index.line_number_shift] = rec;
 				continue_scan = true;
 				break;
@@ -124,7 +124,7 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 		index.record_storage.push(record::default());
 		let rec = &mut index.record_storage[last];
 		rec.line_number = line_number;
-		rec.cnt = 1;
+		rec.count = 1;
 		rec.next = index.record[tbl_idx];
 		index.record[tbl_idx] = rec;
 		index.line_map[line_number - index.line_number_shift] = rec;
@@ -154,7 +154,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 	let mut should_break;
 
 	for rec in RecordIter::new(index.record[b_line_number_mph]) {
-		if (*rec).cnt > index.cnt {
+		if (*rec).count > index.count {
 			if !index.has_common {
 				index.has_common = record_equal(pair, (*rec).line_number, b_line_number);
 			}
@@ -173,7 +173,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 			range_b.start = b_line_number;
 			range_a.end = range_a.start;
 			range_b.end = range_b.start;
-			rc = (*rec).cnt;
+			rc = (*rec).count;
 
 			while range1.start < range_a.start && range2.start < range_b.start
 				&& record_equal(pair, range_a.start - 1, range_b.start - 1) {
@@ -181,8 +181,8 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				range_b.start -= 1;
 				if 1 < rc {
 					let t_rec: *mut record = index.line_map[range_a.start - index.line_number_shift];
-					let cnt = unsafe { (*t_rec).cnt };
-					rc = std::cmp::min(rc, cnt);
+					let count = unsafe { (*t_rec).count };
+					rc = std::cmp::min(rc, count);
 				}
 			}
 			while range_a.end < range1.end - 1 && range_b.end < range2.end - 1
@@ -191,20 +191,20 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				range_b.end += 1;
 				if 1 < rc {
 					let t_rec: *mut record = index.line_map[range_a.end - index.line_number_shift];
-					let cnt = unsafe { (*t_rec).cnt };
-					rc = std::cmp::min(rc, cnt);
+					let count = unsafe { (*t_rec).count };
+					rc = std::cmp::min(rc, count);
 				}
 			}
 
 			if b_next <= range_b.end {
 				b_next = range_b.end + 1;
 			}
-			if lcs.range1.end - lcs.range1.start < range_a.end - range_a.start || rc < index.cnt {
+			if lcs.range1.end - lcs.range1.start < range_a.end - range_a.start || rc < index.count {
 				lcs.range1.start = range_a.start;
 				lcs.range2.start = range_b.start;
 				lcs.range1.end = range_a.end;
 				lcs.range2.end = range_b.end;
-				index.cnt = rc;
+				index.count = rc;
 			}
 
 			if np == 0 {
@@ -245,7 +245,7 @@ fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 		line_map: vec!(std::ptr::null_mut(); range1.len()),
 		next_line_numbers: vec![0usize; range1.len()],
 		line_number_shift: range1.start,
-		cnt: 0,
+		count: 0,
 		has_common: false,
 	};
 
@@ -253,14 +253,14 @@ fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 		return -1;
 	}
 
-	index.cnt = MAX_CHAIN_LENGTH + 1;
+	index.count = MAX_CHAIN_LENGTH + 1;
 
 	let mut b_line_number = range2.start;
 	while b_line_number < range2.end {
 		b_line_number = try_lcs(&mut index, pair, lcs, b_line_number, range1.clone(), range2.clone());
 	}
 
-	if index.has_common && MAX_CHAIN_LENGTH < index.cnt {
+	if index.has_common && MAX_CHAIN_LENGTH < index.count {
 		1
 	} else {
 		0
