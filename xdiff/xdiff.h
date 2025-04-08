@@ -27,6 +27,8 @@
 extern "C" {
 #endif /* #ifdef __cplusplus */
 
+#include "../rust/header/types.h"
+
 #define INVALID_INDEX SIZE_MAX
 #define LINE_SHIFT 1
 #define SENTINEL 1
@@ -87,7 +89,7 @@ typedef struct s_mmbuffer {
 } mmbuffer_t;
 
 typedef struct s_xpparam {
-	unsigned long flags;
+	u64 flags;
 
 	/* -I<regex> */
 	regex_t **ignore_regex;
