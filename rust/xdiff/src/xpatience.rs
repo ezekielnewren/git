@@ -2,7 +2,8 @@
 
 use std::marker::PhantomData;
 use interop::ivec::IVec;
-use crate::xdiff::xpparam_t;
+use crate::xdiff::*;
+use crate::xdiffi::classic_diff_with_range;
 use crate::xtypes::xdpair;
 
 const NON_UNIQUE: usize = usize::MAX;
@@ -88,6 +89,18 @@ struct hashmap {
     last: *mut entry,
 	/* were common records found? */
 	has_matches: bool,
+}
+
+impl Default for hashmap {
+	fn default() -> Self {
+		Self {
+			nr: 0,
+			entries: Default::default(),
+			first: std::ptr::null_mut(),
+			last: std::ptr::null_mut(),
+			has_matches: false,
+		}
+	}
 }
 
 #[no_mangle]
@@ -294,3 +307,119 @@ unsafe extern "C" fn find_longest_common_sequence(map: *mut hashmap, res: *mut *
 
 	0
 }
+
+
+#[no_mangle]
+unsafe extern "C" fn walk_common_sequence(xpp: *const xpparam_t, pair: *mut xdpair,
+                                          mut first: *mut entry,
+                                          mut line1: usize, count1: usize, mut line2: usize, count2: usize
+) -> i32 {
+	let pair = xdpair::from_raw_mut(pair);
+
+	let end1 = line1 + count1;
+    let end2 = line2 + count2;
+	let mut next1;
+    let mut next2;
+
+	loop {
+		/* Try to grow the line ranges of common lines */
+		if !first.is_null() {
+			next1 = (*first).line1;
+			next2 = (*first).line2;
+			while next1 > line1 && next2 > line2 &&
+				pair.equal_by_line_number(next1 - 1, next2 - 1) {
+				next1 -= 1;
+				next2 -= 1;
+			}
+		} else {
+			next1 = end1;
+			next2 = end2;
+		}
+		while line1 < next1 && line2 < next2 &&
+            pair.equal_by_line_number(line1, line2) {
+			line1 += 1;
+			line2 += 1;
+		}
+
+		/* Recurse */
+		if next1 > line1 || next2 > line2 {
+			if patience_diff(xpp, pair,
+					line1, next1 - line1,
+					line2, next2 - line2) != 0 {
+				return -1;
+			}
+		}
+
+		if first.is_null() {
+			return 0;
+        }
+
+		while !(*first).next.is_null() &&
+			(*(*first).next).line1 == (*first).line1 + 1 &&
+			(*(*first).next).line2 == (*first).line2 + 1 {
+			first = (*first).next;
+        }
+
+		line1 = (*first).line1 + 1;
+		line2 = (*first).line2 + 1;
+
+		first = (*first).next;
+	}
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn patience_diff(xpp: *const xpparam_t, pair: *mut xdpair,
+		line1: usize, count1: usize, line2: usize, count2: usize
+) -> i32 {
+	let xpp = &*xpp;
+	let pair = &mut *pair;
+
+	let mut map = hashmap::default();
+	let mut result = 0i32;
+
+	/* trivial case: one side is empty */
+	if count1 == 0 {
+		for i in line2..line2 + count2 {
+			pair.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+		}
+		return 0;
+	} else if count2 == 0 {
+		for i in line1..line1 + count1 {
+			pair.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+		}
+		return 0;
+	}
+
+	if fill_hashmap(xpp, pair, &mut map,
+			line1, count1, line2, count2) != 0 {
+		return -1;
+	}
+
+	/* are there any matching lines at all? */
+	if !map.has_matches {
+		for i in line1..line1 + count1 {
+			pair.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+		}
+		for i in line2..line2 + count2 {
+			pair.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+		}
+		return 0;
+	}
+
+	let mut first = std::ptr::null_mut();
+	result = find_longest_common_sequence(&mut map, &mut first);
+	if result != 0 {
+		return result;
+	}
+	if !first.is_null() {
+		result = walk_common_sequence(xpp, pair, first,
+			line1, count1, line2, count2);
+	} else {
+		result = classic_diff_with_range(xpp.flags, pair,
+			line1..line1 + count1, line2..line2 + count2);
+	}
+
+	result
+}
+
