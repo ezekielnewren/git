@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 
 use interop::ivec::IVec;
-
+use crate::xdiff::xpparam_t;
 
 #[repr(C)]
 struct entry {
@@ -56,3 +56,14 @@ struct hashmap {
 	has_matches: bool,
 }
 
+#[no_mangle]
+unsafe extern "C" fn is_anchor(xpp: *const xpparam_t, line: *const u8) -> bool {
+    let xpp = &*xpp;
+    for i in 0..xpp.anchors_nr {
+        if 0 == libc::strncmp(line as *const libc::c_char, *xpp.anchors.add(i), libc::strlen(*xpp.anchors.add(i))) {
+            return true;
+        }
+    }
+
+    false
+}

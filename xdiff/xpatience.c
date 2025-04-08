@@ -77,15 +77,7 @@ struct hashmap {
 	bool has_matches;
 };
 
-static bool is_anchor(xpparam_t const *xpp, u8 const *line)
-{
-	size_t i;
-	for (i = 0; i < xpp->anchors_nr; i++) {
-		if (!strncmp((const char*) line, xpp->anchors[i], strlen(xpp->anchors[i])))
-			return true;
-	}
-	return false;
-}
+extern bool is_anchor(xpparam_t const *xpp, u8 const *line);
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
 static void insert_record(xpparam_t const *xpp, struct xdpair *pair,
