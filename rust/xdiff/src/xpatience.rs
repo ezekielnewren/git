@@ -171,3 +171,32 @@ unsafe extern "C" fn fill_hashmap(
 	0
 }
 
+
+/*
+ * Find the longest sequence with a smaller last element (meaning a smaller
+ * line2, as we construct the sequence with entries ordered by line1).
+ */
+#[no_mangle]
+unsafe extern "C" fn binary_search(sequence: *mut IVec<*mut entry>, longest: isize,
+		entry: *mut entry
+) -> isize {
+    let sequence = IVec::from_raw_mut(sequence);
+    let entry = &mut *entry;
+
+	let mut left: isize = -1isize;
+	let mut right: isize = longest;
+
+	while left + 1 < right {
+		let middle = left + (right - left) / 2;
+		/* by construction, no two entries can be equal */
+		if (*sequence[middle as usize]).line2 > entry.line2 {
+			right = middle;
+        } else {
+			left = middle;
+        }
+	}
+	/* return the index in "sequence", _not_ the sequence length */
+	left
+}
+
+
