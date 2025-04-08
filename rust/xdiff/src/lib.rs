@@ -17,6 +17,7 @@ pub mod maps;
 pub(crate) mod mock;
 pub(crate) mod xdiffi;
 pub(crate) mod xhistogram;
+pub(crate) mod xpatience;
 
 #[no_mangle]
 unsafe extern "C" fn xdl_mphb_new(max_unique_keys: usize, flags: u64) -> *mut libc::c_void {
