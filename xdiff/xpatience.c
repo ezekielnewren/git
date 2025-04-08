@@ -109,9 +109,9 @@ extern isize binary_search(struct ivec_entry_ptr *sequence, isize longest,
 static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res) {
 	struct ivec_entry_ptr sequence;
 	IVEC_INIT(sequence);
+	ivec_zero(&sequence, map->entries.length);
 
-	isize longest = 0, i;
-	struct entry *entry;
+	isize longest = 0;
 
 	/*
 	 * If not -1, this entry in sequence must never be overridden.
@@ -120,16 +120,20 @@ static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	 */
 	isize anchor_i = -1;
 
-	ivec_zero(&sequence, map->entries.length);
-
-	for (entry = map->first; entry; entry = entry->next) {
-		if (!entry->line2 || entry->line2 == NON_UNIQUE)
+	for (struct entry *entry = map->first; entry; entry = entry->next) {
+		if (entry->line2 == 0 || entry->line2 == NON_UNIQUE) {
 			continue;
-		i = binary_search(&sequence, longest, entry);
-		entry->previous = i < 0 ? NULL : sequence.ptr[i];
-		++i;
-		if (i <= anchor_i)
+		}
+		isize i = binary_search(&sequence, longest, entry);
+		if (i < 0) {
+			entry->previous = NULL;
+		} else {
+			entry->previous = sequence.ptr[i];
+		}
+		i += 1;
+		if (i <= anchor_i) {
 			continue;
+		}
 		sequence.ptr[i] = entry;
 		if (entry->anchor) {
 			anchor_i = i;
@@ -140,14 +144,14 @@ static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	}
 
 	/* No common unique lines were found */
-	if (!longest) {
+	if (longest == 0) {
 		*res = NULL;
 		ivec_free(&sequence);
 		return 0;
 	}
 
 	/* Iterate starting at the last element, adjusting the "next" members */
-	entry = sequence.ptr[longest - 1];
+	struct entry *entry = sequence.ptr[longest - 1];
 	entry->next = NULL;
 	while (entry->previous) {
 		entry->previous->next = entry;
