@@ -13,7 +13,7 @@ const MAX_CHAIN_LENGTH: usize = 64;
 
 #[repr(C)]
 struct record {
-	ptr: usize,
+	line_number: usize,
     cnt: usize,
 	next: *mut record,
 }
@@ -21,7 +21,7 @@ struct record {
 impl Default for record {
 	fn default() -> Self {
 		Self {
-			ptr: 0,
+			line_number: 0,
 			cnt: 0,
 			next: std::ptr::null_mut(),
 		}
@@ -62,8 +62,8 @@ struct histindex {
 	record_storage: IVec<record>,
 	record: IVec<*mut record>,
 	line_map: IVec<*mut record>,
-	next_ptrs: IVec<usize>,
-	ptr_shift: usize,
+	next_line_numbers: IVec<usize>,
+	line_number_shift: usize,
 	cnt: usize,
 	has_common: bool,
 }
@@ -79,25 +79,25 @@ struct region {
 fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32 {
     let lhs = FileContext::new(&mut pair.lhs);
 
-    for ptr in range1.rev() {
+    for line_number in range1.rev() {
 		let mut continue_scan = false;
-		let tbl_idx = lhs.minimal_perfect_hash[ptr - LINE_SHIFT] as usize;
+		let tbl_idx = lhs.minimal_perfect_hash[line_number - LINE_SHIFT] as usize;
 
 		let mut chain_len = 0;
 		for rec in RecordIter::new(index.record[tbl_idx]) {
 			continue_scan = false;
-			let mph1 = lhs.minimal_perfect_hash[rec.ptr - LINE_SHIFT];
-			let mph2 = lhs.minimal_perfect_hash[ptr - LINE_SHIFT];
+			let mph1 = lhs.minimal_perfect_hash[rec.line_number - LINE_SHIFT];
+			let mph2 = lhs.minimal_perfect_hash[line_number - LINE_SHIFT];
 			if mph1 == mph2 {
 				/*
-				 * ptr is identical to another element. Insert
+				 * line_number is identical to another element. Insert
 				 * it onto the front of the existing element
 				 * chain.
 				 */
-				index.next_ptrs[ptr - index.ptr_shift] = rec.ptr;
-				rec.ptr = ptr;
+				index.next_line_numbers[line_number - index.line_number_shift] = rec.line_number;
+				rec.line_number = line_number;
 				rec.cnt = rec.cnt + 1;
-				index.line_map[ptr - index.ptr_shift] = rec;
+				index.line_map[line_number - index.line_number_shift] = rec;
 				continue_scan = true;
 				break;
 			}
@@ -123,11 +123,11 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 		let last = index.record_storage.len();
 		index.record_storage.push(record::default());
 		let rec = &mut index.record_storage[last];
-		rec.ptr = ptr;
+		rec.line_number = line_number;
 		rec.cnt = 1;
 		rec.next = index.record[tbl_idx];
 		index.record[tbl_idx] = rec;
-		index.line_map[ptr - index.ptr_shift] = rec;
+		index.line_map[line_number - index.line_number_shift] = rec;
 	}
 
 	0
@@ -140,37 +140,37 @@ fn record_equal(pair: &xdpair, i1: usize, i2: usize) -> bool {
 }
 
 
-unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_ptr: usize,
-	range1: Range<usize>, range2: Range<usize>,
+unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_number: usize,
+				  range1: Range<usize>, range2: Range<usize>,
 ) -> usize {
 	let rhs = FileContext::new(&mut pair.rhs);
 
-	let mut b_next = b_ptr + 1;
-	let tbl_idx = rhs.minimal_perfect_hash[b_ptr - LINE_SHIFT] as usize;
+	let mut b_next = b_line_number + 1;
+	let b_line_number_mph = rhs.minimal_perfect_hash[b_line_number - LINE_SHIFT] as usize;
 	let mut range_a = Range::default();
 	let mut range_b = Range::default();
 	let mut np;
 	let mut rc;
 	let mut should_break;
 
-	for rec in RecordIter::new(index.record[tbl_idx]) {
+	for rec in RecordIter::new(index.record[b_line_number_mph]) {
 		if (*rec).cnt > index.cnt {
 			if !index.has_common {
-				index.has_common = record_equal(pair, (*rec).ptr, b_ptr);
+				index.has_common = record_equal(pair, (*rec).line_number, b_line_number);
 			}
 			continue;
 		}
 
-		range_a.start = (*rec).ptr;
-		if !record_equal(pair, range_a.start, b_ptr) {
+		range_a.start = (*rec).line_number;
+		if !record_equal(pair, range_a.start, b_line_number) {
 			continue;
 		}
 
 		index.has_common = true;
 		loop {
 			should_break = false;
-			np = index.next_ptrs[range_a.start - index.ptr_shift];
-			range_b.start = b_ptr;
+			np = index.next_line_numbers[range_a.start - index.line_number_shift];
+			range_b.start = b_line_number;
 			range_a.end = range_a.start;
 			range_b.end = range_b.start;
 			rc = (*rec).cnt;
@@ -180,7 +180,7 @@ unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_
 				range_a.start -= 1;
 				range_b.start -= 1;
 				if 1 < rc {
-					let t_rec: *mut record = index.line_map[range_a.start - index.ptr_shift];
+					let t_rec: *mut record = index.line_map[range_a.start - index.line_number_shift];
 					let cnt = (*t_rec).cnt;
 					rc = std::cmp::min(rc, cnt);
 				}
@@ -190,7 +190,7 @@ unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_
 				range_a.end += 1;
 				range_b.end += 1;
 				if 1 < rc {
-					let t_rec: *mut record = index.line_map[range_a.end - index.ptr_shift];
+					let t_rec: *mut record = index.line_map[range_a.end - index.line_number_shift];
 					let cnt = (*t_rec).cnt;
 					rc = std::cmp::min(rc, cnt);
 				}
@@ -212,7 +212,7 @@ unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_
 			}
 
 			while np <= range_a.end {
-				np = index.next_ptrs[np - index.ptr_shift];
+				np = index.next_line_numbers[np - index.line_number_shift];
 				if np == 0 {
 					should_break = true;
 					break;
@@ -240,8 +240,8 @@ unsafe fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 		record_storage: IVec::with_capacity(fudge),
 		record: IVec::zero(pair.minimal_perfect_hash_size),
 		line_map: IVec::zero(range1.len()),
-		next_ptrs: IVec::zero(range1.len()),
-		ptr_shift: range1.start,
+		next_line_numbers: IVec::zero(range1.len()),
+		line_number_shift: range1.start,
 		cnt: 0,
 		has_common: false,
 	};
@@ -252,9 +252,9 @@ unsafe fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 
 	index.cnt = MAX_CHAIN_LENGTH + 1;
 
-	let mut b_ptr = range2.start;
-	while b_ptr < range2.end {
-		b_ptr = try_lcs(&mut index, pair, lcs, b_ptr, range1.clone(), range2.clone());
+	let mut b_line_number = range2.start;
+	while b_line_number < range2.end {
+		b_line_number = try_lcs(&mut index, pair, lcs, b_line_number, range1.clone(), range2.clone());
 	}
 
 	if index.has_common && MAX_CHAIN_LENGTH < index.cnt {
