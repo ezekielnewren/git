@@ -97,70 +97,8 @@ extern isize binary_search(struct ivec_entry_ptr *sequence, isize longest,
 		struct entry *entry);
 
 
-/*
- * The idea is to start with the list of common unique lines sorted by
- * the order in file1.  For each of these pairs, the longest (partial)
- * sequence whose last element's line2 is smaller is determined.
- *
- * For efficiency, the sequences are kept in a list containing exactly one
- * item per sequence length: the sequence with the smallest last
- * element (in terms of line2).
- */
-static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res) {
-	struct ivec_entry_ptr sequence;
-	IVEC_INIT(sequence);
-	ivec_zero(&sequence, map->entries.length);
+extern i32 find_longest_common_sequence(struct hashmap *map, struct entry **res);
 
-	isize longest = 0;
-
-	/*
-	 * If not -1, this entry in sequence must never be overridden.
-	 * Therefore, overriding entries before this has no effect, so
-	 * do not do that either.
-	 */
-	isize anchor_i = -1;
-
-	for (struct entry *entry = map->first; entry; entry = entry->next) {
-		if (entry->line2 == 0 || entry->line2 == NON_UNIQUE) {
-			continue;
-		}
-		isize i = binary_search(&sequence, longest, entry);
-		if (i < 0) {
-			entry->previous = NULL;
-		} else {
-			entry->previous = sequence.ptr[i];
-		}
-		i += 1;
-		if (i <= anchor_i) {
-			continue;
-		}
-		sequence.ptr[i] = entry;
-		if (entry->anchor) {
-			anchor_i = i;
-			longest = anchor_i + 1;
-		} else if (i == longest) {
-			longest++;
-		}
-	}
-
-	/* No common unique lines were found */
-	if (longest == 0) {
-		*res = NULL;
-		ivec_free(&sequence);
-		return 0;
-	}
-
-	/* Iterate starting at the last element, adjusting the "next" members */
-	struct entry *entry = sequence.ptr[longest - 1];
-	entry->next = NULL;
-	while (entry->previous) {
-		entry->previous->next = entry;
-		entry = entry->previous;
-	}
-	*res = entry;
-	ivec_free(&sequence);
-	return 0;
-}
 
 static bool match(struct xdpair *pair, usize line1, usize line2) {
 	u64 mph1 = pair->lhs.minimal_perfect_hash->ptr[line1 - LINE_SHIFT];

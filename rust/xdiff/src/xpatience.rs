@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types)]
 
+use std::marker::PhantomData;
 use interop::ivec::IVec;
 use crate::xdiff::xpparam_t;
 use crate::xtypes::xdpair;
@@ -42,6 +43,35 @@ impl Default for entry {
             previous: std::ptr::null_mut(),
             anchor: true,
         }
+    }
+}
+
+
+struct EntryNextIter<'a> {
+    cur: *mut entry,
+    _marker: PhantomData<&'a entry>,
+}
+
+impl<'a> EntryNextIter<'a> {
+    fn new(start: *mut entry) -> Self {
+        Self {
+            cur: start,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a> Iterator for EntryNextIter<'a> {
+    type Item = &'a mut entry;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cur.is_null() {
+            return None;
+        }
+
+        let t = self.cur;
+        self.cur = unsafe { (*self.cur).next };
+        Some(unsafe { &mut *t })
     }
 }
 
@@ -200,3 +230,67 @@ unsafe extern "C" fn binary_search(sequence: *mut IVec<*mut entry>, longest: isi
 }
 
 
+/*
+ * The idea is to start with the list of common unique lines sorted by
+ * the order in file1.  For each of these pairs, the longest (partial)
+ * sequence whose last element's line2 is smaller is determined.
+ *
+ * For efficiency, the sequences are kept in a list containing exactly one
+ * item per sequence length: the sequence with the smallest last
+ * element (in terms of line2).
+ */
+#[no_mangle]
+unsafe extern "C" fn find_longest_common_sequence(map: *mut hashmap, res: *mut *mut entry) -> i32 {
+    let map = &mut *map;
+
+    let mut sequence = IVec::zero(map.entries.len());
+
+	let mut longest = 0isize;
+
+	/*
+	 * If not -1, this entry in sequence must never be overridden.
+	 * Therefore, overriding entries before this has no effect, so
+	 * do not do that either.
+	 */
+	let mut anchor_i = -1;
+
+    for entry in EntryNextIter::new(map.first) {
+		if entry.line2 == 0 || entry.line2 == NON_UNIQUE {
+			continue;
+		}
+		let mut i = binary_search(&mut sequence, longest, entry);
+		if i < 0 {
+			entry.previous = std::ptr::null_mut();
+		} else {
+			entry.previous = sequence[i as usize];
+		}
+		i += 1;
+		if i <= anchor_i {
+			continue;
+		}
+		sequence[i as usize] = entry;
+		if entry.anchor {
+			anchor_i = i;
+			longest = anchor_i + 1;
+		} else if i == longest {
+			longest += 1;
+		}
+	}
+
+	/* No common unique lines were found */
+	if longest == 0 {
+		*res = std::ptr::null_mut();
+		return 0;
+	}
+
+	/* Iterate starting at the last element, adjusting the "next" members */
+	let mut entry = sequence[(longest - 1) as usize];
+    (*entry).next = std::ptr::null_mut();
+	while !(*entry).previous.is_null() {
+        (*(*entry).previous).next = entry;
+		entry = (*entry).previous;
+	}
+	*res = entry;
+
+	0
+}
