@@ -41,33 +41,38 @@
 
 #define NON_UNIQUE ULONG_MAX
 
+struct entry {
+	u64 minimal_perfect_hash;
+	/*
+	 * 0 = unused entry, 1 = first line, 2 = second, etc.
+	 * line2 is NON_UNIQUE if the line is not unique
+	 * in either the first or the second file.
+	 */
+	usize line1, line2;
+	/*
+	 * "next" & "previous" are used for the longest common
+	 * sequence;
+	 * initially, "next" reflects only the order in file1.
+	 */
+	struct entry *next, *previous;
+
+	/*
+	 * If 1, this entry can serve as an anchor. See
+	 * Documentation/diff-options.adoc for more information.
+	 */
+	bool anchor : true;
+};
+
+DEFINE_IVEC_TYPE(struct entry, entry);
+
 /*
  * This is a hash mapping from line hash to line numbers in the first and
  * second file.
  */
 struct hashmap {
 	usize nr, alloc;
-	struct entry {
-		u64 minimal_perfect_hash;
-		/*
-		 * 0 = unused entry, 1 = first line, 2 = second, etc.
-		 * line2 is NON_UNIQUE if the line is not unique
-		 * in either the first or the second file.
-		 */
-		usize line1, line2;
-		/*
-		 * "next" & "previous" are used for the longest common
-		 * sequence;
-		 * initially, "next" reflects only the order in file1.
-		 */
-		struct entry *next, *previous;
-
-		/*
-		 * If 1, this entry can serve as an anchor. See
-		 * Documentation/diff-options.adoc for more information.
-		 */
-		bool anchor : 1;
-	} *entries, *first, *last;
+	struct ivec_entry entries;
+	struct entry *first, *last;
 	/* were common records found? */
 	bool has_matches;
 	struct xdpair *pair;
@@ -103,32 +108,32 @@ static void insert_record(xpparam_t const *xpp, usize line, struct hashmap *map,
 	 */
 	usize index = ((mph << 1) % map->alloc);
 
-	while (map->entries[index].line1) {
-		if (map->entries[index].minimal_perfect_hash != mph) {
+	while (map->entries.ptr[index].line1) {
+		if (map->entries.ptr[index].minimal_perfect_hash != mph) {
 			if (++index >= map->alloc)
 				index = 0;
 			continue;
 		}
 		if (pass == 2)
 			map->has_matches = true;
-		if (pass == 1 || map->entries[index].line2)
-			map->entries[index].line2 = NON_UNIQUE;
+		if (pass == 1 || map->entries.ptr[index].line2)
+			map->entries.ptr[index].line2 = NON_UNIQUE;
 		else
-			map->entries[index].line2 = line;
+			map->entries.ptr[index].line2 = line;
 		return;
 	}
 	if (pass == 2)
 		return;
-	map->entries[index].line1 = line;
-	map->entries[index].minimal_perfect_hash = mph;
-	map->entries[index].anchor = is_anchor(xpp, (const char*) map->pair->lhs.record->ptr[line - 1].ptr);
+	map->entries.ptr[index].line1 = line;
+	map->entries.ptr[index].minimal_perfect_hash = mph;
+	map->entries.ptr[index].anchor = is_anchor(xpp, (const char*) map->pair->lhs.record->ptr[line - 1].ptr);
 	if (!map->first)
-		map->first = map->entries + index;
+		map->first = &map->entries.ptr[index];
 	if (map->last) {
-		map->last->next = map->entries + index;
-		map->entries[index].previous = map->last;
+		map->last->next = &map->entries.ptr[index];
+		map->entries.ptr[index].previous = map->last;
 	}
-	map->last = map->entries + index;
+	map->last = &map->entries.ptr[index];
 	map->nr++;
 }
 
@@ -148,8 +153,8 @@ static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 
 	/* We know exactly how large we want the hash map */
 	result->alloc = count1 * 2;
-	if (!XDL_CALLOC_ARRAY(result->entries, result->alloc))
-		return -1;
+	IVEC_INIT(result->entries);
+	ivec_zero(&result->entries, result->alloc);
 
 	/* First, fill with entries from the first file */
 	while (count1--)
@@ -349,7 +354,7 @@ static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 			pair->lhs.consider.ptr[SENTINEL + line1++ - 1] = YES;
 		while(count2--)
 			pair->rhs.consider.ptr[SENTINEL + line2++ - 1] = YES;
-		xdl_free(map.entries);
+		ivec_free(&map.entries);
 		return 0;
 	}
 
@@ -363,7 +368,7 @@ static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 		result = fall_back_to_classic_diff(&map,
 			line1, count1, line2, count2);
  out:
-	xdl_free(map.entries);
+	ivec_free(&map.entries);
 	return result;
 }
 
