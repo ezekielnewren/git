@@ -110,7 +110,7 @@ static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2);
 
 static i32 walk_common_sequence(xpparam_t const *xpp, struct xdpair *pair,
-	struct hashmap *map, struct entry *first,
+	struct entry *first,
 	usize line1, usize count1, usize line2, usize count2
 ) {
 	usize end1 = line1 + count1, end2 = line2 + count2;
@@ -214,7 +214,7 @@ static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	if (result)
 		goto out;
 	if (first)
-		result = walk_common_sequence(xpp, pair, &map, first,
+		result = walk_common_sequence(xpp, pair, first,
 			line1, count1, line2, count2);
 	else
 		result = fall_back_to_classic_diff(xpp->flags, pair,
