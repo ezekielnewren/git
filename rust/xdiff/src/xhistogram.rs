@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 use std::ops::Range;
-use interop::ivec::IVec;
+use crate::get_file_context;
 use crate::xdiff::{LINE_SHIFT, SENTINEL, YES};
 use crate::xdiffi::classic_diff_with_range;
 use crate::xtypes::{xdpair, FileContext};
@@ -59,10 +59,10 @@ impl<'a> RecordIter<'a> {
 
 #[repr(C)]
 struct histindex {
-	record_storage: IVec<record>,
-	record: IVec<*mut record>,
-	line_map: IVec<*mut record>,
-	next_line_numbers: IVec<usize>,
+	record_storage: Vec<record>,
+	record: Vec<*mut record>,
+	line_map: Vec<*mut record>,
+	next_line_numbers: Vec<usize>,
 	line_number_shift: usize,
 	cnt: usize,
 	has_common: bool,
@@ -140,7 +140,7 @@ fn record_equal(pair: &xdpair, i1: usize, i2: usize) -> bool {
 }
 
 
-unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_number: usize,
+fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_number: usize,
 				  range1: Range<usize>, range2: Range<usize>,
 ) -> usize {
 	let rhs = FileContext::new(&mut pair.rhs);
@@ -181,7 +181,7 @@ unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_
 				range_b.start -= 1;
 				if 1 < rc {
 					let t_rec: *mut record = index.line_map[range_a.start - index.line_number_shift];
-					let cnt = (*t_rec).cnt;
+					let cnt = unsafe { (*t_rec).cnt };
 					rc = std::cmp::min(rc, cnt);
 				}
 			}
@@ -191,7 +191,7 @@ unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_
 				range_b.end += 1;
 				if 1 < rc {
 					let t_rec: *mut record = index.line_map[range_a.end - index.line_number_shift];
-					let cnt = (*t_rec).cnt;
+					let cnt = unsafe { (*t_rec).cnt };
 					rc = std::cmp::min(rc, cnt);
 				}
 			}
@@ -231,16 +231,19 @@ unsafe fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_
 }
 
 
-unsafe fn find_lcs(pair: &mut xdpair, lcs: &mut region,
+fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 	range1: Range<usize>, range2: Range<usize>,
 ) -> i32 {
-	let fudge = ((*pair.lhs.record).len() + (*pair.rhs.record).len()) * 10;
+	let (lhs, rhs) = get_file_context!(pair);
+	let fudge = (lhs.record.len() + rhs.record.len()) * 10;
+	drop(lhs);
+	drop(rhs);
 
 	let mut index = histindex {
-		record_storage: IVec::with_capacity(fudge),
-		record: IVec::zero(pair.minimal_perfect_hash_size),
-		line_map: IVec::zero(range1.len()),
-		next_line_numbers: IVec::zero(range1.len()),
+		record_storage: Vec::with_capacity(fudge),
+		record: vec![std::ptr::null_mut(); pair.minimal_perfect_hash_size],
+		line_map: vec!(std::ptr::null_mut(); range1.len()),
+		next_line_numbers: vec![0usize; range1.len()],
 		line_number_shift: range1.start,
 		cnt: 0,
 		has_common: false,
@@ -265,12 +268,9 @@ unsafe fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn histogram_diff(flags: u64, pair: *mut xdpair,
+fn histogram_diff(flags: u64, pair: &mut xdpair,
 	mut range1: Range<usize>, mut range2: Range<usize>,
 ) -> i32 {
-	let pair = xdpair::from_raw_mut(pair);
-
 	let mut result;
 	loop {
 		result = -1;
