@@ -80,52 +80,10 @@ struct hashmap {
 extern bool is_anchor(xpparam_t const *xpp, u8 const *line);
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
-static void insert_record(xpparam_t const *xpp, struct xdpair *pair,
+extern void insert_record(xpparam_t const *xpp, struct xdpair *pair,
 	usize line, struct hashmap *map, i32 pass
-) {
-	u64* mph_vec = pass == 1 ?
-		pair->lhs.minimal_perfect_hash->ptr : pair->rhs.minimal_perfect_hash->ptr;
-	u64 mph = mph_vec[line - 1];
-	/*
-	 * After xdl_prepare_env() (or more precisely, due to
-	 * xdl_classify_record()), the "ha" member of the records (AKA lines)
-	 * is _not_ the hash anymore, but a linearized version of it.  In
-	 * other words, the "ha" member is guaranteed to start with 0 and
-	 * the second record's ha can only be 0 or 1, etc.
-	 *
-	 * So we multiply ha by 2 in the hope that the hashing was
-	 * "unique enough".
-	 */
-	usize index = ((mph << 1) % map->entries.capacity);
+);
 
-	while (map->entries.ptr[index].line1) {
-		if (map->entries.ptr[index].minimal_perfect_hash != mph) {
-			if (++index >= map->entries.capacity)
-				index = 0;
-			continue;
-		}
-		if (pass == 2)
-			map->has_matches = true;
-		if (pass == 1 || map->entries.ptr[index].line2)
-			map->entries.ptr[index].line2 = NON_UNIQUE;
-		else
-			map->entries.ptr[index].line2 = line;
-		return;
-	}
-	if (pass == 2)
-		return;
-	map->entries.ptr[index].line1 = line;
-	map->entries.ptr[index].minimal_perfect_hash = mph;
-	map->entries.ptr[index].anchor = is_anchor(xpp, pair->lhs.record->ptr[line - 1].ptr);
-	if (!map->first)
-		map->first = &map->entries.ptr[index];
-	if (map->last) {
-		map->last->next = &map->entries.ptr[index];
-		map->entries.ptr[index].previous = map->last;
-	}
-	map->last = &map->entries.ptr[index];
-	map->nr++;
-}
 
 /*
  * This function has to be called for each recursion into the inter-hunk
