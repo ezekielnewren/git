@@ -90,11 +90,13 @@ extern i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2);
 
 
+DEFINE_IVEC_TYPE(struct entry*, entry_ptr);
+
 /*
  * Find the longest sequence with a smaller last element (meaning a smaller
  * line2, as we construct the sequence with entries ordered by line1).
  */
-static isize binary_search(struct entry **sequence, usize longest,
+static isize binary_search(struct ivec_entry_ptr *sequence, isize longest,
 		struct entry *entry)
 {
 	isize left = -1;
@@ -103,7 +105,7 @@ static isize binary_search(struct entry **sequence, usize longest,
 	while (left + 1 < right) {
 		usize middle = left + (right - left) / 2;
 		/* by construction, no two entries can be equal */
-		if (sequence[middle]->line2 > entry->line2)
+		if (sequence->ptr[middle]->line2 > entry->line2)
 			right = middle;
 		else
 			left = middle;
@@ -122,7 +124,6 @@ static isize binary_search(struct entry **sequence, usize longest,
  * element (in terms of line2).
  */
 static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res) {
-	DEFINE_IVEC_TYPE(struct entry*, entry_ptr);
 	struct ivec_entry_ptr sequence;
 	IVEC_INIT(sequence);
 
@@ -141,7 +142,7 @@ static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	for (entry = map->first; entry; entry = entry->next) {
 		if (!entry->line2 || entry->line2 == NON_UNIQUE)
 			continue;
-		i = binary_search(sequence.ptr, longest, entry);
+		i = binary_search(&sequence, longest, entry);
 		entry->previous = i < 0 ? NULL : sequence.ptr[i];
 		++i;
 		if (i <= anchor_i)
