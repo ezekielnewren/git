@@ -99,9 +99,6 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 			}
 
 			chain_len += 1;
-			if rec.next.is_null() {
-				break;
-			}
 		}
 
 		if chain_len == MAX_CHAIN_LENGTH {
