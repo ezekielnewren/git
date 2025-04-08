@@ -137,3 +137,37 @@ unsafe extern "C" fn insert_record(
     map.nr += 1;
 }
 
+
+/*
+ * This function has to be called for each recursion into the inter-hunk
+ * parts, as previously non-unique lines can become unique when being
+ * restricted to a smaller part of the files.
+ *
+ * It is assumed that env has been prepared using xdl_prepare().
+ */
+#[no_mangle]
+unsafe extern "C" fn fill_hashmap(
+    xpp: *const xpparam_t, pair: *mut xdpair,
+    result: *mut hashmap,
+    line1: usize, count1: usize, line2: usize, count2: usize
+) -> i32 {
+    let xpp = &*xpp;
+    let pair = xdpair::from_raw_mut(pair);
+    let result = &mut *result;
+
+	/* We know exactly how large we want the hash map */
+    result.entries = IVec::zero(count1 * 2);
+
+	/* First, fill with entries from the first file */
+    for i in line1..line1 + count1 {
+        insert_record(xpp, pair, i, result, 1);
+    }
+
+    /* Then search for matches in the second file */
+    for i in line2..line2 + count2 {
+        insert_record(xpp, pair, i, result, 2);
+    }
+
+	0
+}
+

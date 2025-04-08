@@ -85,31 +85,10 @@ extern void insert_record(xpparam_t const *xpp, struct xdpair *pair,
 );
 
 
-/*
- * This function has to be called for each recursion into the inter-hunk
- * parts, as previously non-unique lines can become unique when being
- * restricted to a smaller part of the files.
- *
- * It is assumed that env has been prepared using xdl_prepare().
- */
-static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
+extern i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 		struct hashmap *result,
-		usize line1, usize count1, usize line2, usize count2)
-{
-	/* We know exactly how large we want the hash map */
-	IVEC_INIT(result->entries);
-	ivec_zero(&result->entries, count1 * 2);
+		usize line1, usize count1, usize line2, usize count2);
 
-	/* First, fill with entries from the first file */
-	while (count1--)
-		insert_record(xpp, pair, line1++, result, 1);
-
-	/* Then search for matches in the second file */
-	while (count2--)
-		insert_record(xpp, pair, line2++, result, 2);
-
-	return 0;
-}
 
 /*
  * Find the longest sequence with a smaller last element (meaning a smaller
