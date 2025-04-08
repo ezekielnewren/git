@@ -76,7 +76,6 @@ struct hashmap {
 	/* were common records found? */
 	bool has_matches;
 	struct xdpair *pair;
-	xpparam_t const *xpp;
 };
 
 static bool is_anchor(xpparam_t const *xpp, const char *line)
@@ -148,7 +147,6 @@ static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
 		struct hashmap *result,
 		usize line1, usize count1, usize line2, usize count2)
 {
-	result->xpp = xpp;
 	result->pair = pair;
 
 	/* We know exactly how large we want the hash map */
@@ -259,7 +257,7 @@ static bool match(struct hashmap *map, usize line1, usize line2) {
 static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 		usize line1, usize count1, usize line2, usize count2);
 
-static i32 walk_common_sequence(struct hashmap *map, struct entry *first,
+static i32 walk_common_sequence(xpparam_t const *xpp, struct hashmap *map, struct entry *first,
 		usize line1, usize count1, usize line2, usize count2)
 {
 	usize end1 = line1 + count1, end2 = line2 + count2;
@@ -287,7 +285,7 @@ static i32 walk_common_sequence(struct hashmap *map, struct entry *first,
 
 		/* Recurse */
 		if (next1 > line1 || next2 > line2) {
-			if (patience_diff(map->xpp, map->pair,
+			if (patience_diff(xpp, map->pair,
 					line1, next1 - line1,
 					line2, next2 - line2))
 				return -1;
@@ -308,13 +306,13 @@ static i32 walk_common_sequence(struct hashmap *map, struct entry *first,
 	}
 }
 
-static i32 fall_back_to_classic_diff(struct hashmap *map,
+static i32 fall_back_to_classic_diff(u64 flags, struct hashmap *map,
 		usize line1, usize count1, usize line2, usize count2)
 {
 	xpparam_t xpp;
 
 	memset(&xpp, 0, sizeof(xpp));
-	xpp.flags = map->xpp->flags & ~XDF_DIFF_ALGORITHM_MASK;
+	xpp.flags = flags & ~XDF_DIFF_ALGORITHM_MASK;
 
 	return xdl_fall_back_diff(map->pair, &xpp,
 				  line1, count1, line2, count2);
@@ -363,10 +361,10 @@ static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	if (result)
 		goto out;
 	if (first)
-		result = walk_common_sequence(&map, first,
+		result = walk_common_sequence(xpp, &map, first,
 			line1, count1, line2, count2);
 	else
-		result = fall_back_to_classic_diff(&map,
+		result = fall_back_to_classic_diff(xpp->flags, &map,
 			line1, count1, line2, count2);
  out:
 	ivec_free(&map.entries);
