@@ -171,13 +171,14 @@ static i32 fill_hashmap(xpparam_t const *xpp, struct xdpair *pair,
  * Find the longest sequence with a smaller last element (meaning a smaller
  * line2, as we construct the sequence with entries ordered by line1).
  */
-static i32 binary_search(struct entry **sequence, int longest,
+static isize binary_search(struct entry **sequence, usize longest,
 		struct entry *entry)
 {
-	int left = -1, right = longest;
+	isize left = -1;
+	usize right = longest;
 
 	while (left + 1 < right) {
-		int middle = left + (right - left) / 2;
+		usize middle = left + (right - left) / 2;
 		/* by construction, no two entries can be equal */
 		if (sequence[middle]->line2 > entry->line2)
 			right = middle;
@@ -197,10 +198,10 @@ static i32 binary_search(struct entry **sequence, int longest,
  * item per sequence length: the sequence with the smallest last
  * element (in terms of line2).
  */
-static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
+static i32 find_longest_common_sequence(struct hashmap *map, struct entry **res)
 {
 	struct entry **sequence;
-	int longest = 0, i;
+	isize longest = 0, i;
 	struct entry *entry;
 
 	/*
@@ -208,7 +209,7 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	 * Therefore, overriding entries before this has no effect, so
 	 * do not do that either.
 	 */
-	int anchor_i = -1;
+	isize anchor_i = -1;
 
 	if (!XDL_ALLOC_ARRAY(sequence, map->nr))
 		return -1;
@@ -249,20 +250,20 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	return 0;
 }
 
-static int match(struct hashmap *map, int line1, int line2) {
-	u64 mph1 = map->pair->lhs.minimal_perfect_hash->ptr[line1 - 1];
-	u64 mph2 = map->pair->rhs.minimal_perfect_hash->ptr[line2 - 1];
+static bool match(struct hashmap *map, usize line1, usize line2) {
+	u64 mph1 = map->pair->lhs.minimal_perfect_hash->ptr[line1 - LINE_SHIFT];
+	u64 mph2 = map->pair->rhs.minimal_perfect_hash->ptr[line2 - LINE_SHIFT];
 	return mph1 == mph2;
 }
 
-static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
-		int line1, int count1, int line2, int count2);
+static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
+		usize line1, usize count1, usize line2, usize count2);
 
-static int walk_common_sequence(struct hashmap *map, struct entry *first,
-		int line1, int count1, int line2, int count2)
+static i32 walk_common_sequence(struct hashmap *map, struct entry *first,
+		usize line1, usize count1, usize line2, usize count2)
 {
-	int end1 = line1 + count1, end2 = line2 + count2;
-	int next1, next2;
+	usize end1 = line1 + count1, end2 = line2 + count2;
+	usize next1, next2;
 
 	for (;;) {
 		/* Try to grow the line ranges of common lines */
@@ -307,8 +308,8 @@ static int walk_common_sequence(struct hashmap *map, struct entry *first,
 	}
 }
 
-static int fall_back_to_classic_diff(struct hashmap *map,
-		int line1, int count1, int line2, int count2)
+static i32 fall_back_to_classic_diff(struct hashmap *map,
+		usize line1, usize count1, usize line2, usize count2)
 {
 	xpparam_t xpp;
 
@@ -325,12 +326,12 @@ static int fall_back_to_classic_diff(struct hashmap *map,
  *
  * This function assumes that env was prepared with xdl_prepare_env().
  */
-static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
-		int line1, int count1, int line2, int count2)
+static i32 patience_diff(xpparam_t const *xpp, struct xdpair *pair,
+		usize line1, usize count1, usize line2, usize count2)
 {
 	struct hashmap map;
 	struct entry *first;
-	int result = 0;
+	i32 result = 0;
 
 	/* trivial case: one side is empty */
 	if (!count1) {
@@ -372,7 +373,7 @@ static int patience_diff(xpparam_t const *xpp, struct xdpair *pair,
 	return result;
 }
 
-int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair)
+i32 xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair)
 {
 	return patience_diff(xpp, pair, 1, pair->lhs.record->length, 1, pair->rhs.record->length);
 }
