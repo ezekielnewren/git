@@ -84,7 +84,6 @@ impl<'a> Iterator for EntryNextIter<'a> {
  */
 #[repr(C)]
 struct PatienceContext<'a> {
-    nr: usize,
 	entries: FixedMap<'a, u64, Node, DefaultHashEq<u64>>,
 	first: *mut Node,
     last: *mut Node,
@@ -95,7 +94,6 @@ struct PatienceContext<'a> {
 impl<'a> Default for PatienceContext<'a> {
 	fn default() -> Self {
 		Self {
-			nr: 0,
 			entries: FixedMap::with_capacity(0),
 			first: std::ptr::null_mut(),
 			last: std::ptr::null_mut(),
@@ -164,7 +162,6 @@ fn insert_record(
 		node.previous = map.last;
 	}
 	map.last = node;
-    map.nr += 1;
 }
 
 
