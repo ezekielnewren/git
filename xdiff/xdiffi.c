@@ -636,7 +636,7 @@ void xdl_free_script(struct xdchange *xscr) {
 
 	while ((xch = xscr) != NULL) {
 		xscr = xscr->next;
-		xdl_free(xch);
+		free(xch);
 	}
 }
 

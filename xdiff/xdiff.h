@@ -130,9 +130,6 @@ typedef struct s_bdiffparam {
 
 
 #define xdl_malloc(x) xmalloc(x)
-#define xdl_calloc(n, sz) xcalloc(n, sz)
-#define xdl_free(ptr) free(ptr)
-#define xdl_realloc(ptr,x) xrealloc(ptr,x)
 
 void *xdl_mmfile_first(mmfile_t *mmf, long *size);
 long xdl_mmfile_size(mmfile_t *mmf);
