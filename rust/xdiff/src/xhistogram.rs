@@ -122,12 +122,6 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 	0
 }
 
-fn record_equal(pair: &xdpair, i1: usize, i2: usize) -> bool {
-	let mph1 = unsafe { (*pair.lhs.minimal_perfect_hash)[i1 - LINE_SHIFT] };
-	let mph2 = unsafe { (*pair.rhs.minimal_perfect_hash)[i2 - LINE_SHIFT] };
-	mph1 == mph2
-}
-
 
 fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_number: usize,
 				  range1: Range<usize>, range2: Range<usize>,
@@ -142,13 +136,13 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 	for rec in RecordIter::new(index.record[b_line_number_mph]) {
 		if rec.count > index.count {
 			if !index.has_common {
-				index.has_common = record_equal(pair, rec.line_number, b_line_number);
+				index.has_common = pair.equal_by_line_number(rec.line_number, b_line_number);
 			}
 			continue;
 		}
 
 		range_a.start = rec.line_number;
-		if !record_equal(pair, range_a.start, b_line_number) {
+		if !pair.equal_by_line_number(range_a.start, b_line_number) {
 			continue;
 		}
 
@@ -161,7 +155,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 			let mut record_count = rec.count;
 
 			while range1.start < range_a.start && range2.start < range_b.start
-				&& record_equal(pair, range_a.start - 1, range_b.start - 1) {
+				&& pair.equal_by_line_number(range_a.start - 1, range_b.start - 1) {
 				range_a.start -= 1;
 				range_b.start -= 1;
 				if 1 < record_count {
@@ -171,7 +165,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				}
 			}
 			while range_a.end < range1.end - 1 && range_b.end < range2.end - 1
-				&& record_equal(pair, range_a.end + 1, range_b.end + 1) {
+				&& pair.equal_by_line_number(range_a.end + 1, range_b.end + 1) {
 				range_a.end += 1;
 				range_b.end += 1;
 				if 1 < record_count {
