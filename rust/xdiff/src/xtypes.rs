@@ -62,6 +62,12 @@ impl xrecord {
             std::slice::from_raw_parts(self.ptr, self.size)
         }
     }
+
+    pub fn as_str(&self) -> &str {
+        unsafe {
+            std::str::from_utf8_unchecked(self.as_ref())
+        }
+    }
 }
 
 pub struct xrecord_he {

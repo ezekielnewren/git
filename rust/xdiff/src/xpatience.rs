@@ -384,7 +384,6 @@ fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 	if !first.is_null() {
 		result = walk_common_sequence(xpp, pair, first, range1, range2);
 	} else {
-		panic!("classic diff triggered");
 		result = classic_diff_with_range(xpp.flags, pair, range1, range2);
 	}
 
@@ -426,6 +425,8 @@ mod tests {
 	#[test]
 	fn test_patience_diff() {
 		let mut tv = Vec::new();
+		tv.push(("xhistogram/salutations-before", "xhistogram/gitdump.txt"));
+		tv.push(("names_of_numbers.txt", "nato_phonetic.txt"));
 		tv.push(("duplicates.txt", "duplicates.txt"));
 		tv.push(("file1.txt", "file2.txt"));
 
