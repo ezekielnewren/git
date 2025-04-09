@@ -12,7 +12,7 @@ const NON_UNIQUE: usize = usize::MAX;
 
 #[repr(C)]
 #[derive(Clone)]
-struct entry {
+struct Node {
     /*
      * 0 = unused entry, 1 = first line, 2 = second, etc.
      * line2 is NON_UNIQUE if the line is not unique
@@ -26,8 +26,8 @@ struct entry {
      * sequence;
      * initially, "next" reflects only the order in file1.
      */
-    next: *mut entry,
-    previous: *mut entry,
+    next: *mut Node,
+    previous: *mut Node,
 
     /*
      * If 1, this entry can serve as an anchor. See
@@ -36,7 +36,7 @@ struct entry {
     anchor: bool,
 }
 
-impl Default for entry {
+impl Default for Node {
     fn default() -> Self {
         Self {
             line1: 0,
@@ -50,12 +50,12 @@ impl Default for entry {
 
 
 struct EntryNextIter<'a> {
-    cur: *mut entry,
-    _marker: PhantomData<&'a entry>,
+    cur: *mut Node,
+    _marker: PhantomData<&'a Node>,
 }
 
 impl<'a> EntryNextIter<'a> {
-    fn new(start: *mut entry) -> Self {
+    fn new(start: *mut Node) -> Self {
         Self {
             cur: start,
             _marker: PhantomData,
@@ -64,7 +64,7 @@ impl<'a> EntryNextIter<'a> {
 }
 
 impl<'a> Iterator for EntryNextIter<'a> {
-    type Item = &'a mut entry;
+    type Item = &'a mut Node;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.cur.is_null() {
@@ -85,9 +85,9 @@ impl<'a> Iterator for EntryNextIter<'a> {
 #[repr(C)]
 struct hashmap<'a> {
     nr: usize,
-	entries: FixedMap<'a, u64, entry, DefaultHashEq<u64>>,
-	first: *mut entry,
-    last: *mut entry,
+	entries: FixedMap<'a, u64, Node, DefaultHashEq<u64>>,
+	first: *mut Node,
+    last: *mut Node,
 	/* were common records found? */
 	has_matches: bool,
 }
@@ -149,7 +149,7 @@ fn insert_record(
 	if pass == 2 {
 		return;
     }
-	let node = map.entries.get_or_insert(&mph, entry {
+	let node = map.entries.get_or_insert(&mph, Node {
 		line1: line,
 		line2: 0,
 		next: std::ptr::null_mut(),
@@ -202,8 +202,8 @@ fn fill_hashmap(
  * Find the longest sequence with a smaller last element (meaning a smaller
  * line2, as we construct the sequence with entries ordered by line1).
  */
-fn binary_search(sequence: &mut Vec<*mut entry>, longest: isize,
-		entry: &mut entry
+fn binary_search(sequence: &mut Vec<*mut Node>, longest: isize,
+				 entry: &mut Node
 ) -> isize {
 	let mut left: isize = -1isize;
 	let mut right: isize = longest;
@@ -231,8 +231,8 @@ fn binary_search(sequence: &mut Vec<*mut entry>, longest: isize,
  * item per sequence length: the sequence with the smallest last
  * element (in terms of line2).
  */
-fn find_longest_common_sequence(map: &mut hashmap, res: &mut *mut entry) -> i32 {
-    let mut sequence: Vec<*mut entry> = vec![std::ptr::null_mut(); map.entries.len()];
+fn find_longest_common_sequence(map: &mut hashmap, res: &mut *mut Node) -> i32 {
+    let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.entries.len()];
 
 	let mut longest = 0isize;
 
@@ -288,7 +288,7 @@ fn find_longest_common_sequence(map: &mut hashmap, res: &mut *mut entry) -> i32 
 
 
 fn walk_common_sequence(
-	xpp: &xpparam_t, pair: &mut xdpair, mut first: *mut entry,
+	xpp: &xpparam_t, pair: &mut xdpair, mut first: *mut Node,
 	mut range1: Range<usize>, mut range2: Range<usize>
 ) -> i32 {
 	let mut next1;
