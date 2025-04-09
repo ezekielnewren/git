@@ -232,14 +232,14 @@ version_gen_environment.set('GIT_VERSION', get_option('version'))
 
 if get_option('optimization') in ['2', '3', 's', 'z']
   rust_target = 'release'
+  rust_args = ['--release']
+  rustflags = '-Aunused_imports -Adead_code'
 else
   rust_target = 'debug'
+  rust_args = []
+  rustflags = '-Aunused_imports -Adead_code -C debuginfo=2 -C opt-level=1 -C force-frame-pointers=yes'
 endif
 
-rust_args = []
-if rust_target == 'release'
-  rust_args += '--release'
-endif
 
 rust_leaf = custom_target('rust_leaf',
   output: 'libxdiff.a',
@@ -249,7 +249,7 @@ rust_leaf = custom_target('rust_leaf',
             '--manifest-path', meson.project_source_root() / 'rust/Cargo.toml'
   ] + rust_args,
   env: {
-    'RUSTFLAGS': '-Aunused_imports -Adead_code',
+    'RUSTFLAGS': rustflags,
   },
   install: false,
 )
