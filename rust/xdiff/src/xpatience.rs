@@ -244,11 +244,8 @@ fn binary_search(sequence: &mut IVec<*mut entry>, longest: isize,
  * item per sequence length: the sequence with the smallest last
  * element (in terms of line2).
  */
-#[no_mangle]
-unsafe extern "C" fn find_longest_common_sequence(map: *mut hashmap, res: *mut *mut entry) -> i32 {
-    let map = &mut *map;
-
-    let mut sequence = IVec::zero(map.entries.len());
+fn find_longest_common_sequence(map: &mut hashmap, res: &mut *mut entry) -> i32 {
+    let mut sequence = unsafe { IVec::zero(map.entries.len()) };
 
 	let mut longest = 0isize;
 
@@ -259,22 +256,22 @@ unsafe extern "C" fn find_longest_common_sequence(map: *mut hashmap, res: *mut *
 	 */
 	let mut anchor_i = -1;
 
-    for entry in EntryNextIter::new(map.first) {
-		if entry.line2 == 0 || entry.line2 == NON_UNIQUE {
+    for e in EntryNextIter::new(map.first) {
+		if e.line2 == 0 || e.line2 == NON_UNIQUE {
 			continue;
 		}
-		let mut i = binary_search(&mut sequence, longest, entry);
+		let mut i = binary_search(&mut sequence, longest, e);
 		if i < 0 {
-			entry.previous = std::ptr::null_mut();
+			e.previous = std::ptr::null_mut();
 		} else {
-			entry.previous = sequence[i as usize];
+			e.previous = sequence[i as usize];
 		}
 		i += 1;
 		if i <= anchor_i {
 			continue;
 		}
-		sequence[i as usize] = entry;
-		if entry.anchor {
+		sequence[i as usize] = e;
+		if e.anchor {
 			anchor_i = i;
 			longest = anchor_i + 1;
 		} else if i == longest {
@@ -289,25 +286,24 @@ unsafe extern "C" fn find_longest_common_sequence(map: *mut hashmap, res: *mut *
 	}
 
 	/* Iterate starting at the last element, adjusting the "next" members */
-	let mut entry = sequence[(longest - 1) as usize];
-    (*entry).next = std::ptr::null_mut();
-	while !(*entry).previous.is_null() {
-        (*(*entry).previous).next = entry;
-		entry = (*entry).previous;
+	let mut e = sequence[(longest - 1) as usize];
+	unsafe {
+		(*e).next = std::ptr::null_mut();
+		while !(*e).previous.is_null() {
+			(*(*e).previous).next = e;
+			e = (*e).previous;
+		}
 	}
-	*res = entry;
+	*res = e;
 
 	0
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn walk_common_sequence(xpp: *const xpparam_t, pair: *mut xdpair,
-                                          mut first: *mut entry,
-                                          mut line1: usize, count1: usize, mut line2: usize, count2: usize
+fn walk_common_sequence(
+	xpp: &xpparam_t, pair: &mut xdpair, mut first: *mut entry,
+	mut line1: usize, count1: usize, mut line2: usize, count2: usize
 ) -> i32 {
-	let pair = xdpair::from_raw_mut(pair);
-
 	let end1 = line1 + count1;
     let end2 = line2 + count2;
 	let mut next1;
@@ -316,8 +312,10 @@ unsafe extern "C" fn walk_common_sequence(xpp: *const xpparam_t, pair: *mut xdpa
 	loop {
 		/* Try to grow the line ranges of common lines */
 		if !first.is_null() {
-			next1 = (*first).line1;
-			next2 = (*first).line2;
+			unsafe {
+				next1 = (*first).line1;
+				next2 = (*first).line2;
+			}
 			while next1 > line1 && next2 > line2 &&
 				pair.equal_by_line_number(next1 - 1, next2 - 1) {
 				next1 -= 1;
@@ -346,27 +344,25 @@ unsafe extern "C" fn walk_common_sequence(xpp: *const xpparam_t, pair: *mut xdpa
 			return 0;
         }
 
-		while !(*first).next.is_null() &&
-			(*(*first).next).line1 == (*first).line1 + 1 &&
-			(*(*first).next).line2 == (*first).line2 + 1 {
+		unsafe {
+			while !(*first).next.is_null() &&
+				(*(*first).next).line1 == (*first).line1 + 1 &&
+				(*(*first).next).line2 == (*first).line2 + 1 {
+				first = (*first).next;
+			}
+
+			line1 = (*first).line1 + 1;
+			line2 = (*first).line2 + 1;
+
 			first = (*first).next;
-        }
-
-		line1 = (*first).line1 + 1;
-		line2 = (*first).line2 + 1;
-
-		first = (*first).next;
+		}
 	}
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn patience_diff(xpp: *const xpparam_t, pair: *mut xdpair,
+fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 		line1: usize, count1: usize, line2: usize, count2: usize
 ) -> i32 {
-	let xpp = &*xpp;
-	let pair = &mut *pair;
-
 	let mut map = hashmap::default();
 	let mut result;
 
