@@ -3,6 +3,7 @@
 use std::marker::PhantomData;
 use std::ops::Range;
 use crate::get_file_context;
+use crate::maps::{DefaultHashEq, FixedMap};
 use crate::xdiff::*;
 use crate::xdiffi::classic_diff_with_range;
 use crate::xtypes::*;
@@ -12,7 +13,6 @@ const NON_UNIQUE: usize = usize::MAX;
 #[repr(C)]
 #[derive(Clone)]
 struct entry {
-    minimal_perfect_hash: u64,
     /*
      * 0 = unused entry, 1 = first line, 2 = second, etc.
      * line2 is NON_UNIQUE if the line is not unique
@@ -39,7 +39,6 @@ struct entry {
 impl Default for entry {
     fn default() -> Self {
         Self {
-            minimal_perfect_hash: 0,
             line1: 0,
             line2: 0,
             next: std::ptr::null_mut(),
@@ -84,20 +83,20 @@ impl<'a> Iterator for EntryNextIter<'a> {
  * second file.
  */
 #[repr(C)]
-struct hashmap {
+struct hashmap<'a> {
     nr: usize,
-	entries: Vec<entry>,
+	entries: FixedMap<'a, u64, entry, DefaultHashEq<u64>>,
 	first: *mut entry,
     last: *mut entry,
 	/* were common records found? */
 	has_matches: bool,
 }
 
-impl Default for hashmap {
+impl<'a> Default for hashmap<'a> {
 	fn default() -> Self {
 		Self {
 			nr: 0,
-			entries: Default::default(),
+			entries: FixedMap::with_capacity(0),
 			first: std::ptr::null_mut(),
 			last: std::ptr::null_mut(),
 			has_matches: false,
@@ -134,41 +133,37 @@ fn insert_record(
         rhs.minimal_perfect_hash
     };
 
-	let mut mph = mph_vec[line - LINE_SHIFT] as usize;
+	let mph = mph_vec[line - LINE_SHIFT];
 
-	while map.entries[mph].line1 != 0 {
-		if map.entries[mph].minimal_perfect_hash != mph as u64 {
-            mph += 1;
-			if mph >= map.entries.capacity() {
-				panic!("mph went out of bounds");
-				// mph = 0;
-            }
-			continue;
-		}
+	if let Some(node) = map.entries.get_mut(&mph) {
 		if pass == 2 {
 			map.has_matches = true;
         }
-		if pass == 1 || map.entries[mph].line2 != 0 {
-			map.entries[mph].line2 = NON_UNIQUE;
+		if pass == 1 || node.line2 != 0 {
+			node.line2 = NON_UNIQUE;
         } else {
-			map.entries[mph].line2 = line;
+			node.line2 = line;
         }
 		return;
 	}
 	if pass == 2 {
 		return;
     }
-	map.entries[mph].line1 = line;
-	map.entries[mph].minimal_perfect_hash = mph as u64;
-	map.entries[mph].anchor = is_anchor(xpp, lhs.record[line - 1].as_ref());
+	let node = map.entries.get_or_insert(&mph, entry {
+		line1: line,
+		line2: 0,
+		next: std::ptr::null_mut(),
+		previous: std::ptr::null_mut(),
+		anchor: is_anchor(xpp, lhs.record[line - LINE_SHIFT].as_ref()),
+	});
 	if map.first.is_null() {
-		map.first = &mut map.entries[mph];
+		map.first = node;
     }
 	if !map.last.is_null() {
-        unsafe { (*map.last).next = &mut map.entries[mph] };
-		map.entries[mph].previous = map.last;
+        unsafe { (*map.last).next = node };
+		node.previous = map.last;
 	}
-	map.last = &mut map.entries[mph];
+	map.last = node;
     map.nr += 1;
 }
 
@@ -186,7 +181,8 @@ fn fill_hashmap(
     range1: Range<usize>, range2: Range<usize>
 ) -> i32 {
 	/* We know exactly how large we want the hash map */
-    result.entries = vec![entry::default(); std::cmp::max(range1.len(), pair.minimal_perfect_hash_size)];
+	let capacity = std::cmp::max(range1.len(), pair.minimal_perfect_hash_size);
+	result.entries = FixedMap::with_capacity(capacity);
 
 	/* First, fill with entries from the first file */
     for i in range1 {

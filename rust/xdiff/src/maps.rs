@@ -69,7 +69,7 @@ impl<K: Hash + Eq, B: BuildHasher> HashEq<K> for HashEqHasher<K, B> {
     }
 }
 
-struct DefaultHashEq<K> {
+pub struct DefaultHashEq<K> {
     hasher: HashEqHasher<K, RandomState>,
 }
 
@@ -214,6 +214,16 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
         let entry = self._find_entry(key, hash);
         if !entry.is_null() {
             Some(unsafe { &(*entry).value })
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        let hash = self.he.hash(key);
+        let entry = self._find_entry(key, hash);
+        if !entry.is_null() {
+            Some(unsafe { &mut (*entry).value })
         } else {
             None
         }
