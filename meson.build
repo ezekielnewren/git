@@ -525,9 +525,7 @@ libgit_sources = [
   'xdiff/ivec.c',
   'xdiff/xdiffi.c',
   'xdiff/xemit.c',
-  'xdiff/xhistogram.c',
   'xdiff/xmerge.c',
-  'xdiff/xpatience.c',
   'xdiff/xutils.c',
 ]
 

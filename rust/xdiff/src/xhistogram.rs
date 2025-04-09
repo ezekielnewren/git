@@ -318,7 +318,7 @@ fn histogram_diff(flags: u64, pair: &mut xdpair,
 
 
 #[no_mangle]
-unsafe extern "C" fn xdl_do_histogram_diff(flags: u64, pair: *mut xdpair) -> i32 {
+pub(crate) unsafe extern "C" fn xdl_do_histogram_diff(flags: u64, pair: *mut xdpair) -> i32 {
 	let pair = xdpair::from_raw_mut(pair);
 
 	let mut range1 = Range::default();

@@ -97,12 +97,7 @@ unsafe extern "C" fn xdl_2way_slice(lhs: *mut xd_file_context, lhs_range: xrange
                                     rhs: *mut xd_file_context, rhs_range: xrange,
                                     mph_size: usize, two_way: *mut xd2way) {
     /* initialize memory of two_way */
-    std::ptr::write(two_way, xd2way {
-        lhs: xdfile::default(),
-        rhs: xdfile::default(),
-        pair: xdpair::default(),
-        minimal_perfect_hash_size: 0,
-    });
+    std::ptr::write(two_way, xd2way::default());
     let two_way = &mut *two_way;
 
     let lhs = &mut *lhs;
@@ -117,12 +112,7 @@ unsafe extern "C" fn xdl_2way_slice(lhs: *mut xd_file_context, lhs_range: xrange
 #[no_mangle]
 unsafe extern "C" fn xdl_2way_prepare(mf1: *const mmfile, mf2: *const mmfile, flags: u64, two_way: *mut xd2way) {
     /* initialize memory of two_way */
-    std::ptr::write(two_way, xd2way {
-        lhs: xdfile::default(),
-        rhs: xdfile::default(),
-        pair: xdpair::default(),
-        minimal_perfect_hash_size: 0,
-    });
+    std::ptr::write(two_way, xd2way::default());
     let two_way = &mut *two_way;
 
     let file1 = mmfile::from_raw(mf1);
@@ -144,14 +134,7 @@ unsafe extern "C" fn xdl_3way_prepare(
     flags: u64, three_way: *mut xd3way
 ) {
     /* initialize memory of three_way */
-    std::ptr::write(three_way, xd3way {
-        base: xdfile::default(),
-        side1: xdfile::default(),
-        side2: xdfile::default(),
-        pair1: xdpair::default(),
-        pair2: xdpair::default(),
-        minimal_perfect_hash_size: 0,
-    });
+    std::ptr::write(three_way, xd3way::default());
     let three_way = &mut *three_way;
 
     let base = mmfile::from_raw(base);

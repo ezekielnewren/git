@@ -263,7 +263,9 @@ pub struct xd2way {
 	pub minimal_perfect_hash_size: usize,
 }
 
+
 #[repr(C)]
+#[derive(Default)]
 pub struct xd3way {
     pub base: xdfile,
     pub side1: xdfile,

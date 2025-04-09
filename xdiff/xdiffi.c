@@ -34,19 +34,6 @@ struct xdpsplit {
 };
 
 
-i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair) {
-	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
-		return xdl_do_patience_diff(xpp, pair);
-	}
-
-	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
-		return xdl_do_histogram_diff(xpp->flags, pair);
-	}
-
-	return xdl_do_classic_diff(xpp->flags, pair);
-}
-
-
 static struct xdchange *xdl_add_change(struct xdchange *xscr, isize i1, isize i2, isize chg1, isize chg2) {
 	struct xdchange *xch;
 

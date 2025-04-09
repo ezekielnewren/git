@@ -5,8 +5,8 @@ use std::ops::Range;
 use interop::ivec::IVec;
 use crate::get_file_context;
 use crate::xdiff::*;
-use crate::xtypes::*;
 use crate::xdiffi::classic_diff_with_range;
+use crate::xtypes::*;
 
 const NON_UNIQUE: usize = usize::MAX;
 
@@ -401,8 +401,7 @@ fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 	if !first.is_null() {
 		result = walk_common_sequence(xpp, pair, first, range1, range2);
 	} else {
-		result = classic_diff_with_range(xpp.flags, pair,
-			range1, range2);
+		result = classic_diff_with_range(xpp.flags, pair, range1, range2);
 	}
 
 	result
@@ -410,7 +409,7 @@ fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 
 
 #[no_mangle]
-unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
+pub(crate) unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
 	let xpp = &*xpp;
 	let pair = xdpair::from_raw_mut(pair);
 	let (lhs, rhs) = get_file_context!(pair);

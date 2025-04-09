@@ -85,4 +85,10 @@ extern void xdl_3way_prepare(mmfile_t const* base, mmfile_t const* side1, mmfile
 	u64 flags, struct xd3way *three_way);
 extern void xdl_3way_free(struct xd3way *three_way);
 
+extern void xdl_2way_slice(
+	struct xd_file_context *lhs, struct xrange lhs_range,
+	struct xd_file_context *rhs, struct xrange rhs_range,
+	usize mph_size, struct xd2way *two_way
+);
+
 #endif /* #if !defined(XTYPES_H) */

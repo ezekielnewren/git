@@ -177,36 +177,3 @@ int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 	return 0;
 }
 
-
-int xdl_fall_back_diff(struct xdpair *pair, xpparam_t const *xpp,
-		int line1, int count1, int line2, int count2)
-{
-	/*
-	 * This probably does not work outside Git, since
-	 * we have a very simple mmfile structure.
-	 *
-	 * Note: ideally, we would reuse the prepared environment, but
-	 * the libxdiff interface does not (yet) allow for diffing only
-	 * ranges of lines instead of the whole files.
-	 */
-	mmfile_t subfile1, subfile2;
-	struct xd2way two_way;
-
-	subfile1.ptr = (char *) pair->lhs.record->ptr[line1 - 1].ptr;
-	subfile1.size = (char *) pair->lhs.record->ptr[line1 + count1 - 2].ptr +
-		pair->lhs.record->ptr[line1 + count1 - 2].size - subfile1.ptr;
-	subfile2.ptr = (char *)pair->rhs.record->ptr[line2 - 1].ptr;
-	subfile2.size = (char *) pair->rhs.record->ptr[line2 + count2 - 2].ptr +
-		pair->rhs.record->ptr[line2 + count2 - 2].size - subfile2.ptr;
-	xdl_2way_prepare(&subfile1, &subfile2, xpp->flags, &two_way);
-	if (xdl_do_diff(xpp, &two_way.pair) < 0)
-		return -1;
-
-	memcpy(pair->lhs.consider.ptr + SENTINEL + line1 - 1, two_way.pair.lhs.consider.ptr + SENTINEL, count1);
-	memcpy(pair->rhs.consider.ptr + SENTINEL + line2 - 1, two_way.pair.rhs.consider.ptr + SENTINEL, count2);
-
-	xdl_2way_free(&two_way);
-
-	return 0;
-}
-
