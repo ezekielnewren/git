@@ -149,7 +149,7 @@ fn insert_record(
 	if pass == 2 {
 		return;
     }
-	let node = map.entries.get_or_insert(&mph, Node {
+	let node = map.entries.insert(mph, Node {
 		line1: line,
 		line2: 0,
 		next: std::ptr::null_mut(),

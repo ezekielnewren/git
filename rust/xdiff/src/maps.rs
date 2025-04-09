@@ -253,13 +253,17 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
         }
     }
 
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert(&mut self, key: K, value: V) -> &mut V {
         let hash = self.he.hash(&key);
         let entry = self._find_entry(&key, hash);
         if !entry.is_null() {
-            unsafe { (*entry).value = value };
+            unsafe {
+                (*entry).value = value;
+                &mut (*entry).value
+            }
         } else {
-            self._push(key, hash, value);
+            let node = self._push(key, hash, value);
+            unsafe { &mut (*node).value }
         }
     }
 
