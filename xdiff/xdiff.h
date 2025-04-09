@@ -37,6 +37,10 @@ extern "C" {
 #define YES 1
 #define TOO_MANY 2
 
+#define XDL_MIN(a, b) ((a) < (b) ? (a): (b))
+#define XDL_MAX(a, b) ((a) > (b) ? (a): (b))
+#define XDL_ISSPACE(c) (isspace((unsigned char)(c)))
+
 /* xpparm_t.flags */
 #define XDF_NEED_MINIMAL (1 << 0)
 

@@ -24,7 +24,6 @@
 #define XINCLUDE_H
 
 #include "../rust/header/types.h"
-#include "xmacros.h"
 #include "xdiff.h"
 #include "xtypes.h"
 #include "xutils.h"

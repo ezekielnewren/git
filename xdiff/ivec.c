@@ -2,8 +2,6 @@
 #include <string.h>
 #include "ivec.h"
 
-#include "xmacros.h"
-
 static void ivec_set_capacity(void* self, usize new_capacity) {
 	rawivec_t *this = self;
 	if (new_capacity == 0) {
@@ -47,8 +45,14 @@ void ivec_reserve_exact(void* self, usize additional) {
 
 void ivec_reserve(void* self, usize additional) {
 	rawivec_t *this = self;
-	usize growby = XDL_MAX(128, this->capacity);
-	ivec_reserve_exact(self, XDL_MAX(additional, growby));
+	usize growby = 128;
+	if (this->capacity > growby) {
+		growby = this->capacity;
+	}
+	if (additional > growby) {
+		growby = additional;
+	}
+	ivec_reserve_exact(self, growby);
 }
 
 void ivec_shrink_to_fit(void* self) {

@@ -12,7 +12,6 @@
 #include "object-name.h"
 #include "quote.h"
 #include "xdiff-interface.h"
-#include "xdiff/xmacros.h"
 #include "log-tree.h"
 #include "refs.h"
 #include "tree.h"
