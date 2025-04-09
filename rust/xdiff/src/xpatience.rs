@@ -1,6 +1,7 @@
 #![allow(non_camel_case_types)]
 
 use std::marker::PhantomData;
+use std::ops::Range;
 use interop::ivec::IVec;
 use crate::get_file_context;
 use crate::xdiff::*;
@@ -192,18 +193,18 @@ fn insert_record(
 fn fill_hashmap(
     xpp: &xpparam_t, pair: &mut xdpair,
     result: &mut hashmap,
-    line1: usize, count1: usize, line2: usize, count2: usize
+    range1: Range<usize>, range2: Range<usize>
 ) -> i32 {
 	/* We know exactly how large we want the hash map */
-    result.entries = unsafe { IVec::zero(count1 * 2) };
+    result.entries = unsafe { IVec::zero(range1.len() * 2) };
 
 	/* First, fill with entries from the first file */
-    for i in line1..line1 + count1 {
+    for i in range1 {
         insert_record(xpp, pair, i, result, 1);
     }
 
     /* Then search for matches in the second file */
-    for i in line2..line2 + count2 {
+    for i in range2 {
         insert_record(xpp, pair, i, result, 2);
     }
 
@@ -302,10 +303,8 @@ fn find_longest_common_sequence(map: &mut hashmap, res: &mut *mut entry) -> i32 
 
 fn walk_common_sequence(
 	xpp: &xpparam_t, pair: &mut xdpair, mut first: *mut entry,
-	mut line1: usize, count1: usize, mut line2: usize, count2: usize
+	mut range1: Range<usize>, mut range2: Range<usize>
 ) -> i32 {
-	let end1 = line1 + count1;
-    let end2 = line2 + count2;
 	let mut next1;
     let mut next2;
 
@@ -316,26 +315,26 @@ fn walk_common_sequence(
 				next1 = (*first).line1;
 				next2 = (*first).line2;
 			}
-			while next1 > line1 && next2 > line2 &&
+			while next1 > range1.start && next2 > range2.start &&
 				pair.equal_by_line_number(next1 - 1, next2 - 1) {
 				next1 -= 1;
 				next2 -= 1;
 			}
 		} else {
-			next1 = end1;
-			next2 = end2;
+			next1 = range1.end;
+			next2 = range2.end;
 		}
-		while line1 < next1 && line2 < next2 &&
-            pair.equal_by_line_number(line1, line2) {
-			line1 += 1;
-			line2 += 1;
+		while range1.start < next1 && range2.start < next2 &&
+            pair.equal_by_line_number(range1.start, range2.start) {
+			range1.start += 1;
+			range2.start += 1;
 		}
 
 		/* Recurse */
-		if next1 > line1 || next2 > line2 {
+		if next1 > range1.start || next2 > range2.start {
 			if patience_diff(xpp, pair,
-					line1, next1 - line1,
-					line2, next2 - line2) != 0 {
+					range1.start..next1,
+					range2.start..next2) != 0 {
 				return -1;
 			}
 		}
@@ -351,8 +350,8 @@ fn walk_common_sequence(
 				first = (*first).next;
 			}
 
-			line1 = (*first).line1 + 1;
-			line2 = (*first).line2 + 1;
+			range1.start = (*first).line1 + 1;
+			range2.start = (*first).line2 + 1;
 
 			first = (*first).next;
 		}
@@ -361,35 +360,34 @@ fn walk_common_sequence(
 
 
 fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
-		line1: usize, count1: usize, line2: usize, count2: usize
+		range1: Range<usize>, range2: Range<usize>
 ) -> i32 {
 	let mut map = hashmap::default();
 	let mut result;
 
 	/* trivial case: one side is empty */
-	if count1 == 0 {
-		for i in line2..line2 + count2 {
+	if range1.len() == 0 {
+		for i in range2 {
 			pair.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
 		}
 		return 0;
-	} else if count2 == 0 {
-		for i in line1..line1 + count1 {
+	} else if range2.len() == 0 {
+		for i in range1 {
 			pair.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
 		}
 		return 0;
 	}
 
-	if fill_hashmap(xpp, pair, &mut map,
-			line1, count1, line2, count2) != 0 {
+	if fill_hashmap(xpp, pair, &mut map, range1.clone(), range2.clone()) != 0 {
 		return -1;
 	}
 
 	/* are there any matching lines at all? */
 	if !map.has_matches {
-		for i in line1..line1 + count1 {
+		for i in range1 {
 			pair.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
 		}
-		for i in line2..line2 + count2 {
+		for i in range2 {
 			pair.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
 		}
 		return 0;
@@ -401,11 +399,10 @@ fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 		return result;
 	}
 	if !first.is_null() {
-		result = walk_common_sequence(xpp, pair, first,
-			line1, count1, line2, count2);
+		result = walk_common_sequence(xpp, pair, first, range1, range2);
 	} else {
 		result = classic_diff_with_range(xpp.flags, pair,
-			line1..line1 + count1, line2..line2 + count2);
+			range1, range2);
 	}
 
 	result
@@ -416,7 +413,14 @@ fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
 	let xpp = &*xpp;
 	let pair = xdpair::from_raw_mut(pair);
+	let (lhs, rhs) = get_file_context!(pair);
 
-	patience_diff(xpp, pair, LINE_SHIFT, (*pair.lhs.record).len(), LINE_SHIFT, (*pair.rhs.record).len())
+	let range1 = LINE_SHIFT..LINE_SHIFT + lhs.record.len();
+	let range2 = LINE_SHIFT..LINE_SHIFT + rhs.record.len();
+
+	drop(lhs);
+	drop(rhs);
+
+	patience_diff(xpp, pair, range1, range2)
 }
 
