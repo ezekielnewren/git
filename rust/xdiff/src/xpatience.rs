@@ -133,52 +133,42 @@ fn insert_record(
     } else {
         rhs.minimal_perfect_hash
     };
-	let mph = mph_vec[line - LINE_SHIFT];
 
-	/*
-	 * After xdl_prepare_env() (or more precisely, due to
-	 * xdl_classify_record()), the "ha" member of the records (AKA lines)
-	 * is _not_ the hash anymore, but a linearized version of it.  In
-	 * other words, the "ha" member is guaranteed to start with 0 and
-	 * the second record's ha can only be 0 or 1, etc.
-	 *
-	 * So we multiply ha by 2 in the hope that the hashing was
-	 * "unique enough".
-	 */
-	let mut index = (mph << 1) as usize % map.entries.capacity();
+	let mut mph = mph_vec[line - LINE_SHIFT] as usize;
 
-	while map.entries[index].line1 != 0 {
-		if map.entries[index].minimal_perfect_hash != mph {
-            index += 1;
-			if index >= map.entries.capacity() {
-				index = 0;
+	while map.entries[mph].line1 != 0 {
+		if map.entries[mph].minimal_perfect_hash != mph as u64 {
+            mph += 1;
+			if mph >= map.entries.capacity() {
+				panic!("mph went out of bounds");
+				// mph = 0;
             }
 			continue;
 		}
 		if pass == 2 {
 			map.has_matches = true;
         }
-		if pass == 1 || map.entries[index].line2 != 0 {
-			map.entries[index].line2 = NON_UNIQUE;
+		if pass == 1 || map.entries[mph].line2 != 0 {
+			map.entries[mph].line2 = NON_UNIQUE;
         } else {
-			map.entries[index].line2 = line;
+			map.entries[mph].line2 = line;
         }
 		return;
 	}
 	if pass == 2 {
 		return;
     }
-	map.entries[index].line1 = line;
-	map.entries[index].minimal_perfect_hash = mph;
-	map.entries[index].anchor = is_anchor(xpp, lhs.record[line - 1].as_ref());
+	map.entries[mph].line1 = line;
+	map.entries[mph].minimal_perfect_hash = mph as u64;
+	map.entries[mph].anchor = is_anchor(xpp, lhs.record[line - 1].as_ref());
 	if map.first.is_null() {
-		map.first = &mut map.entries[index];
+		map.first = &mut map.entries[mph];
     }
 	if !map.last.is_null() {
-        unsafe { (*map.last).next = &mut map.entries[index] };
-		map.entries[index].previous = map.last;
+        unsafe { (*map.last).next = &mut map.entries[mph] };
+		map.entries[mph].previous = map.last;
 	}
-	map.last = &mut map.entries[index];
+	map.last = &mut map.entries[mph];
     map.nr += 1;
 }
 
