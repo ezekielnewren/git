@@ -391,10 +391,7 @@ fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 }
 
 
-#[no_mangle]
-pub(crate) unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
-	let xpp = &*xpp;
-	let pair = xdpair::from_raw_mut(pair);
+pub(crate) fn do_patience_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 	let (lhs, rhs) = get_file_context!(pair);
 
 	let range1 = LINE_SHIFT..LINE_SHIFT + lhs.record.len();
@@ -406,3 +403,36 @@ pub(crate) unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair
 	patience_diff(xpp, pair, range1, range2)
 }
 
+
+#[no_mangle]
+pub(crate) unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
+	let xpp = &*xpp;
+	let pair = xdpair::from_raw_mut(pair);
+
+	do_patience_diff(xpp, pair)
+}
+
+
+#[cfg(test)]
+mod tests {
+	use std::path::PathBuf;
+	use crate::mock::helper::read_test_file;
+	use crate::xdiff::*;
+	use crate::xpatience::*;
+	use crate::xprepare::safe_2way_prepare;
+	use crate::xtypes::xd2way;
+
+	#[test]
+	fn test_patience_diff() {
+		let file1 = read_test_file(PathBuf::from("file1.txt").as_path()).unwrap();
+		let file2 = read_test_file(PathBuf::from("file2.txt").as_path()).unwrap();
+
+		let xpp = xpparam_t::default();
+		let mut two_way = xd2way::default();
+
+		safe_2way_prepare(file1.as_slice(), file2.as_slice(), xpp.flags, &mut two_way);
+
+		do_patience_diff(&xpp, &mut two_way.pair);
+	}
+
+}

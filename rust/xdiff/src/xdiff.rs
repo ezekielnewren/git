@@ -62,6 +62,17 @@ pub struct xpparam_t {
     pub anchors_nr: usize,
 }
 
+impl Default for xpparam_t {
+    fn default() -> Self {
+        Self {
+            flags: 0,
+            ignore_regex: std::ptr::null_mut(),
+            ignore_regex_nr: 0,
+            anchors: std::ptr::null_mut(),
+            anchors_nr: 0,
+        }
+    }
+}
 
 #[repr(C)]
 pub struct mmfile {
@@ -69,6 +80,14 @@ pub struct mmfile {
     pub size: libc::c_long,
 }
 
+impl mmfile {
+    pub(crate) fn from_slice(p0: &[u8]) -> Self {
+        Self {
+            ptr: p0.as_ptr() as *const libc::c_char,
+            size: p0.len() as libc::c_long,
+        }
+    }
+}
 
 impl mmfile {
 

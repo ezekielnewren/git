@@ -1,0 +1,22 @@
+fn main() {
+    println!("Start");
+    let a = 10;
+    let b = 21; // changed
+    let sum = a + b;
+    println!("Sum is {}", sum);
+    // inserted extra line
+    let inserted = 123;
+    let c = 30;
+    println!("C is {}", c);
+    do_another(); // out of order
+    do_something();
+    fn helper() {
+        println!("Helper");
+    }
+    let d = 40;
+    println!("D is {}", d);
+    cleanup();
+    println!("End");
+    // notes
+    // trailing
+}
