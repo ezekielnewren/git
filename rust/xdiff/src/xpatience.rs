@@ -2,7 +2,6 @@
 
 use std::marker::PhantomData;
 use std::ops::Range;
-use interop::ivec::IVec;
 use crate::get_file_context;
 use crate::xdiff::*;
 use crate::xdiffi::classic_diff_with_range;
@@ -11,6 +10,7 @@ use crate::xtypes::*;
 const NON_UNIQUE: usize = usize::MAX;
 
 #[repr(C)]
+#[derive(Clone)]
 struct entry {
     minimal_perfect_hash: u64,
     /*
@@ -86,7 +86,7 @@ impl<'a> Iterator for EntryNextIter<'a> {
 #[repr(C)]
 struct hashmap {
     nr: usize,
-	entries: IVec<entry>,
+	entries: Vec<entry>,
 	first: *mut entry,
     last: *mut entry,
 	/* were common records found? */
@@ -133,7 +133,7 @@ fn insert_record(
     } else {
         rhs.minimal_perfect_hash
     };
-	let mph = mph_vec[line - 1];
+	let mph = mph_vec[line - LINE_SHIFT];
 
 	/*
 	 * After xdl_prepare_env() (or more precisely, due to
@@ -196,7 +196,7 @@ fn fill_hashmap(
     range1: Range<usize>, range2: Range<usize>
 ) -> i32 {
 	/* We know exactly how large we want the hash map */
-    result.entries = unsafe { IVec::zero(range1.len() * 2) };
+    result.entries = vec![entry::default(); std::cmp::max(range1.len(), pair.minimal_perfect_hash_size)];
 
 	/* First, fill with entries from the first file */
     for i in range1 {
@@ -216,7 +216,7 @@ fn fill_hashmap(
  * Find the longest sequence with a smaller last element (meaning a smaller
  * line2, as we construct the sequence with entries ordered by line1).
  */
-fn binary_search(sequence: &mut IVec<*mut entry>, longest: isize,
+fn binary_search(sequence: &mut Vec<*mut entry>, longest: isize,
 		entry: &mut entry
 ) -> isize {
 	let mut left: isize = -1isize;
@@ -246,7 +246,7 @@ fn binary_search(sequence: &mut IVec<*mut entry>, longest: isize,
  * element (in terms of line2).
  */
 fn find_longest_common_sequence(map: &mut hashmap, res: &mut *mut entry) -> i32 {
-    let mut sequence = unsafe { IVec::zero(map.entries.len()) };
+    let mut sequence: Vec<*mut entry> = vec![std::ptr::null_mut(); map.entries.len()];
 
 	let mut longest = 0isize;
 
