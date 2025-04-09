@@ -83,7 +83,7 @@ impl<'a> Iterator for EntryNextIter<'a> {
  * second file.
  */
 #[repr(C)]
-struct hashmap<'a> {
+struct PatienceContext<'a> {
     nr: usize,
 	entries: FixedMap<'a, u64, Node, DefaultHashEq<u64>>,
 	first: *mut Node,
@@ -92,7 +92,7 @@ struct hashmap<'a> {
 	has_matches: bool,
 }
 
-impl<'a> Default for hashmap<'a> {
+impl<'a> Default for PatienceContext<'a> {
 	fn default() -> Self {
 		Self {
 			nr: 0,
@@ -122,8 +122,8 @@ fn is_anchor(xpp: &xpparam_t, line: &[u8]) -> bool {
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
 fn insert_record(
-    xpp: &xpparam_t, pair: &mut xdpair,
-	line: usize, map: &mut hashmap, pass: i32
+	xpp: &xpparam_t, pair: &mut xdpair,
+	line: usize, map: &mut PatienceContext, pass: i32
 ) {
 	let (lhs, rhs) = get_file_context!(pair);
 
@@ -176,9 +176,9 @@ fn insert_record(
  * It is assumed that env has been prepared using xdl_prepare().
  */
 fn fill_hashmap(
-    xpp: &xpparam_t, pair: &mut xdpair,
-    result: &mut hashmap,
-    range1: Range<usize>, range2: Range<usize>
+	xpp: &xpparam_t, pair: &mut xdpair,
+	result: &mut PatienceContext,
+	range1: Range<usize>, range2: Range<usize>
 ) -> i32 {
 	/* We know exactly how large we want the hash map */
 	let capacity = std::cmp::max(range1.len(), pair.minimal_perfect_hash_size);
@@ -231,7 +231,7 @@ fn binary_search(sequence: &mut Vec<*mut Node>, longest: isize,
  * item per sequence length: the sequence with the smallest last
  * element (in terms of line2).
  */
-fn find_longest_common_sequence(map: &mut hashmap, res: &mut *mut Node) -> i32 {
+fn find_longest_common_sequence(map: &mut PatienceContext, res: &mut *mut Node) -> i32 {
     let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.entries.len()];
 
 	let mut longest = 0isize;
@@ -348,7 +348,7 @@ fn walk_common_sequence(
 fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
 		range1: Range<usize>, range2: Range<usize>
 ) -> i32 {
-	let mut map = hashmap::default();
+	let mut map = PatienceContext::default();
 	let mut result;
 
 	/* trivial case: one side is empty */
