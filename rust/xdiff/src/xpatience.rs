@@ -102,7 +102,6 @@ impl Default for OrderedMap {
 }
 
 struct PatienceContext<'a> {
-	map: IVec<Node>,
 	lhs: FileContext<'a>,
 	rhs: FileContext<'a>,
 	minimal_perfect_hash_size: usize,
@@ -400,7 +399,6 @@ impl<'a> PatienceContext<'a> {
 
 pub(crate) fn do_patience_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 	let mut ctx = PatienceContext {
-		map: IVec::new(),
 		lhs: FileContext::from_raw(&mut pair.lhs as *mut xd_file_context),
 		rhs: FileContext::from_raw(&mut pair.rhs as *mut xd_file_context),
 		minimal_perfect_hash_size: pair.minimal_perfect_hash_size,
