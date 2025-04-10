@@ -3,8 +3,7 @@
 use std::alloc::Layout;
 use std::marker::PhantomData;
 use std::ops::Range;
-use interop::ivec::IVec;
-use crate::maps::{DefaultHashEq};
+use bitvec::prelude::*;
 use crate::xdiff::*;
 use crate::xdiffi::classic_diff_with_range;
 use crate::xtypes::*;
@@ -84,10 +83,11 @@ impl<'a> Iterator for EntryNextIter<'a> {
  * second file.
  */
 struct OrderedMap<'a> {
-	layout: Layout,
+	bitvec: BitVec,
 	entries: &'a mut [Node],
 	first: *mut Node,
     last: *mut Node,
+	layout: Layout,
 	/* were common records found? */
 	has_matches: bool,
 }
@@ -97,6 +97,7 @@ impl<'a> OrderedMap<'a> {
 		let layout = Layout::array::<Node>(capacity).unwrap();
 		let ptr1 = unsafe { std::alloc::alloc_zeroed(layout) } as *mut Node;
 		Self {
+			bitvec: bitvec![0; capacity],
 			layout,
 			entries: unsafe { std::slice::from_raw_parts_mut(ptr1, capacity) },
 			first: std::ptr::null_mut(),
