@@ -312,17 +312,15 @@ fn histogram_diff(flags: u64, pair: &mut xdpair,
 }
 
 
-#[no_mangle]
-pub(crate) unsafe extern "C" fn xdl_do_histogram_diff(flags: u64, pair: *mut xdpair) -> i32 {
-	let pair = xdpair::from_raw_mut(pair);
-
+pub(crate) fn do_histogram_diff(flags: u64, pair: &mut xdpair) -> i32 {
 	let mut range1 = Range::default();
 	let mut range2 = Range::default();
 
+	let (lhs, rhs) = get_file_context!(pair);
 	range1.start = LINE_SHIFT + pair.delta_start;
-	range1.end = LINE_SHIFT + (*pair.lhs.record).len() - pair.delta_end;
+	range1.end = LINE_SHIFT + lhs.record.len() - pair.delta_end;
 	range2.start = LINE_SHIFT + pair.delta_start;
-	range2.end = LINE_SHIFT + (*pair.rhs.record).len() - pair.delta_end;
+	range2.end = LINE_SHIFT + rhs.record.len() - pair.delta_end;
 
 	histogram_diff(flags, pair, range1, range2)
 }

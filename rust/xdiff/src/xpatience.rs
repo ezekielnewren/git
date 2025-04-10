@@ -404,15 +404,6 @@ pub(crate) fn do_patience_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 }
 
 
-#[no_mangle]
-pub(crate) unsafe extern "C" fn xdl_do_patience_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
-	let xpp = &*xpp;
-	let pair = xdpair::from_raw_mut(pair);
-
-	do_patience_diff(xpp, pair)
-}
-
-
 #[cfg(test)]
 mod tests {
 	use std::path::PathBuf;

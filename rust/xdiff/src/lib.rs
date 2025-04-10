@@ -2,8 +2,8 @@ use std::hash::Hasher;
 use std::ops::Range;
 use xxhash_rust::xxh3::{xxh3_64, Xxh3Default};
 use interop::ivec::IVec;
-use crate::xdiff::{mmfile, XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
-use crate::xdiffi::classic_diff;
+use crate::xdiff::{mmfile, xpparam_t, XDF_IGNORE_CR_AT_EOL, XDF_WHITESPACE_FLAGS};
+use crate::xdiffi::{classic_diff, do_diff};
 use crate::xprepare::{safe_2way_prepare, safe_2way_slice, safe_3way_prepare};
 use crate::xtypes::{parse_lines, xd2way, xd3way, xd_file_context, xdfile, xdpair, xrange, xrecord, FileContext};
 use crate::xutils::{chunked_iter_equal, LineReader, MinimalPerfectHashBuilder, WhitespaceIter};
@@ -147,5 +147,14 @@ unsafe extern "C" fn xdl_3way_prepare(
 #[no_mangle]
 unsafe extern "C" fn xdl_3way_free(three_way: *mut xd3way) {
     std::ptr::drop_in_place(three_way);
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_do_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
+    let xpp = &*xpp;
+    let pair = xdpair::from_raw_mut(pair);
+
+    do_diff(xpp, pair)
 }
 

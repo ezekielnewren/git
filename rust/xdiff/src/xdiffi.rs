@@ -1,10 +1,10 @@
 use std::ops::Range;
 use interop::ivec::IVec;
-use crate::{get_file_context, xdl_2way_slice, xdl_do_classic_diff};
+use crate::get_file_context;
 use crate::xdiff::*;
+use crate::xhistogram::{do_histogram_diff};
+use crate::xpatience::{do_patience_diff};
 use crate::xprepare::safe_2way_slice;
-use crate::xhistogram::xdl_do_histogram_diff;
-use crate::xpatience::xdl_do_patience_diff;
 use crate::xtypes::*;
 use crate::xutils::xdl_bogosqrt;
 
@@ -660,20 +660,16 @@ pub(crate) fn classic_diff_with_range(flags: u64, pair: &mut xdpair, mut range1:
 }
 
 
-#[no_mangle]
-unsafe extern "C" fn xdl_do_diff(xpp: *const xpparam_t, pair: *mut xdpair) -> i32 {
-	let xpp = &*xpp;
-	let pair = xdpair::from_raw_mut(pair);
-
+pub(crate) fn do_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 	if (xpp.flags & XDF_PATIENCE_DIFF) != 0 {
-		return xdl_do_patience_diff(xpp, pair);
+		return do_patience_diff(xpp, pair);
 	}
 
 	if (xpp.flags & XDF_HISTOGRAM_DIFF) != 0 {
-		return xdl_do_histogram_diff(xpp.flags, pair);
+		return do_histogram_diff(xpp.flags, pair);
 	}
 
-	xdl_do_classic_diff(xpp.flags, pair)
+	classic_diff(xpp.flags, pair)
 }
 
 
