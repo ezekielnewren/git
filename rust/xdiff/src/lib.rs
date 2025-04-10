@@ -19,43 +19,6 @@ pub(crate) mod xdiffi;
 pub(crate) mod xhistogram;
 pub(crate) mod xpatience;
 
-#[no_mangle]
-unsafe extern "C" fn xdl_mphb_new(max_unique_keys: usize, flags: u64) -> *mut libc::c_void {
-    let a = Box::new(MinimalPerfectHashBuilder::new(max_unique_keys, flags));
-    let b = Box::into_raw(a);
-    b as *mut libc::c_void
-}
-
-#[no_mangle]
-unsafe extern "C" fn xdl_mphb_process(mphb: *mut libc::c_void, file: *mut xdfile) {
-    let mphb: &mut MinimalPerfectHashBuilder = &mut *(mphb as *mut MinimalPerfectHashBuilder);
-    let file = xdfile::from_raw_mut(file);
-
-    mphb.process(file);
-}
-
-#[no_mangle]
-unsafe extern "C" fn xdl_mphb_finish(mphb: *mut libc::c_void) -> usize {
-    let mphb = Box::from_raw(mphb as *mut MinimalPerfectHashBuilder);
-    mphb.finish()
-}
-
-
-#[no_mangle]
-unsafe extern "C" fn xdl_parse_lines(file: *const mmfile, record: *mut IVec<xrecord>) {
-    let file = mmfile::from_raw(file);
-    let record = IVec::from_raw_mut(record);
-
-    parse_lines(file, record);
-}
-
-#[no_mangle]
-unsafe extern "C" fn xdl_do_classic_diff(flags: u64, pair: *mut xdpair) -> i32 {
-    let pair = xdpair::from_raw_mut(pair);
-
-    classic_diff(flags, pair)
-}
-
 
 #[no_mangle]
 unsafe extern "C" fn xdl_line_hash(ptr: *const u8, size: usize, flags: u64) -> u64 {
