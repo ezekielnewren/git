@@ -2,7 +2,8 @@
 
 use std::marker::PhantomData;
 use std::ops::Range;
-use crate::maps::{DefaultHashEq, FixedMap};
+use interop::ivec::IVec;
+use crate::maps::{DefaultHashEq};
 use crate::xdiff::*;
 use crate::xdiffi::classic_diff_with_range;
 use crate::xtypes::*;
@@ -81,18 +82,18 @@ impl<'a> Iterator for EntryNextIter<'a> {
  * This is a hash mapping from line hash to line numbers in the first and
  * second file.
  */
-struct OrderedMap<'a> {
-	entries: FixedMap<'a, u64, Node, DefaultHashEq<u64>>,
+struct OrderedMap {
+	entries: IVec<Node>,
 	first: *mut Node,
     last: *mut Node,
 	/* were common records found? */
 	has_matches: bool,
 }
 
-impl<'a> Default for OrderedMap<'a> {
+impl Default for OrderedMap {
 	fn default() -> Self {
 		Self {
-			entries: FixedMap::with_capacity(0),
+			entries: IVec::new(),
 			first: std::ptr::null_mut(),
 			last: std::ptr::null_mut(),
 			has_matches: false,
@@ -101,7 +102,7 @@ impl<'a> Default for OrderedMap<'a> {
 }
 
 struct PatienceContext<'a> {
-	map: OrderedMap<'a>,
+	map: IVec<Node>,
 	lhs: FileContext<'a>,
 	rhs: FileContext<'a>,
 	minimal_perfect_hash_size: usize,
@@ -222,8 +223,9 @@ impl<'a> PatienceContext<'a> {
 		};
 
 		let mph = mph_vec[line - LINE_SHIFT];
+		let node: &mut Node = &mut map.entries[mph as usize];
 
-		if let Some(node) = map.entries.get_mut(&mph) {
+		if node.line1 != 0 {
 			if pass == 2 {
 				map.has_matches = true;
 			}
@@ -237,13 +239,15 @@ impl<'a> PatienceContext<'a> {
 		if pass == 2 {
 			return;
 		}
-		let node = map.entries.insert(mph, Node {
+
+		map.entries[mph as usize] = Node {
 			line1: line,
 			line2: 0,
 			next: std::ptr::null_mut(),
 			previous: std::ptr::null_mut(),
 			anchor: is_anchor(self.xpp, self.lhs.record[line - LINE_SHIFT].as_ref()),
-		});
+		};
+		let node = &mut map.entries[mph as usize];
 		if map.first.is_null() {
 			map.first = node;
 		}
@@ -268,7 +272,7 @@ impl<'a> PatienceContext<'a> {
 	) -> i32 {
 		/* We know exactly how large we want the hash map */
 		let capacity = std::cmp::max(range1.len(), self.minimal_perfect_hash_size);
-		result.entries = FixedMap::with_capacity(capacity);
+		result.entries = unsafe { IVec::zero(capacity) };
 
 		/* First, fill with entries from the first file */
 		for i in range1 {
@@ -396,7 +400,7 @@ impl<'a> PatienceContext<'a> {
 
 pub(crate) fn do_patience_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 	let mut ctx = PatienceContext {
-		map: OrderedMap::default(),
+		map: IVec::new(),
 		lhs: FileContext::from_raw(&mut pair.lhs as *mut xd_file_context),
 		rhs: FileContext::from_raw(&mut pair.rhs as *mut xd_file_context),
 		minimal_perfect_hash_size: pair.minimal_perfect_hash_size,
