@@ -296,8 +296,12 @@ impl<'a> PatienceContext<'a> {
 					next1 = (*first).line1;
 					next2 = (*first).line2;
 				}
-				while next1 > range1.start && next2 > range2.start &&
-					self.pair.equal_by_line_number(next1 - 1, next2 - 1) {
+				while next1 > range1.start && next2 > range2.start {
+					let mph1 = self.lhs.minimal_perfect_hash[next1 - 1 - LINE_SHIFT];
+					let mph2 = self.rhs.minimal_perfect_hash[next2 - 1 - LINE_SHIFT];
+					if mph1 != mph2 {
+						break;
+					}
 					next1 -= 1;
 					next2 -= 1;
 				}
@@ -305,8 +309,12 @@ impl<'a> PatienceContext<'a> {
 				next1 = range1.end;
 				next2 = range2.end;
 			}
-			while range1.start < next1 && range2.start < next2 &&
-				self.pair.equal_by_line_number(range1.start, range2.start) {
+			while range1.start < next1 && range2.start < next2 {
+				let mph1 = self.lhs.minimal_perfect_hash[range1.start - LINE_SHIFT];
+				let mph2 = self.rhs.minimal_perfect_hash[range2.start - LINE_SHIFT];
+				if mph1 != mph2 {
+					break;
+				}
 				range1.start += 1;
 				range2.start += 1;
 			}
