@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 use std::ops::Range;
+use interop::ivec::IVec;
 use crate::get_file_context;
 use crate::xdiff::{LINE_SHIFT, SENTINEL, YES};
 use crate::xdiffi::classic_diff_with_range;
@@ -60,9 +61,9 @@ impl<'a> RecordIter<'a> {
 #[repr(C)]
 struct histindex {
 	record_storage: Vec<record>,
-	record: Vec<*mut record>,
-	line_map: Vec<*mut record>,
-	next_line_numbers: Vec<usize>,
+	record: IVec<*mut record>,
+	line_map: IVec<*mut record>,
+	next_line_numbers: IVec<usize>,
 	line_number_shift: usize,
 	count: usize,
 	has_common: bool,
@@ -215,9 +216,9 @@ fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 
 	let mut index = histindex {
 		record_storage: Vec::with_capacity(fudge),
-		record: vec![std::ptr::null_mut(); pair.minimal_perfect_hash_size],
-		line_map: vec!(std::ptr::null_mut(); range1.len()),
-		next_line_numbers: vec![0usize; range1.len()],
+		record: unsafe { IVec::zero(pair.minimal_perfect_hash_size) },
+		line_map: unsafe { IVec::zero(range1.len()) },
+		next_line_numbers: unsafe { IVec::zero(range1.len()) },
 		line_number_shift: range1.start,
 		count: 0,
 		has_common: false,
