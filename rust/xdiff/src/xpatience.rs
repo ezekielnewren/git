@@ -120,6 +120,7 @@ impl<'a> Drop for OrderedMap<'a> {
 struct PatienceContext<'a> {
 	lhs: FileContext<'a>,
 	rhs: FileContext<'a>,
+	rhs_reverse: Vec<Vec<usize>>,
 	minimal_perfect_hash_size: usize,
 	pair: &'a mut xdpair,
 	xpp: &'a xpparam_t,
@@ -414,10 +415,15 @@ pub(crate) fn do_patience_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 	let mut ctx = PatienceContext {
 		lhs: FileContext::from_raw(&mut pair.lhs as *mut xd_file_context),
 		rhs: FileContext::from_raw(&mut pair.rhs as *mut xd_file_context),
+		rhs_reverse: vec![Vec::new(); pair.minimal_perfect_hash_size],
 		minimal_perfect_hash_size: pair.minimal_perfect_hash_size,
 		pair,
 		xpp,
 	};
+
+	for (i, mph) in ctx.rhs.minimal_perfect_hash.iter().enumerate() {
+		ctx.rhs_reverse[*mph as usize].push(i);
+	}
 
 	let range1 = LINE_SHIFT..LINE_SHIFT + ctx.lhs.record.len();
 	let range2 = LINE_SHIFT..LINE_SHIFT + ctx.rhs.record.len();
