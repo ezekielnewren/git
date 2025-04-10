@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types)]
 
+use std::alloc::Layout;
 use std::marker::PhantomData;
 use std::ops::Range;
 use interop::ivec::IVec;
@@ -82,24 +83,38 @@ impl<'a> Iterator for EntryNextIter<'a> {
  * This is a hash mapping from line hash to line numbers in the first and
  * second file.
  */
-struct OrderedMap {
-	entries: IVec<Node>,
+struct OrderedMap<'a> {
+	layout: Layout,
+	entries: &'a mut [Node],
 	first: *mut Node,
     last: *mut Node,
 	/* were common records found? */
 	has_matches: bool,
 }
 
-impl Default for OrderedMap {
-	fn default() -> Self {
+impl<'a> OrderedMap<'a> {
+	fn new(capacity: usize) -> Self {
+		let layout = Layout::array::<Node>(capacity).unwrap();
+		let ptr1 = unsafe { std::alloc::alloc_zeroed(layout) } as *mut Node;
 		Self {
-			entries: IVec::new(),
+			layout,
+			entries: unsafe { std::slice::from_raw_parts_mut(ptr1, capacity) },
 			first: std::ptr::null_mut(),
 			last: std::ptr::null_mut(),
 			has_matches: false,
 		}
 	}
 }
+
+
+impl<'a> Drop for OrderedMap<'a> {
+	fn drop(&mut self) {
+		unsafe {
+			std::alloc::dealloc(self.entries.as_mut_ptr() as *mut u8, self.layout);
+		}
+	}
+}
+
 
 struct PatienceContext<'a> {
 	lhs: FileContext<'a>,
@@ -269,10 +284,6 @@ impl<'a> PatienceContext<'a> {
 		result: &mut OrderedMap,
 		range1: Range<usize>, range2: Range<usize>
 	) -> i32 {
-		/* We know exactly how large we want the hash map */
-		let capacity = std::cmp::max(range1.len(), self.minimal_perfect_hash_size);
-		result.entries = unsafe { IVec::zero(capacity) };
-
 		/* First, fill with entries from the first file */
 		for i in range1 {
 			self.insert_record(i, result, 1);
@@ -350,7 +361,8 @@ impl<'a> PatienceContext<'a> {
 	}
 
 	fn patience_diff(&mut self, range1: Range<usize>, range2: Range<usize>) -> i32 {
-		let mut map = OrderedMap::default();
+		/* We know exactly how large we want the hash map */
+		let mut map = OrderedMap::new(self.minimal_perfect_hash_size);
 		let mut result;
 
 		/* trivial case: one side is empty */
