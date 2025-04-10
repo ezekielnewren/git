@@ -505,11 +505,11 @@ fn cleanup_records(pair: &mut xdpair) {
 	let mut occurrence = Vec::new();
 	occurrence.resize_with(pair.minimal_perfect_hash_size, || Occurrence::default());
 
-	for mph in lhs.minimal_perfect_hash.as_slice() {
+	for mph in lhs.minimal_perfect_hash {
 		occurrence[*mph as usize].file1 += 1;
 	}
 
-	for mph in rhs.minimal_perfect_hash.as_slice() {
+	for mph in rhs.minimal_perfect_hash {
 		occurrence[*mph as usize].file2 += 1;
 	}
 
@@ -646,13 +646,13 @@ pub(crate) fn classic_diff_with_range(flags: u64, pair: &mut xdpair, mut range1:
 
 	range1.start += SENTINEL - LINE_SHIFT;
 	range1.end += SENTINEL - LINE_SHIFT;
-	let dst = &mut lhs.consider.as_mut_slice()[range1.clone()];
+	let dst = &mut lhs.consider[range1.clone()];
 	let src = &two_way.pair.lhs.consider.as_slice()[SENTINEL..SENTINEL + range1.len()];
 	dst.copy_from_slice(src);
 
 	range2.start += SENTINEL - LINE_SHIFT;
 	range2.end += SENTINEL - LINE_SHIFT;
-	let dst = &mut rhs.consider.as_mut_slice()[range2.clone()];
+	let dst = &mut rhs.consider[range2.clone()];
 	let src = &two_way.pair.rhs.consider.as_slice()[SENTINEL..SENTINEL + range2.len()];
 	dst.copy_from_slice(src);
 

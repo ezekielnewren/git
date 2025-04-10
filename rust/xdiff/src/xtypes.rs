@@ -185,9 +185,9 @@ impl xd_file_context {
 
 
 pub struct FileContext<'a> {
-    pub minimal_perfect_hash: &'a IVec<u64>,
-    pub record: &'a IVec<xrecord>,
-    pub consider: &'a mut IVec<u8>,
+    pub minimal_perfect_hash: &'a [u64],
+    pub record: &'a [xrecord],
+    pub consider: &'a mut [u8],
     pub rindex: &'a mut IVec<usize>,
 }
 
@@ -195,10 +195,21 @@ pub struct FileContext<'a> {
 impl<'a> FileContext<'a> {
     pub fn new(ctx: &'a mut xd_file_context) -> Self {
         Self {
-            minimal_perfect_hash: unsafe { &*ctx.minimal_perfect_hash },
-            record: unsafe { &*ctx.record },
-            consider: &mut ctx.consider,
+            minimal_perfect_hash: unsafe { &*ctx.minimal_perfect_hash }.as_slice(),
+            record: unsafe { &*ctx.record }.as_slice(),
+            consider: ctx.consider.as_mut_slice(),
             rindex: &mut ctx.rindex,
+        }
+    }
+
+    pub fn from_raw(ctx: *mut xd_file_context) -> Self {
+        unsafe {
+            Self {
+                minimal_perfect_hash: &(*(*ctx).minimal_perfect_hash).as_slice(),
+                record: &(*(*ctx).record).as_slice(),
+                consider: (*ctx).consider.as_mut_slice(),
+                rindex: &mut (*ctx).rindex,
+            }
         }
     }
 }

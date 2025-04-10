@@ -2,7 +2,6 @@
 
 use std::marker::PhantomData;
 use std::ops::Range;
-use crate::get_file_context;
 use crate::maps::{DefaultHashEq, FixedMap};
 use crate::xdiff::*;
 use crate::xdiffi::classic_diff_with_range;
@@ -82,8 +81,7 @@ impl<'a> Iterator for EntryNextIter<'a> {
  * This is a hash mapping from line hash to line numbers in the first and
  * second file.
  */
-#[repr(C)]
-struct PatienceContext<'a> {
+struct OrderedMap<'a> {
 	entries: FixedMap<'a, u64, Node, DefaultHashEq<u64>>,
 	first: *mut Node,
     last: *mut Node,
@@ -91,7 +89,7 @@ struct PatienceContext<'a> {
 	has_matches: bool,
 }
 
-impl<'a> Default for PatienceContext<'a> {
+impl<'a> Default for OrderedMap<'a> {
 	fn default() -> Self {
 		Self {
 			entries: FixedMap::with_capacity(0),
@@ -102,8 +100,17 @@ impl<'a> Default for PatienceContext<'a> {
 	}
 }
 
+struct PatienceContext<'a> {
+	map: OrderedMap<'a>,
+	lhs: FileContext<'a>,
+	rhs: FileContext<'a>,
+	minimal_perfect_hash_size: usize,
+	pair: &'a mut xdpair,
+	xpp: &'a xpparam_t,
+}
+
 fn is_anchor(xpp: &xpparam_t, line: &[u8]) -> bool {
-    for i in 0..xpp.anchors_nr {
+	for i in 0..xpp.anchors_nr {
 		let anchor = unsafe {
 			let t = *xpp.anchors.add(i);
 			let len = libc::strlen(t);
@@ -112,88 +119,10 @@ fn is_anchor(xpp: &xpparam_t, line: &[u8]) -> bool {
 		if line.starts_with(anchor) {
 			return true;
 		}
-    }
-
-    false
-}
-
-
-/* The argument "pass" is 1 for the first file, 2 for the second. */
-fn insert_record(
-	xpp: &xpparam_t, pair: &mut xdpair,
-	line: usize, map: &mut PatienceContext, pass: i32
-) {
-	let (lhs, rhs) = get_file_context!(pair);
-
-	let mph_vec = if pass == 1 {
-        lhs.minimal_perfect_hash
-    } else {
-        rhs.minimal_perfect_hash
-    };
-
-	let mph = mph_vec[line - LINE_SHIFT];
-
-	if let Some(node) = map.entries.get_mut(&mph) {
-		if pass == 2 {
-			map.has_matches = true;
-        }
-		if pass == 1 || node.line2 != 0 {
-			node.line2 = NON_UNIQUE;
-        } else {
-			node.line2 = line;
-        }
-		return;
 	}
-	if pass == 2 {
-		return;
-    }
-	let node = map.entries.insert(mph, Node {
-		line1: line,
-		line2: 0,
-		next: std::ptr::null_mut(),
-		previous: std::ptr::null_mut(),
-		anchor: is_anchor(xpp, lhs.record[line - LINE_SHIFT].as_ref()),
-	});
-	if map.first.is_null() {
-		map.first = node;
-    }
-	if !map.last.is_null() {
-        unsafe { (*map.last).next = node };
-		node.previous = map.last;
-	}
-	map.last = node;
+
+	false
 }
-
-
-/*
- * This function has to be called for each recursion into the inter-hunk
- * parts, as previously non-unique lines can become unique when being
- * restricted to a smaller part of the files.
- *
- * It is assumed that env has been prepared using xdl_prepare().
- */
-fn fill_hashmap(
-	xpp: &xpparam_t, pair: &mut xdpair,
-	result: &mut PatienceContext,
-	range1: Range<usize>, range2: Range<usize>
-) -> i32 {
-	/* We know exactly how large we want the hash map */
-	let capacity = std::cmp::max(range1.len(), pair.minimal_perfect_hash_size);
-	result.entries = FixedMap::with_capacity(capacity);
-
-	/* First, fill with entries from the first file */
-    for i in range1 {
-        insert_record(xpp, pair, i, result, 1);
-    }
-
-    /* Then search for matches in the second file */
-    for i in range2 {
-        insert_record(xpp, pair, i, result, 2);
-    }
-
-	0
-}
-
 
 /*
  * Find the longest sequence with a smaller last element (meaning a smaller
@@ -210,37 +139,36 @@ fn binary_search(sequence: &mut Vec<*mut Node>, longest: isize,
 		/* by construction, no two entries can be equal */
 		if unsafe { (*sequence[middle as usize]).line2 } > entry.line2 {
 			right = middle;
-        } else {
+		} else {
 			left = middle;
-        }
+		}
 	}
 	/* return the index in "sequence", _not_ the sequence length */
 	left
 }
 
-
 /*
- * The idea is to start with the list of common unique lines sorted by
- * the order in file1.  For each of these pairs, the longest (partial)
- * sequence whose last element's line2 is smaller is determined.
- *
- * For efficiency, the sequences are kept in a list containing exactly one
- * item per sequence length: the sequence with the smallest last
- * element (in terms of line2).
- */
-fn find_longest_common_sequence(map: &mut PatienceContext, res: &mut *mut Node) -> i32 {
-    let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.entries.len()];
+	 * The idea is to start with the list of common unique lines sorted by
+	 * the order in file1.  For each of these pairs, the longest (partial)
+	 * sequence whose last element's line2 is smaller is determined.
+	 *
+	 * For efficiency, the sequences are kept in a list containing exactly one
+	 * item per sequence length: the sequence with the smallest last
+	 * element (in terms of line2).
+	 */
+fn find_longest_common_sequence(map: &mut OrderedMap, res: &mut *mut Node) -> i32 {
+	let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.entries.len()];
 
 	let mut longest = 0isize;
 
 	/*
-	 * If not -1, this entry in sequence must never be overridden.
-	 * Therefore, overriding entries before this has no effect, so
-	 * do not do that either.
-	 */
+     * If not -1, this entry in sequence must never be overridden.
+     * Therefore, overriding entries before this has no effect, so
+     * do not do that either.
+     */
 	let mut anchor_i = -1;
 
-    for e in EntryNextIter::new(map.first) {
+	for e in EntryNextIter::new(map.first) {
 		if e.line2 == 0 || e.line2 == NON_UNIQUE {
 			continue;
 		}
@@ -283,124 +211,195 @@ fn find_longest_common_sequence(map: &mut PatienceContext, res: &mut *mut Node) 
 	0
 }
 
+impl<'a> PatienceContext<'a> {
 
-fn walk_common_sequence(
-	xpp: &xpparam_t, pair: &mut xdpair, mut first: *mut Node,
-	mut range1: Range<usize>, mut range2: Range<usize>
-) -> i32 {
-	let mut next1;
-    let mut next2;
-
-	loop {
-		/* Try to grow the line ranges of common lines */
-		if !first.is_null() {
-			unsafe {
-				next1 = (*first).line1;
-				next2 = (*first).line2;
-			}
-			while next1 > range1.start && next2 > range2.start &&
-				pair.equal_by_line_number(next1 - 1, next2 - 1) {
-				next1 -= 1;
-				next2 -= 1;
-			}
+	/* The argument "pass" is 1 for the first file, 2 for the second. */
+	fn insert_record(&mut self, line: usize, map: &mut OrderedMap, pass: i32) {
+		let mph_vec = if pass == 1 {
+			self.lhs.minimal_perfect_hash
 		} else {
-			next1 = range1.end;
-			next2 = range2.end;
-		}
-		while range1.start < next1 && range2.start < next2 &&
-            pair.equal_by_line_number(range1.start, range2.start) {
-			range1.start += 1;
-			range2.start += 1;
-		}
+			self.rhs.minimal_perfect_hash
+		};
 
-		/* Recurse */
-		if next1 > range1.start || next2 > range2.start {
-			if patience_diff(xpp, pair,
-					range1.start..next1,
-					range2.start..next2) != 0 {
-				return -1;
+		let mph = mph_vec[line - LINE_SHIFT];
+
+		if let Some(node) = map.entries.get_mut(&mph) {
+			if pass == 2 {
+				map.has_matches = true;
 			}
+			if pass == 1 || node.line2 != 0 {
+				node.line2 = NON_UNIQUE;
+			} else {
+				node.line2 = line;
+			}
+			return;
+		}
+		if pass == 2 {
+			return;
+		}
+		let node = map.entries.insert(mph, Node {
+			line1: line,
+			line2: 0,
+			next: std::ptr::null_mut(),
+			previous: std::ptr::null_mut(),
+			anchor: is_anchor(self.xpp, self.lhs.record[line - LINE_SHIFT].as_ref()),
+		});
+		if map.first.is_null() {
+			map.first = node;
+		}
+		if !map.last.is_null() {
+			unsafe { (*map.last).next = node };
+			node.previous = map.last;
+		}
+		map.last = node;
+	}
+
+
+	/*
+	 * This function has to be called for each recursion into the inter-hunk
+	 * parts, as previously non-unique lines can become unique when being
+	 * restricted to a smaller part of the files.
+	 *
+	 * It is assumed that env has been prepared using xdl_prepare().
+	 */
+	fn fill_hashmap(&mut self,
+		result: &mut OrderedMap,
+		range1: Range<usize>, range2: Range<usize>
+	) -> i32 {
+		/* We know exactly how large we want the hash map */
+		let capacity = std::cmp::max(range1.len(), self.minimal_perfect_hash_size);
+		result.entries = FixedMap::with_capacity(capacity);
+
+		/* First, fill with entries from the first file */
+		for i in range1 {
+			self.insert_record(i, result, 1);
 		}
 
-		if first.is_null() {
-			return 0;
-        }
+		/* Then search for matches in the second file */
+		for i in range2 {
+			self.insert_record(i, result, 2);
+		}
 
-		unsafe {
-			while !(*first).next.is_null() &&
-				(*(*first).next).line1 == (*first).line1 + 1 &&
-				(*(*first).next).line2 == (*first).line2 + 1 {
+		0
+	}
+
+	fn walk_common_sequence(&mut self, mut first: *mut Node,
+		mut range1: Range<usize>, mut range2: Range<usize>
+	) -> i32 {
+		let mut next1;
+		let mut next2;
+
+		loop {
+			/* Try to grow the line ranges of common lines */
+			if !first.is_null() {
+				unsafe {
+					next1 = (*first).line1;
+					next2 = (*first).line2;
+				}
+				while next1 > range1.start && next2 > range2.start &&
+					self.pair.equal_by_line_number(next1 - 1, next2 - 1) {
+					next1 -= 1;
+					next2 -= 1;
+				}
+			} else {
+				next1 = range1.end;
+				next2 = range2.end;
+			}
+			while range1.start < next1 && range2.start < next2 &&
+				self.pair.equal_by_line_number(range1.start, range2.start) {
+				range1.start += 1;
+				range2.start += 1;
+			}
+
+			/* Recurse */
+			if next1 > range1.start || next2 > range2.start {
+				if self.patience_diff(range1.start..next1,
+									  range2.start..next2) != 0 {
+					return -1;
+				}
+			}
+
+			if first.is_null() {
+				return 0;
+			}
+
+			unsafe {
+				while !(*first).next.is_null() &&
+					(*(*first).next).line1 == (*first).line1 + 1 &&
+					(*(*first).next).line2 == (*first).line2 + 1 {
+					first = (*first).next;
+				}
+
+				range1.start = (*first).line1 + 1;
+				range2.start = (*first).line2 + 1;
+
 				first = (*first).next;
 			}
-
-			range1.start = (*first).line1 + 1;
-			range2.start = (*first).line2 + 1;
-
-			first = (*first).next;
 		}
 	}
-}
 
+	fn patience_diff(&mut self, range1: Range<usize>, range2: Range<usize>) -> i32 {
+		let mut map = OrderedMap::default();
+		let mut result;
 
-fn patience_diff(xpp: &xpparam_t, pair: &mut xdpair,
-		range1: Range<usize>, range2: Range<usize>
-) -> i32 {
-	let mut map = PatienceContext::default();
-	let mut result;
-
-	/* trivial case: one side is empty */
-	if range1.len() == 0 {
-		for i in range2 {
-			pair.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+		/* trivial case: one side is empty */
+		if range1.len() == 0 {
+			for i in range2 {
+				self.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+			}
+			return 0;
+		} else if range2.len() == 0 {
+			for i in range1 {
+				self.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+			}
+			return 0;
 		}
-		return 0;
-	} else if range2.len() == 0 {
-		for i in range1 {
-			pair.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+
+		if self.fill_hashmap(&mut map, range1.clone(), range2.clone()) != 0 {
+			return -1;
 		}
-		return 0;
-	}
 
-	if fill_hashmap(xpp, pair, &mut map, range1.clone(), range2.clone()) != 0 {
-		return -1;
-	}
-
-	/* are there any matching lines at all? */
-	if !map.has_matches {
-		for i in range1 {
-			pair.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+		/* are there any matching lines at all? */
+		if !map.has_matches {
+			for i in range1 {
+				self.lhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+			}
+			for i in range2 {
+				self.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+			}
+			return 0;
 		}
-		for i in range2 {
-			pair.rhs.consider[SENTINEL + i - LINE_SHIFT] = YES;
+
+		let mut first = std::ptr::null_mut();
+		result = find_longest_common_sequence(&mut map, &mut first);
+		if result != 0 {
+			return result;
 		}
-		return 0;
-	}
+		if !first.is_null() {
+			result = self.walk_common_sequence(first, range1, range2);
+		} else {
+			result = classic_diff_with_range(self.xpp.flags, self.pair, range1, range2);
+		}
 
-	let mut first = std::ptr::null_mut();
-	result = find_longest_common_sequence(&mut map, &mut first);
-	if result != 0 {
-		return result;
+		result
 	}
-	if !first.is_null() {
-		result = walk_common_sequence(xpp, pair, first, range1, range2);
-	} else {
-		result = classic_diff_with_range(xpp.flags, pair, range1, range2);
-	}
-
-	result
 }
 
 
 pub(crate) fn do_patience_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
-	let (lhs, rhs) = get_file_context!(pair);
+	let mut ctx = PatienceContext {
+		map: OrderedMap::default(),
+		lhs: FileContext::from_raw(&mut pair.lhs as *mut xd_file_context),
+		rhs: FileContext::from_raw(&mut pair.rhs as *mut xd_file_context),
+		minimal_perfect_hash_size: pair.minimal_perfect_hash_size,
+		pair,
+		xpp,
+	};
 
-	let range1 = LINE_SHIFT..LINE_SHIFT + lhs.record.len();
-	let range2 = LINE_SHIFT..LINE_SHIFT + rhs.record.len();
+	let range1 = LINE_SHIFT..LINE_SHIFT + ctx.lhs.record.len();
+	let range2 = LINE_SHIFT..LINE_SHIFT + ctx.rhs.record.len();
 
-	drop(lhs);
-	drop(rhs);
-
-	patience_diff(xpp, pair, range1, range2)
+	ctx.patience_diff(range1, range2)
 }
 
 
