@@ -230,50 +230,6 @@ fn find_longest_common_sequence(map: &mut OrderedMap, res: &mut *mut Node) -> i3
 
 impl<'a> PatienceContext<'a> {
 
-	/* The argument "pass" is 1 for the first file, 2 for the second. */
-	fn insert_record(&mut self, line: usize, map: &mut OrderedMap, pass: i32) {
-		let mph_vec = if pass == 1 {
-			self.lhs.minimal_perfect_hash
-		} else {
-			self.rhs.minimal_perfect_hash
-		};
-
-		let mph = mph_vec[line - LINE_SHIFT];
-		let node: &mut Node = &mut map.entries[mph as usize];
-
-		if node.line1 != 0 {
-			if pass == 2 {
-				map.has_matches = true;
-			}
-			if pass == 1 || node.line2 != 0 {
-				node.line2 = NON_UNIQUE;
-			} else {
-				node.line2 = line;
-			}
-			return;
-		}
-		if pass == 2 {
-			return;
-		}
-
-		map.entries[mph as usize] = Node {
-			line1: line,
-			line2: 0,
-			next: std::ptr::null_mut(),
-			previous: std::ptr::null_mut(),
-			anchor: is_anchor(self.xpp, self.lhs.record[line - LINE_SHIFT].as_ref()),
-		};
-		let node = &mut map.entries[mph as usize];
-		if map.first.is_null() {
-			map.first = node;
-		}
-		if !map.last.is_null() {
-			unsafe { (*map.last).next = node };
-			node.previous = map.last;
-		}
-		map.last = node;
-	}
-
 
 	/*
 	 * This function has to be called for each recursion into the inter-hunk
@@ -316,7 +272,18 @@ impl<'a> PatienceContext<'a> {
 
 		/* Then search for matches in the second file */
 		for i in range2 {
-			self.insert_record(i, map, 2);
+			let mph = self.rhs.minimal_perfect_hash[i - LINE_SHIFT];
+			let node: &mut Node = &mut map.entries[mph as usize];
+
+			if node.line1 != 0 {
+				map.has_matches = true;
+				if node.line2 != 0 {
+					node.line2 = NON_UNIQUE;
+				} else {
+					node.line2 = i;
+				}
+			}
+			continue;
 		}
 
 		0
