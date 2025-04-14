@@ -283,17 +283,40 @@ impl<'a> PatienceContext<'a> {
 	 * It is assumed that env has been prepared using xdl_prepare().
 	 */
 	fn fill_hashmap(&mut self,
-		result: &mut OrderedMap,
+		map: &mut OrderedMap,
 		range1: Range<usize>, range2: Range<usize>
 	) -> i32 {
 		/* First, fill with entries from the first file */
 		for i in range1 {
-			self.insert_record(i, result, 1);
+			let mph = self.lhs.minimal_perfect_hash[i - LINE_SHIFT];
+			let node: &mut Node = &mut map.entries[mph as usize];
+
+			if node.line1 != 0 {
+				node.line2 = NON_UNIQUE;
+				continue;
+			} else {
+				map.entries[mph as usize] = Node {
+					line1: i,
+					line2: 0,
+					next: std::ptr::null_mut(),
+					previous: std::ptr::null_mut(),
+					anchor: is_anchor(self.xpp, self.lhs.record[i - LINE_SHIFT].as_ref()),
+				};
+				let node = &mut map.entries[mph as usize];
+				if map.first.is_null() {
+					map.first = node;
+				}
+				if !map.last.is_null() {
+					unsafe { (*map.last).next = node };
+					node.previous = map.last;
+				}
+				map.last = node;
+			}
 		}
 
 		/* Then search for matches in the second file */
 		for i in range2 {
-			self.insert_record(i, result, 2);
+			self.insert_record(i, map, 2);
 		}
 
 		0
