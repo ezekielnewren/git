@@ -298,41 +298,48 @@ impl<'a> PatienceContext<'a> {
 		0
 	}
 
-	fn walk_common_sequence(&mut self, mut first: *mut Node,
-		mut range1: Range<usize>, mut range2: Range<usize>
-	) -> i32 {
+	fn expand(&mut self, mut first: *mut Node,
+			  range1: &mut Range<usize>, range2: &mut Range<usize>
+	) -> (usize, usize) {
+		/* Try to grow the line ranges of common lines */
 		let mut next1;
 		let mut next2;
-
-		loop {
-			/* Try to grow the line ranges of common lines */
-			if !first.is_null() {
-				unsafe {
-					next1 = (*first).line1;
-					next2 = (*first).line2;
-				}
-				while next1 > range1.start && next2 > range2.start {
-					let mph1 = self.lhs.minimal_perfect_hash[next1 - 1 - LINE_SHIFT];
-					let mph2 = self.rhs.minimal_perfect_hash[next2 - 1 - LINE_SHIFT];
-					if mph1 != mph2 {
-						break;
-					}
-					next1 -= 1;
-					next2 -= 1;
-				}
-			} else {
-				next1 = range1.end;
-				next2 = range2.end;
+		if !first.is_null() {
+			unsafe {
+				next1 = (*first).line1;
+				next2 = (*first).line2;
 			}
-			while range1.start < next1 && range2.start < next2 {
-				let mph1 = self.lhs.minimal_perfect_hash[range1.start - LINE_SHIFT];
-				let mph2 = self.rhs.minimal_perfect_hash[range2.start - LINE_SHIFT];
+			while next1 > range1.start && next2 > range2.start {
+				let mph1 = self.lhs.minimal_perfect_hash[next1 - 1 - LINE_SHIFT];
+				let mph2 = self.rhs.minimal_perfect_hash[next2 - 1 - LINE_SHIFT];
 				if mph1 != mph2 {
 					break;
 				}
-				range1.start += 1;
-				range2.start += 1;
+				next1 -= 1;
+				next2 -= 1;
 			}
+		} else {
+			next1 = range1.end;
+			next2 = range2.end;
+		}
+		while range1.start < next1 && range2.start < next2 {
+			let mph1 = self.lhs.minimal_perfect_hash[range1.start - LINE_SHIFT];
+			let mph2 = self.rhs.minimal_perfect_hash[range2.start - LINE_SHIFT];
+			if mph1 != mph2 {
+				break;
+			}
+			range1.start += 1;
+			range2.start += 1;
+		}
+
+		(next1, next2)
+	}
+
+	fn walk_common_sequence(&mut self, mut first: *mut Node,
+		mut range1: Range<usize>, mut range2: Range<usize>
+	) -> i32 {
+		loop {
+			let (next1, next2) = self.expand(first, &mut range1, &mut range2);
 
 			/* Recurse */
 			if next1 > range1.start || next2 > range2.start {
