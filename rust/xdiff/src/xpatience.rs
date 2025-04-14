@@ -82,37 +82,43 @@ impl<'a> Iterator for EntryNextIter<'a> {
  * This is a hash mapping from line hash to line numbers in the first and
  * second file.
  */
-struct OrderedMap<'a> {
+struct OrderedMap {
 	bitvec: BitVec,
-	entries: &'a mut [Node],
+	entries: Vec<Node>,
 	first: *mut Node,
     last: *mut Node,
-	layout: Layout,
 	/* were common records found? */
 	has_matches: bool,
 }
 
-impl<'a> OrderedMap<'a> {
-	fn new(capacity: usize) -> Self {
-		let layout = Layout::array::<Node>(capacity).unwrap();
-		let ptr1 = unsafe { std::alloc::alloc_zeroed(layout) } as *mut Node;
-		Self {
-			bitvec: bitvec![0; capacity],
-			layout,
-			entries: unsafe { std::slice::from_raw_parts_mut(ptr1, capacity) },
-			first: std::ptr::null_mut(),
-			last: std::ptr::null_mut(),
-			has_matches: false,
+impl Drop for OrderedMap {
+	fn drop(&mut self) {
+		if std::mem::needs_drop::<Self>() {
+			for i in self.bitvec.iter_ones() {
+				unsafe {
+					std::ptr::drop_in_place(&mut self.entries[i])
+				}
+			}
+		}
+		unsafe {
+			self.entries.set_len(0);
 		}
 	}
 }
 
-
-impl<'a> Drop for OrderedMap<'a> {
-	fn drop(&mut self) {
+impl OrderedMap {
+	fn new(capacity: usize) -> Self {
+		let mut it = Self {
+			bitvec: bitvec![0; capacity],
+			entries: Vec::with_capacity(capacity),
+			first: std::ptr::null_mut(),
+			last: std::ptr::null_mut(),
+			has_matches: false,
+		};
 		unsafe {
-			std::alloc::dealloc(self.entries.as_mut_ptr() as *mut u8, self.layout);
+			it.entries.set_len(it.entries.capacity());
 		}
+		it
 	}
 }
 
@@ -253,13 +259,15 @@ impl<'a> PatienceContext<'a> {
 				continue;
 			} else {
 				map.bitvec.set(mph as usize, true);
-				*node = Node {
-					line1: i,
-					line2: 0,
-					next: std::ptr::null_mut(),
-					previous: std::ptr::null_mut(),
-					anchor: is_anchor(self.xpp, self.lhs.record[i - LINE_SHIFT].as_ref()),
-				};
+				unsafe {
+					std::ptr::write(node, Node {
+						line1: i,
+						line2: 0,
+						next: std::ptr::null_mut(),
+						previous: std::ptr::null_mut(),
+						anchor: is_anchor(self.xpp, self.lhs.record[i - LINE_SHIFT].as_ref()),
+					});
+				}
 				if map.first.is_null() {
 					map.first = node;
 				}
