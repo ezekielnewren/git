@@ -164,7 +164,11 @@ fn binary_search(sequence: &mut Vec<*mut Node>, longest: isize,
 	left
 }
 
-/*
+
+impl<'a> PatienceContext<'a> {
+
+
+	/*
 	 * The idea is to start with the list of common unique lines sorted by
 	 * the order in file1.  For each of these pairs, the longest (partial)
 	 * sequence whose last element's line2 is smaller is determined.
@@ -173,63 +177,60 @@ fn binary_search(sequence: &mut Vec<*mut Node>, longest: isize,
 	 * item per sequence length: the sequence with the smallest last
 	 * element (in terms of line2).
 	 */
-fn find_longest_common_sequence(map: &mut OrderedMap, res: &mut *mut Node) -> i32 {
-	let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.entries.len()];
+	fn find_longest_common_sequence(&mut self, map: &mut OrderedMap, res: &mut *mut Node, range1: Range<usize>, range2: Range<usize>) -> i32 {
+		let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.entries.len()];
 
-	let mut longest = 0isize;
+		let mut longest = 0isize;
 
-	/*
-     * If not -1, this entry in sequence must never be overridden.
-     * Therefore, overriding entries before this has no effect, so
-     * do not do that either.
-     */
-	let mut anchor_i = -1;
+		/*
+         * If not -1, this entry in sequence must never be overridden.
+         * Therefore, overriding entries before this has no effect, so
+         * do not do that either.
+         */
+		let mut anchor_i = -1;
 
-	for entry in EntryNextIter::new(map.first) {
-		if entry.line2 == 0 || entry.line2 == NON_UNIQUE {
-			continue;
+		for entry in EntryNextIter::new(map.first) {
+			if entry.line2 == 0 || entry.line2 == NON_UNIQUE {
+				continue;
+			}
+			let mut i = binary_search(&mut sequence, longest, entry);
+			if i < 0 {
+				entry.previous = std::ptr::null_mut();
+			} else {
+				entry.previous = sequence[i as usize];
+			}
+			i += 1;
+			if i <= anchor_i {
+				continue;
+			}
+			sequence[i as usize] = entry;
+			if entry.anchor {
+				anchor_i = i;
+				longest = anchor_i + 1;
+			} else if i == longest {
+				longest += 1;
+			}
 		}
-		let mut i = binary_search(&mut sequence, longest, entry);
-		if i < 0 {
-			entry.previous = std::ptr::null_mut();
-		} else {
-			entry.previous = sequence[i as usize];
+
+		/* No common unique lines were found */
+		if longest == 0 {
+			*res = std::ptr::null_mut();
+			return 0;
 		}
-		i += 1;
-		if i <= anchor_i {
-			continue;
+
+		/* Iterate starting at the last element, adjusting the "next" members */
+		let mut e = sequence[(longest - 1) as usize];
+		unsafe {
+			(*e).next = std::ptr::null_mut();
+			while !(*e).previous.is_null() {
+				(*(*e).previous).next = e;
+				e = (*e).previous;
+			}
 		}
-		sequence[i as usize] = entry;
-		if entry.anchor {
-			anchor_i = i;
-			longest = anchor_i + 1;
-		} else if i == longest {
-			longest += 1;
-		}
+		*res = e;
+
+		0
 	}
-
-	/* No common unique lines were found */
-	if longest == 0 {
-		*res = std::ptr::null_mut();
-		return 0;
-	}
-
-	/* Iterate starting at the last element, adjusting the "next" members */
-	let mut e = sequence[(longest - 1) as usize];
-	unsafe {
-		(*e).next = std::ptr::null_mut();
-		while !(*e).previous.is_null() {
-			(*(*e).previous).next = e;
-			e = (*e).previous;
-		}
-	}
-	*res = e;
-
-	0
-}
-
-impl<'a> PatienceContext<'a> {
-
 
 	/*
 	 * This function has to be called for each recursion into the inter-hunk
@@ -386,7 +387,7 @@ impl<'a> PatienceContext<'a> {
 		}
 
 		let mut first = std::ptr::null_mut();
-		result = find_longest_common_sequence(&mut map, &mut first);
+		result = self.find_longest_common_sequence(&mut map, &mut first, range1.clone(), range2.clone());
 		if result != 0 {
 			return result;
 		}
