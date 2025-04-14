@@ -247,18 +247,18 @@ impl<'a> PatienceContext<'a> {
 			let mph = self.lhs.minimal_perfect_hash[i - LINE_SHIFT];
 			let node: &mut Node = &mut map.entries[mph as usize];
 
-			if node.line1 != 0 {
+			if map.bitvec[mph as usize] {
 				node.line2 = NON_UNIQUE;
 				continue;
 			} else {
-				map.entries[mph as usize] = Node {
+				map.bitvec.set(mph as usize, true);
+				*node = Node {
 					line1: i,
 					line2: 0,
 					next: std::ptr::null_mut(),
 					previous: std::ptr::null_mut(),
 					anchor: is_anchor(self.xpp, self.lhs.record[i - LINE_SHIFT].as_ref()),
 				};
-				let node = &mut map.entries[mph as usize];
 				if map.first.is_null() {
 					map.first = node;
 				}
@@ -275,7 +275,7 @@ impl<'a> PatienceContext<'a> {
 			let mph = self.rhs.minimal_perfect_hash[i - LINE_SHIFT];
 			let node: &mut Node = &mut map.entries[mph as usize];
 
-			if node.line1 != 0 {
+			if map.bitvec[mph as usize] {
 				map.has_matches = true;
 				if node.line2 != 0 {
 					node.line2 = NON_UNIQUE;
