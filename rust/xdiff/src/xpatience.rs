@@ -185,22 +185,22 @@ fn find_longest_common_sequence(map: &mut OrderedMap, res: &mut *mut Node) -> i3
      */
 	let mut anchor_i = -1;
 
-	for e in EntryNextIter::new(map.first) {
-		if e.line2 == 0 || e.line2 == NON_UNIQUE {
+	for entry in EntryNextIter::new(map.first) {
+		if entry.line2 == 0 || entry.line2 == NON_UNIQUE {
 			continue;
 		}
-		let mut i = binary_search(&mut sequence, longest, e);
+		let mut i = binary_search(&mut sequence, longest, entry);
 		if i < 0 {
-			e.previous = std::ptr::null_mut();
+			entry.previous = std::ptr::null_mut();
 		} else {
-			e.previous = sequence[i as usize];
+			entry.previous = sequence[i as usize];
 		}
 		i += 1;
 		if i <= anchor_i {
 			continue;
 		}
-		sequence[i as usize] = e;
-		if e.anchor {
+		sequence[i as usize] = entry;
+		if entry.anchor {
 			anchor_i = i;
 			longest = anchor_i + 1;
 		} else if i == longest {
