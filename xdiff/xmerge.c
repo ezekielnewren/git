@@ -22,8 +22,8 @@
 
 #include "xinclude.h"
 
-typedef struct s_xdmerge {
-	struct s_xdmerge *next;
+struct xdmerge {
+	struct xdmerge *next;
 	/*
 	 * 0 = conflict,
 	 * 1 = no conflict, take first,
@@ -45,15 +45,15 @@ typedef struct s_xdmerge {
 	 */
 	long i0;
 	long chg0;
-} xdmerge_t;
+};
 
 
-static int xdl_append_merge(xdmerge_t **merge, int mode,
+static int xdl_append_merge(struct xdmerge **merge, int mode,
 			    long i0, long chg0,
 			    long i1, long chg1,
 			    long i2, long chg2)
 {
-	xdmerge_t *m = *merge;
+	struct xdmerge *m = *merge;
 	if (m && (i1 <= m->i1 + m->chg1 || i2 <= m->i2 + m->chg2)) {
 		if (mode != m->mode)
 			m->mode = 0;
@@ -61,7 +61,7 @@ static int xdl_append_merge(xdmerge_t **merge, int mode,
 		m->chg1 = i1 + chg1 - m->i1;
 		m->chg2 = i2 + chg2 - m->i2;
 	} else {
-		m = xdl_malloc(sizeof(xdmerge_t));
+		m = xdl_malloc(sizeof(struct xdmerge));
 		if (!m)
 			return -1;
 		m->next = NULL;
@@ -79,10 +79,10 @@ static int xdl_append_merge(xdmerge_t **merge, int mode,
 	return 0;
 }
 
-static int xdl_cleanup_merge(xdmerge_t *c)
+static int xdl_cleanup_merge(struct xdmerge *c)
 {
 	int count = 0;
-	xdmerge_t *next_c;
+	struct xdmerge *next_c;
 
 	/* were there conflicts? */
 	for (; c; c = next_c) {
@@ -160,7 +160,7 @@ static i32 is_eol_crlf(struct ivec_xrecord *record, usize i)
 		record->ptr[i - 1].ptr[size - 2] == '\r';
 }
 
-static bool is_cr_needed(struct xd3way *three_way, xdmerge_t *m) {
+static bool is_cr_needed(struct xd3way *three_way, struct xdmerge *m) {
 	/* Match post-images' preceding, or first, lines' end-of-line style */
 	i32 result = is_eol_crlf(&three_way->side1.record, m->i1 ? m->i1 - 1 : 0);
 	if (result)
@@ -177,7 +177,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 			      const char *name2,
 			      const char *name3,
 			      int size, int i, int style,
-			      xdmerge_t *m, char *dest, int marker_size)
+			      struct xdmerge *m, char *dest, int marker_size)
 {
 	int marker1_size = (name1 ? strlen(name1) + 1 : 0);
 	int marker2_size = (name2 ? strlen(name2) + 1 : 0);
@@ -265,7 +265,7 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 				 const char *name2,
 				 const char *ancestor_name,
 				 int favor,
-				 xdmerge_t *m, char *dest, int style,
+				 struct xdmerge *m, char *dest, int style,
 				 int marker_size)
 {
 	int size, i;
@@ -306,7 +306,7 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 /*
  * Remove any common lines from the beginning and end of the conflicted region.
  */
-static void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, xdmerge_t *m) {
+static void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, struct xdmerge *m) {
 	u64 *mph1 = three_way->side1.minimal_perfect_hash.ptr;
 	u64 *mph2 = three_way->side2.minimal_perfect_hash.ptr;
 	for (; m; m = m->next) {
@@ -332,7 +332,7 @@ static void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, xdmerge_t *m) 
  * Sometimes, changes are not quite identical, but differ in only a few
  * lines. Try hard to show only these few lines as conflicting.
  */
-static int xdl_refine_conflicts(struct xd3way *three_way, xdmerge_t *m, xpparam_t const *xpp) {
+static int xdl_refine_conflicts(struct xd3way *three_way, struct xdmerge *m, xpparam_t const *xpp) {
 	for (; m; m = m->next) {
 		struct xd2way two_way;
 		struct xdchange *xscr, *x;
@@ -374,7 +374,7 @@ static int xdl_refine_conflicts(struct xd3way *three_way, xdmerge_t *m, xpparam_
 		m->i2 = xscr->i2 + i2;
 		m->chg2 = xscr->chg2;
 		while (xscr->next) {
-			xdmerge_t *m2 = xdl_malloc(sizeof(xdmerge_t));
+			struct xdmerge *m2 = xdl_malloc(sizeof(struct xdmerge));
 			if (!m2) {
 				xdl_2way_free(&two_way);
 				xdl_free_script(x);
@@ -417,9 +417,9 @@ static int lines_contain_alnum(struct xdpair *pair, int i, int chg)
  * This function merges m and m->next, marking everything between those hunks
  * as conflicting, too.
  */
-static void xdl_merge_two_conflicts(xdmerge_t *m)
+static void xdl_merge_two_conflicts(struct xdmerge *m)
 {
-	xdmerge_t *next_m = m->next;
+	struct xdmerge *next_m = m->next;
 	m->chg1 = next_m->i1 + next_m->chg1 - m->i1;
 	m->chg2 = next_m->i2 + next_m->chg2 - m->i2;
 	m->next = next_m->next;
@@ -431,7 +431,7 @@ static void xdl_merge_two_conflicts(xdmerge_t *m)
  * it appears simpler -- because it takes up less (or as many) lines --
  * if the lines are moved into the conflicts.
  */
-static int xdl_simplify_non_conflicts(struct xdpair *pair1, xdmerge_t *m,
+static int xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
 				      int simplify_if_no_alnum)
 {
 	int result = 0;
@@ -439,7 +439,7 @@ static int xdl_simplify_non_conflicts(struct xdpair *pair1, xdmerge_t *m,
 	if (!m)
 		return result;
 	for (;;) {
-		xdmerge_t *next_m = m->next;
+		struct xdmerge *next_m = m->next;
 		int begin, end;
 
 		if (!next_m)
@@ -473,7 +473,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		struct xdchange *xscr2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
-	xdmerge_t *changes, *c;
+	struct xdmerge *changes, *c;
 	xpparam_t const *xpp = &xmp->xpp;
 	const char *const ancestor_name = xmp->ancestor;
 	const char *const name1 = xmp->file1;
