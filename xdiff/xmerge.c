@@ -104,8 +104,8 @@ static bool xdl_merge_cmp_lines(struct xd3way *three_way, usize i1, usize i2, us
 	return true;
 }
 
-static int xdl_recs_copy(struct ivec_xrecord *record, int off, int count, int needs_cr, int add_nl, char *dest) {
-	int size = 0;
+static usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, bool needs_cr, bool add_nl, char *dest) {
+	usize size = 0;
 
 	if (count < 1)
 		return 0;
@@ -136,7 +136,7 @@ static int xdl_recs_copy(struct ivec_xrecord *record, int off, int count, int ne
  * has no eol, the preceding line, if any), 0 if it ends in LF-only, and
  * -1 if the line ending cannot be determined.
  */
-static bool is_eol_crlf(struct ivec_xrecord *record, usize i)
+static i32 is_eol_crlf(struct ivec_xrecord *record, usize i)
 {
 	usize size;
 
@@ -160,19 +160,16 @@ static bool is_eol_crlf(struct ivec_xrecord *record, usize i)
 		record->ptr[i - 1].ptr[size - 2] == '\r';
 }
 
-static int is_cr_needed(struct xd3way *three_way, xdmerge_t *m)
-{
-	int needs_cr;
-
+static bool is_cr_needed(struct xd3way *three_way, xdmerge_t *m) {
 	/* Match post-images' preceding, or first, lines' end-of-line style */
-	needs_cr = is_eol_crlf(&three_way->side1.record, m->i1 ? m->i1 - 1 : 0);
-	if (needs_cr)
-		needs_cr = is_eol_crlf(&three_way->side2.record, m->i2 ? m->i2 - 1 : 0);
+	i32 result = is_eol_crlf(&three_way->side1.record, m->i1 ? m->i1 - 1 : 0);
+	if (result)
+		result = is_eol_crlf(&three_way->side2.record, m->i2 ? m->i2 - 1 : 0);
 	/* Look at pre-image's first line, unless we already settled on LF */
-	if (needs_cr)
-		needs_cr = is_eol_crlf(&three_way->base.record, 0);
+	if (result)
+		result = is_eol_crlf(&three_way->base.record, 0);
 	/* If still undecided, use LF-only */
-	return needs_cr < 0 ? 0 : needs_cr;
+	return result < 0 ? false : result != 0;
 }
 
 static int fill_conflict_hunk(struct xd3way *three_way,
@@ -185,13 +182,13 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 	int marker1_size = (name1 ? strlen(name1) + 1 : 0);
 	int marker2_size = (name2 ? strlen(name2) + 1 : 0);
 	int marker3_size = (name3 ? strlen(name3) + 1 : 0);
-	int needs_cr = is_cr_needed(three_way, m);
+	bool needs_cr = is_cr_needed(three_way, m);
 
 	if (marker_size <= 0)
 		marker_size = DEFAULT_CONFLICT_MARKER_SIZE;
 
 	/* Before conflicting part */
-	size += xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, 0, 0,
+	size += xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, false, false,
 			      dest ? dest + size : NULL);
 
 	if (!dest) {
@@ -210,7 +207,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 	}
 
 	/* Postimage from side #1 */
-	size += xdl_recs_copy(&three_way->side1.record, m->i1, m->chg1, needs_cr, 1,
+	size += xdl_recs_copy(&three_way->side1.record, m->i1, m->chg1, needs_cr, true,
 			      dest ? dest + size : NULL);
 
 	if (style == XDL_MERGE_DIFF3 || style == XDL_MERGE_ZEALOUS_DIFF3) {
@@ -229,7 +226,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 				dest[size++] = '\r';
 			dest[size++] = '\n';
 		}
-		size += xdl_recs_copy(&three_way->base.record, m->i0, m->chg0, needs_cr, 1,
+		size += xdl_recs_copy(&three_way->base.record, m->i0, m->chg0, needs_cr, true,
 				      dest ? dest + size : NULL);
 	}
 
@@ -244,7 +241,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 	}
 
 	/* Postimage from side #2 */
-	size += xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, needs_cr, 1,
+	size += xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, needs_cr, true,
 			      dest ? dest + size : NULL);
 	if (!dest) {
 		size += marker_size + 1 + needs_cr + marker2_size;
@@ -284,7 +281,7 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 						  marker_size);
 		else if (m->mode & 3) {
 			/* Before conflicting part */
-			size += xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, 0, 0,
+			size += xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, false, false,
 					      dest ? dest + size : NULL);
 			/* Postimage from side #1 */
 			if (m->mode & 1) {
@@ -295,13 +292,13 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 			}
 			/* Postimage from side #2 */
 			if (m->mode & 2)
-				size += xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, 0, 0,
+				size += xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, false, false,
 						      dest ? dest + size : NULL);
 		} else
 			continue;
 		i = m->i1 + m->chg1;
 	}
-	size += xdl_recs_copy(&three_way->side1.record, i, three_way->side1.record.length - i, 0, 0,
+	size += xdl_recs_copy(&three_way->side1.record, i, three_way->side1.record.length - i, false, false,
 			      dest ? dest + size : NULL);
 	return size;
 }
