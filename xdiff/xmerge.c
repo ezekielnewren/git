@@ -275,8 +275,9 @@ static int fill_conflict_hunk(struct xdpair *pair1, const char *name1,
 	return size;
 }
 
-static int xdl_fill_merge_buffer(struct xdpair *pair1, const char *name1,
-				 struct xdpair *pair2, const char *name2,
+static int xdl_fill_merge_buffer(struct xd3way *three_way,
+				 const char *name1,
+				 const char *name2,
 				 const char *ancestor_name,
 				 int favor,
 				 xdmerge_t *m, char *dest, int style,
@@ -289,30 +290,30 @@ static int xdl_fill_merge_buffer(struct xdpair *pair1, const char *name1,
 			m->mode = favor;
 
 		if (m->mode == 0)
-			size = fill_conflict_hunk(pair1, name1, pair2, name2,
+			size = fill_conflict_hunk(&three_way->pair1, name1, &three_way->pair2, name2,
 						  ancestor_name,
 						  size, i, style, m, dest,
 						  marker_size);
 		else if (m->mode & 3) {
 			/* Before conflicting part */
-			size += xdl_recs_copy(pair1, i, m->i1 - i, 0, 0,
+			size += xdl_recs_copy(&three_way->pair1, i, m->i1 - i, 0, 0,
 					      dest ? dest + size : NULL);
 			/* Postimage from side #1 */
 			if (m->mode & 1) {
-				int needs_cr = is_cr_needed(pair1, pair2, m);
+				int needs_cr = is_cr_needed(&three_way->pair1, &three_way->pair2, m);
 
-				size += xdl_recs_copy(pair1, m->i1, m->chg1, needs_cr, (m->mode & 2),
+				size += xdl_recs_copy(&three_way->pair1, m->i1, m->chg1, needs_cr, (m->mode & 2),
 						      dest ? dest + size : NULL);
 			}
 			/* Postimage from side #2 */
 			if (m->mode & 2)
-				size += xdl_recs_copy(pair2, m->i2, m->chg2, 0, 0,
+				size += xdl_recs_copy(&three_way->pair2, m->i2, m->chg2, 0, 0,
 						      dest ? dest + size : NULL);
 		} else
 			continue;
 		i = m->i1 + m->chg1;
 	}
-	size += xdl_recs_copy(pair1, i, pair1->rhs.record->length - i, 0, 0,
+	size += xdl_recs_copy(&three_way->pair1, i, three_way->pair1.rhs.record->length - i, 0, 0,
 			      dest ? dest + size : NULL);
 	return size;
 }
@@ -645,7 +646,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 	/* output */
 	if (result) {
 		int marker_size = xmp->marker_size;
-		int size = xdl_fill_merge_buffer(&three_way->pair1, name1, &three_way->pair2, name2,
+		int size = xdl_fill_merge_buffer(three_way, name1, name2,
 						 ancestor_name,
 						 favor, changes, NULL, style,
 						 marker_size);
@@ -655,7 +656,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 			return -1;
 		}
 		result->size = size;
-		xdl_fill_merge_buffer(&three_way->pair1, name1, &three_way->pair2, name2,
+		xdl_fill_merge_buffer(three_way, name1, name2,
 				      ancestor_name, favor, changes,
 				      result->ptr, style, marker_size);
 	}
