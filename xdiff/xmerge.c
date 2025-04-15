@@ -149,47 +149,48 @@ static int xdl_orig_copy(struct xdpair *pair, int i, int count, int needs_cr, in
  * has no eol, the preceding line, if any), 0 if it ends in LF-only, and
  * -1 if the line ending cannot be determined.
  */
-static int is_eol_crlf(struct xd_file_context *ctx, usize i)
+static bool is_eol_crlf(struct ivec_xrecord *record, usize i)
 {
-	long size;
+	usize size;
 
-	if (i + 1 < ctx->record->length)
+	if (i + 1 < record->length)
 		/* All lines before the last *must* end in LF */
-		return (size = ctx->record->ptr[i].size) > 1 &&
-			ctx->record->ptr[i].ptr[size - 2] == '\r';
-	if (!ctx->record->length)
+		return (size = record->ptr[i].size) > 1 &&
+			record->ptr[i].ptr[size - 2] == '\r';
+	if (!record->length)
 		/* Cannot determine eol style from empty file */
 		return -1;
-	if ((size = ctx->record->ptr[i].size) &&
-			ctx->record->ptr[i].ptr[size - 1] == '\n')
+	if ((size = record->ptr[i].size) &&
+			record->ptr[i].ptr[size - 1] == '\n')
 		/* Last line; ends in LF; Is it CR/LF? */
 		return size > 1 &&
-			ctx->record->ptr[i].ptr[size - 2] == '\r';
+			record->ptr[i].ptr[size - 2] == '\r';
 	if (!i)
 		/* The only line has no eol */
 		return -1;
 	/* Determine eol from second-to-last line */
-	return (size = ctx->record->ptr[i - 1].size) > 1 &&
-		ctx->record->ptr[i - 1].ptr[size - 2] == '\r';
+	return (size = record->ptr[i - 1].size) > 1 &&
+		record->ptr[i - 1].ptr[size - 2] == '\r';
 }
 
-static int is_cr_needed(struct xdpair *pair1, struct xdpair *pair2, xdmerge_t *m)
+static int is_cr_needed(struct xd3way *three_way, xdmerge_t *m)
 {
 	int needs_cr;
 
 	/* Match post-images' preceding, or first, lines' end-of-line style */
-	needs_cr = is_eol_crlf(&pair1->rhs, m->i1 ? m->i1 - 1 : 0);
+	needs_cr = is_eol_crlf(&three_way->side1.record, m->i1 ? m->i1 - 1 : 0);
 	if (needs_cr)
-		needs_cr = is_eol_crlf(&pair2->rhs, m->i2 ? m->i2 - 1 : 0);
+		needs_cr = is_eol_crlf(&three_way->side2.record, m->i2 ? m->i2 - 1 : 0);
 	/* Look at pre-image's first line, unless we already settled on LF */
 	if (needs_cr)
-		needs_cr = is_eol_crlf(&pair1->lhs, 0);
+		needs_cr = is_eol_crlf(&three_way->base.record, 0);
 	/* If still undecided, use LF-only */
 	return needs_cr < 0 ? 0 : needs_cr;
 }
 
-static int fill_conflict_hunk(struct xdpair *pair1, const char *name1,
-			      struct xdpair *pair2, const char *name2,
+static int fill_conflict_hunk(struct xd3way *three_way,
+			      const char *name1,
+			      const char *name2,
 			      const char *name3,
 			      int size, int i, int style,
 			      xdmerge_t *m, char *dest, int marker_size)
@@ -197,13 +198,13 @@ static int fill_conflict_hunk(struct xdpair *pair1, const char *name1,
 	int marker1_size = (name1 ? strlen(name1) + 1 : 0);
 	int marker2_size = (name2 ? strlen(name2) + 1 : 0);
 	int marker3_size = (name3 ? strlen(name3) + 1 : 0);
-	int needs_cr = is_cr_needed(pair1, pair2, m);
+	int needs_cr = is_cr_needed(three_way, m);
 
 	if (marker_size <= 0)
 		marker_size = DEFAULT_CONFLICT_MARKER_SIZE;
 
 	/* Before conflicting part */
-	size += xdl_recs_copy(pair1, i, m->i1 - i, 0, 0,
+	size += xdl_recs_copy(&three_way->pair1, i, m->i1 - i, 0, 0,
 			      dest ? dest + size : NULL);
 
 	if (!dest) {
@@ -222,7 +223,7 @@ static int fill_conflict_hunk(struct xdpair *pair1, const char *name1,
 	}
 
 	/* Postimage from side #1 */
-	size += xdl_recs_copy(pair1, m->i1, m->chg1, needs_cr, 1,
+	size += xdl_recs_copy(&three_way->pair1, m->i1, m->chg1, needs_cr, 1,
 			      dest ? dest + size : NULL);
 
 	if (style == XDL_MERGE_DIFF3 || style == XDL_MERGE_ZEALOUS_DIFF3) {
@@ -241,7 +242,7 @@ static int fill_conflict_hunk(struct xdpair *pair1, const char *name1,
 				dest[size++] = '\r';
 			dest[size++] = '\n';
 		}
-		size += xdl_orig_copy(pair1, m->i0, m->chg0, needs_cr, 1,
+		size += xdl_orig_copy(&three_way->pair1, m->i0, m->chg0, needs_cr, 1,
 				      dest ? dest + size : NULL);
 	}
 
@@ -256,7 +257,7 @@ static int fill_conflict_hunk(struct xdpair *pair1, const char *name1,
 	}
 
 	/* Postimage from side #2 */
-	size += xdl_recs_copy(pair2, m->i2, m->chg2, needs_cr, 1,
+	size += xdl_recs_copy(&three_way->pair2, m->i2, m->chg2, needs_cr, 1,
 			      dest ? dest + size : NULL);
 	if (!dest) {
 		size += marker_size + 1 + needs_cr + marker2_size;
@@ -290,7 +291,7 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 			m->mode = favor;
 
 		if (m->mode == 0)
-			size = fill_conflict_hunk(&three_way->pair1, name1, &three_way->pair2, name2,
+			size = fill_conflict_hunk(three_way, name1, name2,
 						  ancestor_name,
 						  size, i, style, m, dest,
 						  marker_size);
@@ -300,7 +301,7 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 					      dest ? dest + size : NULL);
 			/* Postimage from side #1 */
 			if (m->mode & 1) {
-				int needs_cr = is_cr_needed(&three_way->pair1, &three_way->pair2, m);
+				int needs_cr = is_cr_needed(three_way, m);
 
 				size += xdl_recs_copy(&three_way->pair1, m->i1, m->chg1, needs_cr, (m->mode & 2),
 						      dest ? dest + size : NULL);
