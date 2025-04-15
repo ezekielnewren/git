@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types)]
 
+use std::cmp::Ordering;
 use std::ops::Range;
 use bitvec::prelude::*;
 use crate::xdiff::*;
@@ -142,7 +143,7 @@ impl<'a> PatienceContext<'a> {
 	 * element (in terms of line2).
 	 */
 	fn find_longest_common_sequence(&mut self, map: &mut OrderedMap, res: &mut *mut Node) -> i32 {
-		let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.mph2entry.len()];
+		let mut sequence: Vec<*mut Node> = Vec::new();
 
 		let mut longest = 0isize;
 
@@ -167,7 +168,11 @@ impl<'a> PatienceContext<'a> {
 			if i <= anchor_i {
 				continue;
 			}
-			sequence[i as usize] = entry;
+			match (i as usize).cmp(&sequence.len()) {
+				Ordering::Less => sequence[i as usize] = entry,
+				Ordering::Equal => sequence.push(entry),
+				Ordering::Greater => panic!("i is out of bounds"),
+			}
 			if entry.anchor {
 				anchor_i = i;
 				longest = anchor_i + 1;
