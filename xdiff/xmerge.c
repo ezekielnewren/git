@@ -104,22 +104,18 @@ static bool xdl_merge_cmp_lines(struct xd3way *three_way, usize i1, usize i2, us
 	return true;
 }
 
-static int xdl_recs_copy_0(int use_orig, struct xdpair *pair, int i, int count, int needs_cr, int add_nl, char *dest)
-{
-	struct xrecord *recs;
+static int xdl_recs_copy(struct ivec_xrecord *record, int off, int count, int needs_cr, int add_nl, char *dest) {
 	int size = 0;
-
-	recs = (use_orig ? pair->lhs.record->ptr : pair->rhs.record->ptr) + i;
 
 	if (count < 1)
 		return 0;
 
-	for (i = 0; i < count; size += recs[i++].size)
+	for (usize i = 0; i < count; size += record->ptr[off + i++].size)
 		if (dest)
-			memcpy(dest + size, recs[i].ptr, recs[i].size);
+			memcpy(dest + size, record->ptr[off + i].ptr, record->ptr[off + i].size);
 	if (add_nl) {
-		i = recs[count - 1].size;
-		if (i == 0 || recs[count - 1].ptr[i - 1] != '\n') {
+		usize i = record->ptr[off + count - 1].size;
+		if (i == 0 || record->ptr[off + count - 1].ptr[i - 1] != '\n') {
 			if (needs_cr) {
 				if (dest)
 					dest[size] = '\r';
@@ -134,15 +130,6 @@ static int xdl_recs_copy_0(int use_orig, struct xdpair *pair, int i, int count, 
 	return size;
 }
 
-static int xdl_recs_copy(struct xdpair *pair, int i, int count, int needs_cr, int add_nl, char *dest)
-{
-	return xdl_recs_copy_0(0, pair, i, count, needs_cr, add_nl, dest);
-}
-
-static int xdl_orig_copy(struct xdpair *pair, int i, int count, int needs_cr, int add_nl, char *dest)
-{
-	return xdl_recs_copy_0(1, pair, i, count, needs_cr, add_nl, dest);
-}
 
 /*
  * Returns 1 if the i'th line ends in CR/LF (if it is the last line and
@@ -204,7 +191,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 		marker_size = DEFAULT_CONFLICT_MARKER_SIZE;
 
 	/* Before conflicting part */
-	size += xdl_recs_copy(&three_way->pair1, i, m->i1 - i, 0, 0,
+	size += xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, 0, 0,
 			      dest ? dest + size : NULL);
 
 	if (!dest) {
@@ -223,7 +210,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 	}
 
 	/* Postimage from side #1 */
-	size += xdl_recs_copy(&three_way->pair1, m->i1, m->chg1, needs_cr, 1,
+	size += xdl_recs_copy(&three_way->side1.record, m->i1, m->chg1, needs_cr, 1,
 			      dest ? dest + size : NULL);
 
 	if (style == XDL_MERGE_DIFF3 || style == XDL_MERGE_ZEALOUS_DIFF3) {
@@ -242,7 +229,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 				dest[size++] = '\r';
 			dest[size++] = '\n';
 		}
-		size += xdl_orig_copy(&three_way->pair1, m->i0, m->chg0, needs_cr, 1,
+		size += xdl_recs_copy(&three_way->base.record, m->i0, m->chg0, needs_cr, 1,
 				      dest ? dest + size : NULL);
 	}
 
@@ -257,7 +244,7 @@ static int fill_conflict_hunk(struct xd3way *three_way,
 	}
 
 	/* Postimage from side #2 */
-	size += xdl_recs_copy(&three_way->pair2, m->i2, m->chg2, needs_cr, 1,
+	size += xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, needs_cr, 1,
 			      dest ? dest + size : NULL);
 	if (!dest) {
 		size += marker_size + 1 + needs_cr + marker2_size;
@@ -297,24 +284,24 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 						  marker_size);
 		else if (m->mode & 3) {
 			/* Before conflicting part */
-			size += xdl_recs_copy(&three_way->pair1, i, m->i1 - i, 0, 0,
+			size += xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, 0, 0,
 					      dest ? dest + size : NULL);
 			/* Postimage from side #1 */
 			if (m->mode & 1) {
 				int needs_cr = is_cr_needed(three_way, m);
 
-				size += xdl_recs_copy(&three_way->pair1, m->i1, m->chg1, needs_cr, (m->mode & 2),
+				size += xdl_recs_copy(&three_way->side1.record, m->i1, m->chg1, needs_cr, (m->mode & 2),
 						      dest ? dest + size : NULL);
 			}
 			/* Postimage from side #2 */
 			if (m->mode & 2)
-				size += xdl_recs_copy(&three_way->pair2, m->i2, m->chg2, 0, 0,
+				size += xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, 0, 0,
 						      dest ? dest + size : NULL);
 		} else
 			continue;
 		i = m->i1 + m->chg1;
 	}
-	size += xdl_recs_copy(&three_way->pair1, i, three_way->pair1.rhs.record->length - i, 0, 0,
+	size += xdl_recs_copy(&three_way->side1.record, i, three_way->side1.record.length - i, 0, 0,
 			      dest ? dest + size : NULL);
 	return size;
 }
