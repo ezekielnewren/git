@@ -325,25 +325,22 @@ static int xdl_fill_merge_buffer(struct xdpair *pair1, const char *name1,
 /*
  * Remove any common lines from the beginning and end of the conflicted region.
  */
-static void xdl_refine_zdiff3_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdmerge_t *m,
-		xpparam_t const *xpp)
-{
-	struct xrecord *rec1 = pair1->rhs.record->ptr, *rec2 = pair2->rhs.record->ptr;
+static void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, xdmerge_t *m) {
+	u64 *mph1 = three_way->side1.minimal_perfect_hash.ptr;
+	u64 *mph2 = three_way->side2.minimal_perfect_hash.ptr;
 	for (; m; m = m->next) {
 		/* let's handle just the conflicts */
-		if (m->mode)
+		if (m->mode) {
 			continue;
+		}
 
-		while(m->chg1 && m->chg2 &&
-		      recmatch(&rec1[m->i1], &rec2[m->i2], xpp->flags)) {
+		while (m->chg1 && m->chg2 && mph1[m->i1] == mph2[m->i2]) {
 			m->chg1--;
 			m->chg2--;
 			m->i1++;
 			m->i2++;
 		}
-		while (m->chg1 && m->chg2 &&
-		       recmatch(&rec1[m->i1 + m->chg1 - 1],
-				&rec2[m->i2 + m->chg2 - 1], xpp->flags)) {
+		while (m->chg1 && m->chg2 && mph1[m->i1 + m->chg1 - 1] == mph2[m->i2 + m->chg2 - 1]) {
 			m->chg1--;
 			m->chg2--;
 		}
@@ -644,7 +641,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		changes = c;
 	/* refine conflicts */
 	if (style == XDL_MERGE_ZEALOUS_DIFF3) {
-		xdl_refine_zdiff3_conflicts(&three_way->pair1, &three_way->pair2, changes, xpp);
+		xdl_refine_zdiff3_conflicts(three_way, changes);
 	} else if (XDL_MERGE_ZEALOUS <= level &&
 		   (xdl_refine_conflicts(&three_way->pair1, &three_way->pair2, changes, xpp) < 0 ||
 		    xdl_simplify_non_conflicts(&three_way->pair1, changes,
