@@ -84,39 +84,26 @@ impl<'a> Iterator for EntryNextIter<'a> {
  */
 struct OrderedMap {
 	bitvec: BitVec,
-	entries: Vec<Node>,
+	mph2entry: Vec<usize>,
+	entry: Vec<Node>,
 	first: *mut Node,
     last: *mut Node,
 	/* were common records found? */
 	has_matches: bool,
 }
 
-impl Drop for OrderedMap {
-	fn drop(&mut self) {
-		if std::mem::needs_drop::<Self>() {
-			for i in self.bitvec.iter_ones() {
-				unsafe {
-					std::ptr::drop_in_place(&mut self.entries[i])
-				}
-			}
-		}
-		unsafe {
-			self.entries.set_len(0);
-		}
-	}
-}
-
 impl OrderedMap {
 	fn new(capacity: usize) -> Self {
 		let mut it = Self {
 			bitvec: bitvec![0; capacity],
-			entries: Vec::with_capacity(capacity),
+			mph2entry: Vec::with_capacity(capacity),
+			entry: Vec::with_capacity(capacity),
 			first: std::ptr::null_mut(),
 			last: std::ptr::null_mut(),
 			has_matches: false,
 		};
 		unsafe {
-			it.entries.set_len(it.entries.capacity());
+			it.mph2entry.set_len(it.mph2entry.capacity());
 		}
 		it
 	}
@@ -184,7 +171,7 @@ impl<'a> PatienceContext<'a> {
 	 * element (in terms of line2).
 	 */
 	fn find_longest_common_sequence(&mut self, map: &mut OrderedMap, res: &mut *mut Node, range1: Range<usize>, range2: Range<usize>) -> i32 {
-		let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.entries.len()];
+		let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.mph2entry.len()];
 
 		let mut longest = 0isize;
 
@@ -251,23 +238,22 @@ impl<'a> PatienceContext<'a> {
 	) -> i32 {
 		/* First, fill with entries from the first file */
 		for i in range1 {
-			let mph = self.lhs.minimal_perfect_hash[i - LINE_SHIFT];
-			let node: &mut Node = &mut map.entries[mph as usize];
-
-			if map.bitvec[mph as usize] {
+			let mph = self.lhs.minimal_perfect_hash[i - LINE_SHIFT] as usize;
+			if map.bitvec[mph] {
+				let node = &mut map.entry[map.mph2entry[mph]];
 				node.line2 = NON_UNIQUE;
 				continue;
 			} else {
-				map.bitvec.set(mph as usize, true);
-				unsafe {
-					std::ptr::write(node, Node {
-						line1: i,
-						line2: 0,
-						next: std::ptr::null_mut(),
-						previous: std::ptr::null_mut(),
-						anchor: is_anchor(self.xpp, self.lhs.record[i - LINE_SHIFT].as_ref()),
-					});
-				}
+				map.bitvec.set(mph, true);
+				map.mph2entry[mph] = map.entry.len();
+				map.entry.push(Node {
+					line1: i,
+					line2: 0,
+					next: std::ptr::null_mut(),
+					previous: std::ptr::null_mut(),
+					anchor: is_anchor(self.xpp, self.lhs.record[i - LINE_SHIFT].as_ref()),
+				});
+				let node = &mut map.entry[map.mph2entry[mph]];
 				if map.first.is_null() {
 					map.first = node;
 				}
@@ -281,10 +267,10 @@ impl<'a> PatienceContext<'a> {
 
 		/* Then search for matches in the second file */
 		for i in range2 {
-			let mph = self.rhs.minimal_perfect_hash[i - LINE_SHIFT];
-			let node: &mut Node = &mut map.entries[mph as usize];
+			let mph = self.rhs.minimal_perfect_hash[i - LINE_SHIFT] as usize;
 
-			if map.bitvec[mph as usize] {
+			if map.bitvec[mph] {
+				let node: &mut Node = &mut map.entry[map.mph2entry[mph]];
 				map.has_matches = true;
 				if node.line2 != 0 {
 					node.line2 = NON_UNIQUE;
@@ -292,7 +278,6 @@ impl<'a> PatienceContext<'a> {
 					node.line2 = i;
 				}
 			}
-			continue;
 		}
 
 		0
