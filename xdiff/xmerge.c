@@ -94,7 +94,7 @@ static int xdl_cleanup_merge(struct xdmerge *c)
 	return count;
 }
 
-static bool xdl_merge_cmp_lines(struct xd3way *three_way, usize i1, usize i2, usize line_count) {
+static bool xdl_merge_lines_equal(struct xd3way *three_way, usize i1, usize i2, usize line_count) {
 	for (usize i = 0; i < line_count; i++) {
 		u64 mph1 = three_way->side1.minimal_perfect_hash.ptr[i1 + i];
 		u64 mph2 = three_way->side2.minimal_perfect_hash.ptr[i2 + i];
@@ -545,7 +545,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		if (level == XDL_MERGE_MINIMAL || xscr1->i1 != xscr2->i1 ||
 				xscr1->chg1 != xscr2->chg1 ||
 				xscr1->chg2 != xscr2->chg2 ||
-				!xdl_merge_cmp_lines(three_way,
+				!xdl_merge_lines_equal(three_way,
 					xscr1->i2, xscr2->i2,
 					xscr1->chg2)) {
 			/* conflict */
