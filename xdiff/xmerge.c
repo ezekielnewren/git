@@ -351,9 +351,7 @@ static void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, xdmerge_t *m) 
  * Sometimes, changes are not quite identical, but differ in only a few
  * lines. Try hard to show only these few lines as conflicting.
  */
-static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdmerge_t *m,
-		xpparam_t const *xpp)
-{
+static int xdl_refine_conflicts(struct xd3way *three_way, xdmerge_t *m, xpparam_t const *xpp) {
 	for (; m; m = m->next) {
 		struct xd2way two_way;
 		struct xdchange *xscr, *x;
@@ -374,7 +372,7 @@ static int xdl_refine_conflicts(struct xdpair *pair1, struct xdpair *pair2, xdme
 		range2.start = m->i2;
 		range2.end = m->i2 + m->chg2;
 
-		xdl_2way_slice(&pair1->rhs, range1, &pair2->rhs, range2, pair2->minimal_perfect_hash_size, &two_way);
+		xdl_2way_slice(&three_way->pair1.rhs, range1, &three_way->pair2.rhs, range2, three_way->minimal_perfect_hash_size, &two_way);
 		if (xdl_do_diff(xpp, &two_way.pair) < 0)
 			return -1;
 		if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
@@ -643,7 +641,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 	if (style == XDL_MERGE_ZEALOUS_DIFF3) {
 		xdl_refine_zdiff3_conflicts(three_way, changes);
 	} else if (XDL_MERGE_ZEALOUS <= level &&
-		   (xdl_refine_conflicts(&three_way->pair1, &three_way->pair2, changes, xpp) < 0 ||
+		   (xdl_refine_conflicts(three_way, changes, xpp) < 0 ||
 		    xdl_simplify_non_conflicts(&three_way->pair1, changes,
 					       XDL_MERGE_ZEALOUS < level) < 0)) {
 		xdl_cleanup_merge(changes);
