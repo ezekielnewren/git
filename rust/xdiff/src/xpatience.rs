@@ -1,7 +1,5 @@
 #![allow(non_camel_case_types)]
 
-use std::alloc::Layout;
-use std::marker::PhantomData;
 use std::ops::Range;
 use bitvec::prelude::*;
 use crate::xdiff::*;
@@ -49,33 +47,6 @@ impl Default for Node {
 }
 
 
-struct EntryNextIter<'a> {
-    cur: *mut Node,
-    _marker: PhantomData<&'a Node>,
-}
-
-impl<'a> EntryNextIter<'a> {
-    fn new(start: *mut Node) -> Self {
-        Self {
-            cur: start,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'a> Iterator for EntryNextIter<'a> {
-    type Item = &'a mut Node;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.cur.is_null() {
-            return None;
-        }
-
-        let t = self.cur;
-        self.cur = unsafe { (*self.cur).next };
-        Some(unsafe { &mut *t })
-    }
-}
 
 
 /*
@@ -182,7 +153,7 @@ impl<'a> PatienceContext<'a> {
          */
 		let mut anchor_i = -1;
 
-		for entry in EntryNextIter::new(map.first) {
+		for entry in map.entry.iter_mut() {
 			if entry.line2 == 0 || entry.line2 == NON_UNIQUE {
 				continue;
 			}
