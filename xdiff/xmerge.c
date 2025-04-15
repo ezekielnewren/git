@@ -99,19 +99,14 @@ static int xdl_cleanup_merge(xdmerge_t *c)
 	return count;
 }
 
-static int xdl_merge_cmp_lines(struct xdpair *pair1, int i1, struct xdpair *pair2, int i2,
-		int line_count, long flags)
-{
-	int i;
-	struct xrecord *rec1 = &pair1->rhs.record->ptr[i1];
-	struct xrecord *rec2 = &pair2->rhs.record->ptr[i2];
-
-	for (i = 0; i < line_count; i++) {
-		int result = recmatch(&rec1[i], &rec2[i], flags);
-		if (!result)
-			return -1;
+static bool xdl_merge_cmp_lines(struct xd3way *three_way, usize i1, usize i2, usize line_count) {
+	for (usize i = 0; i < line_count; i++) {
+		u64 mph1 = three_way->side1.minimal_perfect_hash.ptr[i1 + i];
+		u64 mph2 = three_way->side2.minimal_perfect_hash.ptr[i2 + i];
+		if (mph1 != mph2)
+			return false;
 	}
-	return 0;
+	return true;
 }
 
 static int xdl_recs_copy_0(int use_orig, struct xdpair *pair, int i, int count, int needs_cr, int add_nl, char *dest)
@@ -498,8 +493,8 @@ static int xdl_simplify_non_conflicts(struct xdpair *pair1, xdmerge_t *m,
  *
  * returns < 0 on error, == 0 for no conflicts, else number of conflicts
  */
-static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
-		struct xdpair *pair2, struct xdchange *xscr2,
+static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
+		struct xdchange *xscr2,
 		xmparam_t const *xmp, mmbuffer_t *result)
 {
 	xdmerge_t *changes, *c;
@@ -574,9 +569,9 @@ static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
 		if (level == XDL_MERGE_MINIMAL || xscr1->i1 != xscr2->i1 ||
 				xscr1->chg1 != xscr2->chg1 ||
 				xscr1->chg2 != xscr2->chg2 ||
-				xdl_merge_cmp_lines(pair1, xscr1->i2,
-					pair2, xscr2->i2,
-					xscr1->chg2, xpp->flags)) {
+				!xdl_merge_cmp_lines(three_way,
+					xscr1->i2, xscr2->i2,
+					xscr1->chg2)) {
 			/* conflict */
 			int off = xscr1->i1 - xscr2->i1;
 			int ffo = off + xscr1->chg1 - xscr2->chg1;
@@ -618,7 +613,7 @@ static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
 			changes = c;
 		i0 = xscr1->i1;
 		i1 = xscr1->i2;
-		i2 = xscr1->i1 + pair2->rhs.record->length - pair2->lhs.record->length;
+		i2 = xscr1->i1 + three_way->side2.record.length - three_way->base.record.length;
 		chg0 = xscr1->chg1;
 		chg1 = xscr1->chg2;
 		chg2 = xscr1->chg1;
@@ -633,7 +628,7 @@ static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
 		if (!changes)
 			changes = c;
 		i0 = xscr2->i1;
-		i1 = xscr2->i1 + pair1->rhs.record->length - pair1->lhs.record->length;
+		i1 = xscr2->i1 + three_way->side1.record.length - three_way->base.record.length;
 		i2 = xscr2->i2;
 		chg0 = xscr2->chg1;
 		chg1 = xscr2->chg1;
@@ -649,10 +644,10 @@ static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
 		changes = c;
 	/* refine conflicts */
 	if (style == XDL_MERGE_ZEALOUS_DIFF3) {
-		xdl_refine_zdiff3_conflicts(pair1, pair2, changes, xpp);
+		xdl_refine_zdiff3_conflicts(&three_way->pair1, &three_way->pair2, changes, xpp);
 	} else if (XDL_MERGE_ZEALOUS <= level &&
-		   (xdl_refine_conflicts(pair1, pair2, changes, xpp) < 0 ||
-		    xdl_simplify_non_conflicts(pair1, changes,
+		   (xdl_refine_conflicts(&three_way->pair1, &three_way->pair2, changes, xpp) < 0 ||
+		    xdl_simplify_non_conflicts(&three_way->pair1, changes,
 					       XDL_MERGE_ZEALOUS < level) < 0)) {
 		xdl_cleanup_merge(changes);
 		return -1;
@@ -660,7 +655,7 @@ static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
 	/* output */
 	if (result) {
 		int marker_size = xmp->marker_size;
-		int size = xdl_fill_merge_buffer(pair1, name1, pair2, name2,
+		int size = xdl_fill_merge_buffer(&three_way->pair1, name1, &three_way->pair2, name2,
 						 ancestor_name,
 						 favor, changes, NULL, style,
 						 marker_size);
@@ -670,7 +665,7 @@ static int xdl_do_merge(struct xdpair *pair1, struct xdchange *xscr1,
 			return -1;
 		}
 		result->size = size;
-		xdl_fill_merge_buffer(pair1, name1, pair2, name2,
+		xdl_fill_merge_buffer(&three_way->pair1, name1, &three_way->pair2, name2,
 				      ancestor_name, favor, changes,
 				      result->ptr, style, marker_size);
 	}
@@ -721,9 +716,7 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		memcpy(result->ptr, mf1->ptr, mf1->size);
 		result->size = mf1->size;
 	} else {
-		status = xdl_do_merge(&three_way.pair1, xscr1,
-				      &three_way.pair2, xscr2,
-				      xmp, result);
+		status = xdl_do_merge(&three_way, xscr1, xscr2, xmp, result);
 	}
  out:
 	xdl_free_script(xscr1);
