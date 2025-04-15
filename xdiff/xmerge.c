@@ -47,11 +47,6 @@ typedef struct s_xdmerge {
 	long chg0;
 } xdmerge_t;
 
-static int recmatch(struct xrecord *rec1, struct xrecord *rec2, unsigned long flags)
-{
-	return xdl_line_equal(rec1->ptr, rec1->size,
-			    rec2->ptr, rec2->size, flags);
-}
 
 static int xdl_append_merge(xdmerge_t **merge, int mode,
 			    long i0, long chg0,
