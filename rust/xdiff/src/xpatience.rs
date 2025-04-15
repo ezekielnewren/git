@@ -141,7 +141,7 @@ impl<'a> PatienceContext<'a> {
 	 * item per sequence length: the sequence with the smallest last
 	 * element (in terms of line2).
 	 */
-	fn find_longest_common_sequence(&mut self, map: &mut OrderedMap, res: &mut *mut Node, range1: Range<usize>, range2: Range<usize>) -> i32 {
+	fn find_longest_common_sequence(&mut self, map: &mut OrderedMap, res: &mut *mut Node) -> i32 {
 		let mut sequence: Vec<*mut Node> = vec![std::ptr::null_mut(); map.mph2entry.len()];
 
 		let mut longest = 0isize;
@@ -358,7 +358,7 @@ impl<'a> PatienceContext<'a> {
 		}
 
 		let mut first = std::ptr::null_mut();
-		result = self.find_longest_common_sequence(&mut map, &mut first, range1.clone(), range2.clone());
+		result = self.find_longest_common_sequence(&mut map, &mut first);
 		if result != 0 {
 			return result;
 		}
