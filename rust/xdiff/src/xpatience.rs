@@ -106,10 +106,7 @@ fn is_anchor(xpp: &xpparam_t, line: &[u8]) -> bool {
 	false
 }
 
-/*
- * Find the longest sequence with a smaller last element (meaning a smaller
- * line2, as we construct the sequence with entries ordered by line1).
- */
+
 fn binary_search(sequence: &mut Vec<*mut Node>, longest: isize,
 				 entry: &mut Node
 ) -> isize {
@@ -158,7 +155,28 @@ impl<'a> PatienceContext<'a> {
 			if entry.line2 == 0 || entry.line2 == NON_UNIQUE {
 				continue;
 			}
-			let mut i = binary_search(&mut sequence, longest, entry);
+			let expected = binary_search(&mut sequence, longest, entry);
+			/*
+			 * Find the longest sequence with a smaller last element (meaning a smaller
+			 * line2, as we construct the sequence with entries ordered by line1).
+			 */
+			let result = sequence[..std::cmp::min(longest as usize, sequence.len())].binary_search_by(|v| {
+				let node = unsafe { &**v };
+				if node.line2 > entry.line2 {
+					Ordering::Greater
+				} else {
+					/* treat <= the same as < */
+					Ordering::Less
+				}
+			});
+			let mut actual = match result {
+				Ok(_) => panic!("binary search found an exact match, which is wrong"),
+				Err(i) => i as isize - 1,
+			};
+			if expected != actual {
+				panic!("bad binary search result expected: {}, actual: {}, sequence.len(): {}, longest: {}", expected, actual, sequence.len(), longest);
+			}
+			let mut i = actual;
 			if i < 0 {
 				entry.previous = std::ptr::null_mut();
 			} else {
