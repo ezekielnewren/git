@@ -342,6 +342,7 @@ impl<V> Index<usize> for IndexMap<V> {
     type Output = V;
 
     fn index(&self, index: usize) -> &Self::Output {
+        #[cfg(debug_assertions)]
         if !self.in_use[index] {
             panic!("uninitialized memory access: {}", index);
         }
@@ -352,6 +353,7 @@ impl<V> Index<usize> for IndexMap<V> {
 
 impl<V> IndexMut<usize> for IndexMap<V> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        #[cfg(debug_assertions)]
         if !self.in_use[index] {
             panic!("uninitialized memory access: {}", index);
         }
