@@ -427,6 +427,19 @@ impl<V> IndexMap<V> {
         &mut self.array[index]
     }
 
+    pub fn get_or_insert<F>(&mut self, index: usize, fun: F) -> &mut V
+    where F: FnOnce() -> V,
+    {
+        if !self.in_use[index] {
+            self.in_use.set(index, true);
+            unsafe {
+                std::ptr::write(&mut self.array[index], fun());
+            }
+        }
+
+        &mut self.array[index]
+    }
+
     pub fn clear(&mut self) {
         if std::mem::needs_drop::<V>() {
             for i in self.in_use.iter_ones() {
