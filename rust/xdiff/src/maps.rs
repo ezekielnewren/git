@@ -2,6 +2,8 @@ use std::alloc::Layout;
 use std::cmp::Ordering;
 use std::hash::{BuildHasher, Hash, Hasher, RandomState};
 use std::marker::PhantomData;
+use bitvec::bitvec;
+use bitvec::prelude::BitVec;
 
 pub trait HashEq<K> {
 
@@ -277,7 +279,80 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
 }
 
 
+pub struct IndexMap<V> {
+    array: Vec<V>,
+    in_use: BitVec,
+}
 
+
+impl<V> Drop for IndexMap<V> {
+    fn drop(&mut self) {
+        if std::mem::needs_drop::<V>() {
+            for i in self.in_use.iter_ones() {
+                unsafe {
+                    std::ptr::drop_in_place(&mut self.array[i]);
+                }
+            }
+        }
+        unsafe {
+            self.array.set_len(0);
+        }
+    }
+}
+
+
+impl<V> IndexMap<V> {
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        let mut it = Self {
+            array: Vec::with_capacity(capacity),
+            in_use: bitvec![0; capacity],
+        };
+        unsafe {
+            it.array.set_len(it.array.capacity());
+        }
+        it
+    }
+
+
+    pub fn get(&self, index: usize) -> Option<&V> {
+        if self.in_use[index] {
+            Some(&self.array[index])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut V> {
+        if self.in_use[index] {
+            Some(&mut self.array[index])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_or_default(&mut self, index: usize) -> &mut V
+    where V: Default
+    {
+        if !self.in_use[index] {
+            self.in_use.set(index, true);
+            unsafe {
+                std::ptr::write(&mut self.array[index], V::default());
+            }
+        }
+
+        &mut self.array[index]
+    }
+
+    pub fn len(&self) -> usize {
+        self.in_use.count_ones()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.array.len()
+    }
+
+}
 
 
 
