@@ -380,6 +380,17 @@ impl<V> IndexMap<V> {
         }
     }
 
+    pub fn set(&mut self, index: usize, value: V) {
+        if !self.in_use[index] {
+            self.in_use.set(index, true);
+            unsafe {
+                std::ptr::write(&mut self.array[index], value);
+            }
+        } else {
+            self.array[index] = value;
+        }
+    }
+
     pub fn get_or_default(&mut self, index: usize) -> &mut V
     where V: Default
     {
