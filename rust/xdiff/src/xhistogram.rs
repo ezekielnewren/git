@@ -85,26 +85,25 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 		let mph1 = lhs.minimal_perfect_hash[line_number - LINE_SHIFT] as usize;
 
 		let mut chain_len = 0;
-		if let Some(ptr) = index.record.get(mph1) {
-			for rec in RecordIter::new(*ptr) {
-				let mph2 = lhs.minimal_perfect_hash[rec.line_number - LINE_SHIFT] as usize;
-				if mph1 == mph2 {
-					/*
-					 * line_number is identical to another element. Insert
-					 * it onto the front of the existing element
-					 * chain.
-					 */
-					index.next_line_numbers.set(line_number - index.line_number_shift, rec.line_number);
-					// index.next_line_numbers[line_number - index.line_number_shift] = rec.line_number;
-					rec.line_number = line_number;
-					rec.count += 1;
-					index.line_map.set(line_number - index.line_number_shift, rec);
-					// index.line_map[line_number - index.line_number_shift] = rec;
-					continue 'outer;
-				}
-
-				chain_len += 1;
+		let start = *index.record.get_or_insert(mph1, || std::ptr::null_mut());
+		for rec in RecordIter::new(start) {
+			let mph2 = lhs.minimal_perfect_hash[rec.line_number - LINE_SHIFT] as usize;
+			if mph1 == mph2 {
+				/*
+				 * line_number is identical to another element. Insert
+				 * it onto the front of the existing element
+				 * chain.
+				 */
+				index.next_line_numbers.set(line_number - index.line_number_shift, rec.line_number);
+				// index.next_line_numbers[line_number - index.line_number_shift] = rec.line_number;
+				rec.line_number = line_number;
+				rec.count += 1;
+				index.line_map.set(line_number - index.line_number_shift, rec);
+				// index.line_map[line_number - index.line_number_shift] = rec;
+				continue 'outer;
 			}
+
+			chain_len += 1;
 		}
 
 		if chain_len == MAX_CHAIN_LENGTH {
@@ -120,7 +119,7 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 		let rec = &mut index.record_storage[last];
 		rec.line_number = line_number;
 		rec.count = 1;
-		rec.next = *index.record.get(mph1).unwrap_or(&std::ptr::null_mut());
+		rec.next = *index.record.get_or_insert(mph1, || std::ptr::null_mut());
 		index.record.set(mph1, rec);
 		// index.record[mph1] = rec;
 		// index.line_map[line_number - index.line_number_shift] = rec;
@@ -141,7 +140,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 	let mut range_a = Range::default();
 	let mut range_b = Range::default();
 
-	let start = *index.record.get(b_line_number_mph).unwrap_or(&std::ptr::null_mut());
+	let start = *index.record.get_or_insert(b_line_number_mph, || std::ptr::null_mut());
 	for rec in RecordIter::new(start) {
 		if rec.count > index.count {
 			if !index.has_common {
