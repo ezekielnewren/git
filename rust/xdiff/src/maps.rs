@@ -287,13 +287,7 @@ pub struct IndexMap<V> {
 
 impl<V> Drop for IndexMap<V> {
     fn drop(&mut self) {
-        if std::mem::needs_drop::<V>() {
-            for i in self.in_use.iter_ones() {
-                unsafe {
-                    std::ptr::drop_in_place(&mut self.array[i]);
-                }
-            }
-        }
+        self.clear();
         unsafe {
             self.array.set_len(0);
         }
@@ -342,6 +336,17 @@ impl<V> IndexMap<V> {
         }
 
         &mut self.array[index]
+    }
+
+    pub fn clear(&mut self) {
+        if std::mem::needs_drop::<V>() {
+            for i in self.in_use.iter_ones() {
+                unsafe {
+                    std::ptr::drop_in_place(&mut self.array[i]);
+                }
+            }
+            self.in_use.fill(false);
+        }
     }
 
     pub fn len(&self) -> usize {
