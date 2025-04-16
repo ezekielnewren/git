@@ -85,7 +85,7 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 
 		let mut chain_len = 0;
 		for rec in RecordIter::new(index.record[mph1]) {
-			let mph2 = lhs.minimal_perfect_hash[line_number - LINE_SHIFT] as usize;
+			let mph2 = lhs.minimal_perfect_hash[rec.line_number - LINE_SHIFT] as usize;
 			if mph1 == mph2 {
 				/*
 				 * line_number is identical to another element. Insert
@@ -94,7 +94,7 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 				 */
 				index.next_line_numbers[line_number - index.line_number_shift] = rec.line_number;
 				rec.line_number = line_number;
-				rec.count = rec.count + 1;
+				rec.count += 1;
 				index.line_map[line_number - index.line_number_shift] = rec;
 				continue 'outer;
 			}
