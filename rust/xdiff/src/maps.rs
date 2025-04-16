@@ -3,7 +3,8 @@ use std::cmp::Ordering;
 use std::hash::{BuildHasher, Hash, Hasher, RandomState};
 use std::marker::PhantomData;
 use bitvec::bitvec;
-use bitvec::prelude::BitVec;
+use bitvec::prelude::{BitVec, Lsb0};
+use bitvec::slice::IterOnes;
 
 pub trait HashEq<K> {
 
@@ -279,6 +280,47 @@ impl<'a, K, V, HE: HashEq<K>> FixedMap<'a, K, V, HE> {
 }
 
 
+
+pub struct IndexMapIter<'a, V> {
+    array: &'a [V],
+    it: IterOnes<'a, usize, Lsb0>,
+}
+
+
+impl<'a, V> Iterator for IndexMapIter<'a, V> {
+    type Item = (usize, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(i) = self.it.next() {
+            Some((i, &self.array[i]))
+        } else {
+            None
+        }
+    }
+}
+
+
+pub struct IndexMapIterMut<'a, V> {
+    array: &'a mut [V],
+    it: IterOnes<'a, usize, Lsb0>,
+}
+
+
+impl<'a, V> Iterator for IndexMapIterMut<'a, V> {
+    type Item = (usize, &'a mut V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(i) = self.it.next() {
+            // evade borrow checker
+            let ptr: *mut V = &mut self.array[i];
+            Some((i, unsafe { &mut *ptr }))
+        } else {
+            None
+        }
+    }
+}
+
+
 pub struct IndexMap<V> {
     array: Vec<V>,
     in_use: BitVec,
@@ -308,6 +350,19 @@ impl<V> IndexMap<V> {
         it
     }
 
+    pub fn iter(&self) -> IndexMapIter<V> {
+        IndexMapIter {
+            array: self.array.as_slice(),
+            it: self.in_use.iter_ones(),
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> IndexMapIterMut<V> {
+        IndexMapIterMut {
+            array: self.array.as_mut_slice(),
+            it: self.in_use.iter_ones(),
+        }
+    }
 
     pub fn get(&self, index: usize) -> Option<&V> {
         if self.in_use[index] {
