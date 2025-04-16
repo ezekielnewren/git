@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::ops::Range;
 use interop::ivec::IVec;
 use crate::get_file_context;
+use crate::maps::IndexMap;
 use crate::xdiff::{LINE_SHIFT, SENTINEL, YES};
 use crate::xdiffi::classic_diff_with_range;
 use crate::xtypes::{xdpair, FileContext};
@@ -61,9 +62,9 @@ impl<'a> RecordIter<'a> {
 #[repr(C)]
 struct histindex {
 	record_storage: Vec<record>,
-	record: IVec<*mut record>,
-	line_map: IVec<*mut record>,
-	next_line_numbers: IVec<usize>,
+	record: IndexMap<*mut record>,
+	line_map: IndexMap<*mut record>,
+	next_line_numbers: IndexMap<usize>,
 	line_number_shift: usize,
 	count: usize,
 	has_common: bool,
@@ -84,22 +85,26 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 		let mph1 = lhs.minimal_perfect_hash[line_number - LINE_SHIFT] as usize;
 
 		let mut chain_len = 0;
-		for rec in RecordIter::new(index.record[mph1]) {
-			let mph2 = lhs.minimal_perfect_hash[rec.line_number - LINE_SHIFT] as usize;
-			if mph1 == mph2 {
-				/*
-				 * line_number is identical to another element. Insert
-				 * it onto the front of the existing element
-				 * chain.
-				 */
-				index.next_line_numbers[line_number - index.line_number_shift] = rec.line_number;
-				rec.line_number = line_number;
-				rec.count += 1;
-				index.line_map[line_number - index.line_number_shift] = rec;
-				continue 'outer;
-			}
+		if let Some(ptr) = index.record.get(mph1) {
+			for rec in RecordIter::new(*ptr) {
+				let mph2 = lhs.minimal_perfect_hash[rec.line_number - LINE_SHIFT] as usize;
+				if mph1 == mph2 {
+					/*
+					 * line_number is identical to another element. Insert
+					 * it onto the front of the existing element
+					 * chain.
+					 */
+					index.next_line_numbers.set(line_number - index.line_number_shift, rec.line_number);
+					// index.next_line_numbers[line_number - index.line_number_shift] = rec.line_number;
+					rec.line_number = line_number;
+					rec.count += 1;
+					index.line_map.set(line_number - index.line_number_shift, rec);
+					// index.line_map[line_number - index.line_number_shift] = rec;
+					continue 'outer;
+				}
 
-			chain_len += 1;
+				chain_len += 1;
+			}
 		}
 
 		if chain_len == MAX_CHAIN_LENGTH {
@@ -115,9 +120,11 @@ fn scan_a(index: &mut histindex, pair: &mut xdpair, range1: Range<usize>) -> i32
 		let rec = &mut index.record_storage[last];
 		rec.line_number = line_number;
 		rec.count = 1;
-		rec.next = index.record[mph1];
-		index.record[mph1] = rec;
-		index.line_map[line_number - index.line_number_shift] = rec;
+		rec.next = *index.record.get(mph1).unwrap_or(&std::ptr::null_mut());
+		index.record.set(mph1, rec);
+		// index.record[mph1] = rec;
+		// index.line_map[line_number - index.line_number_shift] = rec;
+		index.line_map.set(line_number - index.line_number_shift, rec);
 	}
 
 	0
@@ -134,7 +141,8 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 	let mut range_a = Range::default();
 	let mut range_b = Range::default();
 
-	for rec in RecordIter::new(index.record[b_line_number_mph]) {
+	let start = *index.record.get(b_line_number_mph).unwrap_or(&std::ptr::null_mut());
+	for rec in RecordIter::new(start) {
 		if rec.count > index.count {
 			if !index.has_common {
 				index.has_common = pair.equal_by_line_number(rec.line_number, b_line_number);
@@ -149,7 +157,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 
 		index.has_common = true;
 		'middle_loop: loop {
-			let mut next_line = index.next_line_numbers[range_a.start - index.line_number_shift];
+			let mut next_line = *index.next_line_numbers.get_or_default(range_a.start - index.line_number_shift);
 			range_b.start = b_line_number;
 			range_a.end = range_a.start;
 			range_b.end = range_b.start;
@@ -160,7 +168,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				range_a.start -= 1;
 				range_b.start -= 1;
 				if 1 < record_count {
-					let t_rec: *mut record = index.line_map[range_a.start - index.line_number_shift];
+					let t_rec: *mut record = *index.line_map.get(range_a.start - index.line_number_shift).unwrap();
 					let count = unsafe { (*t_rec).count };
 					record_count = std::cmp::min(record_count, count);
 				}
@@ -170,7 +178,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				range_a.end += 1;
 				range_b.end += 1;
 				if 1 < record_count {
-					let t_rec: *mut record = index.line_map[range_a.end - index.line_number_shift];
+					let t_rec: *mut record = *index.line_map.get(range_a.end - index.line_number_shift).unwrap();
 					let count = unsafe { (*t_rec).count };
 					record_count = std::cmp::min(record_count, count);
 				}
@@ -192,7 +200,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 			}
 
 			while next_line <= range_a.end {
-				next_line = index.next_line_numbers[next_line - index.line_number_shift];
+				next_line = *index.next_line_numbers.get_or_default(next_line - index.line_number_shift);
 				if next_line == 0 {
 					break 'middle_loop;
 				}
@@ -215,9 +223,9 @@ fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 
 	let mut index = histindex {
 		record_storage: Vec::with_capacity(range1.len()),
-		record: unsafe { IVec::zero(pair.minimal_perfect_hash_size) },
-		line_map: unsafe { IVec::zero(range1.len()) },
-		next_line_numbers: unsafe { IVec::zero(range1.len()) },
+		record: IndexMap::with_capacity(pair.minimal_perfect_hash_size),
+		line_map: IndexMap::with_capacity(range1.len()),
+		next_line_numbers: IndexMap::with_capacity(range1.len()),
 		line_number_shift: range1.start,
 		count: 0,
 		has_common: false,
