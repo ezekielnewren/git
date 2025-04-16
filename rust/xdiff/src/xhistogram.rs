@@ -210,12 +210,11 @@ fn find_lcs(pair: &mut xdpair, lcs: &mut region,
 	range1: Range<usize>, range2: Range<usize>,
 ) -> i32 {
 	let (lhs, rhs) = get_file_context!(pair);
-	let fudge = (lhs.record.len() + rhs.record.len()) * 10;
 	drop(lhs);
 	drop(rhs);
 
 	let mut index = histindex {
-		record_storage: Vec::with_capacity(fudge),
+		record_storage: Vec::with_capacity(range1.len()),
 		record: unsafe { IVec::zero(pair.minimal_perfect_hash_size) },
 		line_map: unsafe { IVec::zero(range1.len()) },
 		next_line_numbers: unsafe { IVec::zero(range1.len()) },
