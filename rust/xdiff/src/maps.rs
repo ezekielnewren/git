@@ -2,6 +2,7 @@ use std::alloc::Layout;
 use std::cmp::Ordering;
 use std::hash::{BuildHasher, Hash, Hasher, RandomState};
 use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
 use bitvec::bitvec;
 use bitvec::prelude::{BitVec, Lsb0};
 use bitvec::slice::IterOnes;
@@ -333,6 +334,28 @@ impl<V> Drop for IndexMap<V> {
         unsafe {
             self.array.set_len(0);
         }
+    }
+}
+
+
+impl<V> Index<usize> for IndexMap<V> {
+    type Output = V;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if !self.in_use[index] {
+            panic!("uninitialized memory access: {}", index);
+        }
+        &self.array[index]
+    }
+}
+
+
+impl<V> IndexMut<usize> for IndexMap<V> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if !self.in_use[index] {
+            panic!("uninitialized memory access: {}", index);
+        }
+        &mut self.array[index]
     }
 }
 
