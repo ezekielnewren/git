@@ -168,7 +168,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				range_a.start -= 1;
 				range_b.start -= 1;
 				if 1 < record_count {
-					let t_rec: *mut record = *index.line_map.get(range_a.start - index.line_number_shift).unwrap();
+					let t_rec: *mut record = index.line_map[range_a.start - index.line_number_shift];
 					let count = unsafe { (*t_rec).count };
 					record_count = std::cmp::min(record_count, count);
 				}
@@ -178,7 +178,7 @@ fn try_lcs(index: &mut histindex, pair: &mut xdpair, lcs: &mut region, b_line_nu
 				range_a.end += 1;
 				range_b.end += 1;
 				if 1 < record_count {
-					let t_rec: *mut record = *index.line_map.get(range_a.end - index.line_number_shift).unwrap();
+					let t_rec: *mut record = index.line_map[range_a.end - index.line_number_shift];
 					let count = unsafe { (*t_rec).count };
 					record_count = std::cmp::min(record_count, count);
 				}
