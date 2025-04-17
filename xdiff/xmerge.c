@@ -182,7 +182,7 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 				 const char *name2,
 				 const char *ancestor_name,
 				 int favor,
-				 struct xdmerge *m, char *dest, int style,
+				 struct xdmerge *m, u8* dest, int style,
 				 int marker_size)
 {
 	int size, i;
@@ -388,7 +388,7 @@ static int xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
  */
 static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		struct xdchange *xscr2,
-		xmparam_t const *xmp, mmbuffer_t *result)
+		xmparam_t const *xmp, struct ivec_u8* buffer)
 {
 	struct xdmerge *changes, *c;
 	xpparam_t const *xpp = &xmp->xpp;
@@ -546,22 +546,16 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		return -1;
 	}
 	/* output */
-	if (result) {
-		int marker_size = xmp->marker_size;
-		int size = xdl_fill_merge_buffer(three_way, name1, name2,
-						 ancestor_name,
-						 favor, changes, NULL, style,
-						 marker_size);
-		result->ptr = xdl_malloc(size);
-		if (!result->ptr) {
-			xdl_cleanup_merge(changes);
-			return -1;
-		}
-		result->size = size;
-		xdl_fill_merge_buffer(three_way, name1, name2,
-				      ancestor_name, favor, changes,
-				      result->ptr, style, marker_size);
-	}
+	int marker_size = xmp->marker_size;
+	int size = xdl_fill_merge_buffer(three_way, name1, name2,
+					 ancestor_name,
+					 favor, changes, NULL, style,
+					 marker_size);
+	ivec_reserve_exact(buffer, size);
+	xdl_fill_merge_buffer(three_way, name1, name2,
+			      ancestor_name, favor, changes,
+			      buffer->ptr, style, marker_size);
+	buffer->length += size;
 	return xdl_cleanup_merge(changes);
 }
 
@@ -611,7 +605,11 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		memcpy(result->ptr, mf1->ptr, mf1->size);
 		result->size = mf1->size;
 	} else {
-		status = xdl_do_merge(&three_way, xscr1, xscr2, xmp, result);
+		status = xdl_do_merge(&three_way, xscr1, xscr2, xmp, &buffer);
+		ivec_shrink_to_fit(&buffer);
+		result->ptr = (char*) buffer.ptr;
+		result->size = (long) buffer.length;
+		memset(&buffer, 0, sizeof(buffer));
 	}
  out:
 	xdl_free_script(xscr1);
