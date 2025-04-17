@@ -570,9 +570,11 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 {
 	struct xdchange *xscr1 = NULL, *xscr2 = NULL;
 	struct xd3way three_way;
+	struct ivec_u8 buffer;
 	int status = -1;
 	xpparam_t const *xpp = &xmp->xpp;
 
+	IVEC_INIT(buffer);
 	result->ptr = NULL;
 	result->size = 0;
 
