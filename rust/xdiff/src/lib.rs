@@ -18,7 +18,7 @@ pub(crate) mod mock;
 pub(crate) mod xdiffi;
 pub(crate) mod xhistogram;
 pub(crate) mod xpatience;
-
+pub(crate) mod xmerge;
 
 #[no_mangle]
 unsafe extern "C" fn xdl_line_hash(ptr: *const u8, size: usize, flags: u64) -> u64 {

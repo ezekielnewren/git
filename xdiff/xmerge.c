@@ -30,21 +30,21 @@ struct xdmerge {
 	 * 2 = no conflict, take second.
 	 * 3 = no conflict, take both.
 	 */
-	int mode;
+	u8 mode;
 	/*
 	 * These point at the respective postimages.  E.g. <i1,chg1> is
 	 * how side #1 wants to change the common ancestor; if there is no
 	 * overlap, lines before i1 in the postimage of side #1 appear
 	 * in the merge result as a region touched by neither side.
 	 */
-	long i1, i2;
-	long chg1, chg2;
+	usize i1, i2;
+	usize chg1, chg2;
 	/*
 	 * These point at the preimage; of course there is just one
 	 * preimage, that is from the shared common ancestor.
 	 */
-	long i0;
-	long chg0;
+	usize i0;
+	usize chg0;
 };
 
 
