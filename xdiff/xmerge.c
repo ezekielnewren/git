@@ -591,26 +591,18 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		goto out;
 
 	if (!xscr1) {
-		result->ptr = xdl_malloc(mf2->size);
-		if (!result->ptr)
-			goto out;
 		status = 0;
-		memcpy(result->ptr, mf2->ptr, mf2->size);
-		result->size = mf2->size;
+		ivec_extend_from_slice(&buffer, mf2->ptr, mf2->size);
 	} else if (!xscr2) {
-		result->ptr = xdl_malloc(mf1->size);
-		if (!result->ptr)
-			goto out;
 		status = 0;
-		memcpy(result->ptr, mf1->ptr, mf1->size);
-		result->size = mf1->size;
+		ivec_extend_from_slice(&buffer, mf1->ptr, mf1->size);
 	} else {
 		status = xdl_do_merge(&three_way, xscr1, xscr2, xmp, &buffer);
-		ivec_shrink_to_fit(&buffer);
-		result->ptr = (char*) buffer.ptr;
-		result->size = (long) buffer.length;
-		memset(&buffer, 0, sizeof(buffer));
 	}
+	ivec_shrink_to_fit(&buffer);
+	result->ptr = (char*) buffer.ptr;
+	result->size = (long) buffer.length;
+	memset(&buffer, 0, sizeof(buffer));
  out:
 	xdl_free_script(xscr1);
 	xdl_free_script(xscr2);
