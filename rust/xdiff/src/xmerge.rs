@@ -98,3 +98,35 @@ unsafe extern "C" fn xdl_recs_copy(record: *mut IVec<xrecord>, off: usize, count
 
 	size
 }
+
+
+/*
+ * Returns 1 if the i'th line ends in CR/LF (if it is the last line and
+ * has no eol, the preceding line, if any), 0 if it ends in LF-only, and
+ * -1 if the line ending cannot be determined.
+ */
+#[no_mangle]
+unsafe extern "C" fn is_eol_crlf(record: *mut IVec<xrecord>, i: usize) -> i32 {
+	let record: &mut IVec<xrecord> = IVec::from_raw_mut(record);
+	if record.len() == 0 {
+		/* Cannot determine eol style from empty file */
+		return -1;
+	}
+
+	let mut line: &[u8] = record[i].as_ref();
+	if i + 1 < record.len() {
+		/* All lines before the last *must* end in LF */
+		return (line.len() > 1 && line[line.len() - 2] == b'\r') as i32;
+	}
+	if line.len() > 0 && line[line.len() - 1] == b'\n' {
+		/* Last line; ends in LF; Is it CR/LF? */
+		return (line.len() > 1 && line[line.len() - 2] == b'\r') as i32;
+	}
+	if i == 0 {
+		/* The only line has no eol */
+		return -1;
+	}
+	/* Determine eol from second-to-last line */
+	line = record[i - 1].as_ref();
+	(line.len() > 1 && line[line.len() - 2] == b'\r') as i32
+}

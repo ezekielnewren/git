@@ -85,35 +85,7 @@ extern bool xdl_merge_lines_equal(struct xd3way *three_way, usize i1, usize i2, 
 
 extern usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, bool needs_cr, bool add_nl, u8 *dest);
 
-
-/*
- * Returns 1 if the i'th line ends in CR/LF (if it is the last line and
- * has no eol, the preceding line, if any), 0 if it ends in LF-only, and
- * -1 if the line ending cannot be determined.
- */
-static i32 is_eol_crlf(struct ivec_xrecord *record, usize i)
-{
-	usize size;
-
-	if (i + 1 < record->length)
-		/* All lines before the last *must* end in LF */
-		return (size = record->ptr[i].size) > 1 &&
-			record->ptr[i].ptr[size - 2] == '\r';
-	if (!record->length)
-		/* Cannot determine eol style from empty file */
-		return -1;
-	if ((size = record->ptr[i].size) &&
-			record->ptr[i].ptr[size - 1] == '\n')
-		/* Last line; ends in LF; Is it CR/LF? */
-		return size > 1 &&
-			record->ptr[i].ptr[size - 2] == '\r';
-	if (!i)
-		/* The only line has no eol */
-		return -1;
-	/* Determine eol from second-to-last line */
-	return (size = record->ptr[i - 1].size) > 1 &&
-		record->ptr[i - 1].ptr[size - 2] == '\r';
-}
+extern i32 is_eol_crlf(struct ivec_xrecord *record, usize i);
 
 static bool is_cr_needed(struct xd3way *three_way, struct xdmerge *m) {
 	/* Match post-images' preceding, or first, lines' end-of-line style */
