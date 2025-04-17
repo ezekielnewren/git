@@ -277,6 +277,14 @@ impl<T> IVec<T> {
         self.length += 1;
     }
 
+    pub fn extend_from_slice(&mut self, slice: &[T])
+    where T: Clone
+    {
+        for v in slice {
+            self.push(v.clone());
+        }
+    }
+
     pub fn clear(&mut self) {
         self.length = 0;
     }
@@ -296,6 +304,14 @@ impl<T> IVec<T> {
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         let range = 0..self.length;
         &mut self._buffer_mut()[range]
+    }
+}
+
+impl<T> Extend<T> for IVec<T> {
+    fn extend<IT: IntoIterator<Item = T>>(&mut self, iter: IT) {
+        for v in iter {
+            self.push(v);
+        }
     }
 }
 
