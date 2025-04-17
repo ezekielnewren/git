@@ -48,6 +48,7 @@ pub const XDL_MERGE_FAVOR_UNION: usize = 3;
 pub const XDL_MERGE_DIFF3: usize = 1;
 pub const XDL_MERGE_ZEALOUS_DIFF3: usize = 2;
 
+pub const DEFAULT_CONFLICT_MARKER_SIZE: usize = 7;
 
 #[repr(C)]
 pub struct xpparam_t {
