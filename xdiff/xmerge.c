@@ -81,15 +81,7 @@ static int xdl_append_merge(struct xdmerge **merge, int mode,
 
 extern usize xdl_cleanup_merge(struct xdmerge *c);
 
-static bool xdl_merge_lines_equal(struct xd3way *three_way, usize i1, usize i2, usize line_count) {
-	for (usize i = 0; i < line_count; i++) {
-		u64 mph1 = three_way->side1.minimal_perfect_hash.ptr[i1 + i];
-		u64 mph2 = three_way->side2.minimal_perfect_hash.ptr[i2 + i];
-		if (mph1 != mph2)
-			return false;
-	}
-	return true;
-}
+extern bool xdl_merge_lines_equal(struct xd3way *three_way, usize i1, usize i2, usize line_count);
 
 static usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, bool needs_cr, bool add_nl, char *dest) {
 	usize size = 0;

@@ -295,4 +295,36 @@ pub struct xd3way {
 	pub minimal_perfect_hash_size: usize,
 }
 
+impl xd3way {
+    pub(crate) unsafe fn from_raw_mut<'a>(three_way: *mut xd3way) -> &'a mut xd3way {
+        if three_way.is_null() {
+            panic!("null pointer");
+        }
+
+        let tw = &mut *three_way;
+
+        #[cfg(debug_assertions)]
+        {
+            tw.base.minimal_perfect_hash.test_invariants();
+            tw.base.record.test_invariants();
+            tw.side1.minimal_perfect_hash.test_invariants();
+            tw.side1.record.test_invariants();
+            tw.side2.minimal_perfect_hash.test_invariants();
+            tw.side2.record.test_invariants();
+
+            tw.pair1.lhs.consider.test_invariants();
+            tw.pair1.lhs.rindex.test_invariants();
+            tw.pair1.rhs.consider.test_invariants();
+            tw.pair1.rhs.rindex.test_invariants();
+
+            tw.pair2.lhs.consider.test_invariants();
+            tw.pair2.lhs.rindex.test_invariants();
+            tw.pair2.rhs.consider.test_invariants();
+            tw.pair2.rhs.rindex.test_invariants();
+        }
+
+        tw
+    }
+}
+
 

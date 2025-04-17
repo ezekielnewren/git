@@ -1,4 +1,4 @@
-
+use crate::xtypes::xd3way;
 
 #[repr(C)]
 struct xdmerge {
@@ -44,3 +44,18 @@ unsafe extern "C" fn xdl_cleanup_merge(mut c: *mut xdmerge) -> usize {
 	count
 }
 
+
+#[no_mangle]
+unsafe extern "C" fn xdl_merge_lines_equal(three_way: *mut xd3way, i1: usize, i2: usize, line_count: usize) -> bool {
+	let three_way = xd3way::from_raw_mut(three_way);
+
+	for i in 0..line_count {
+		let mph1 = three_way.side1.minimal_perfect_hash[i1 + i];
+		let mph2 = three_way.side2.minimal_perfect_hash[i2 + i];
+		if mph1 != mph2 {
+			return false;
+		}
+	}
+
+	true
+}
