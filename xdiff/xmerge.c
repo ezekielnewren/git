@@ -177,17 +177,18 @@ static usize fill_conflict_hunk(struct xd3way *three_way,
 	return size;
 }
 
-static int xdl_fill_merge_buffer(struct xd3way *three_way,
-				 const char *name1,
-				 const char *name2,
-				 const char *ancestor_name,
-				 int favor,
-				 struct xdmerge *m, u8* dest, int style,
-				 int marker_size)
+static usize xdl_fill_merge_buffer(struct xd3way *three_way,
+				 u8 const* name1,
+				 u8 const* name2,
+				 u8 const* ancestor_name,
+				 u8 favor,
+				 struct xdmerge *m, u8* dest, u64 style,
+				 usize marker_size)
 {
-	int size, i;
+	usize size = 0;
+	usize i = 0;
 
-	for (size = i = 0; m; m = m->next) {
+	for (; m; m = m->next) {
 		if (favor && !m->mode)
 			m->mode = favor;
 
@@ -202,7 +203,7 @@ static int xdl_fill_merge_buffer(struct xd3way *three_way,
 					      dest ? dest + size : NULL);
 			/* Postimage from side #1 */
 			if (m->mode & 1) {
-				int needs_cr = is_cr_needed(three_way, m);
+				bool needs_cr = is_cr_needed(three_way, m);
 
 				size += xdl_recs_copy(&three_way->side1.record, m->i1, m->chg1, needs_cr, (m->mode & 2),
 						      dest ? dest + size : NULL);
