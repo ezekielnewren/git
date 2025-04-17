@@ -83,7 +83,7 @@ extern usize xdl_cleanup_merge(struct xdmerge *c);
 
 extern bool xdl_merge_lines_equal(struct xd3way *three_way, usize i1, usize i2, usize line_count);
 
-static usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, bool needs_cr, bool add_nl, char *dest) {
+static usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, bool needs_cr, bool add_nl, u8 *dest) {
 	usize size = 0;
 
 	if (count < 1)
@@ -151,16 +151,16 @@ static bool is_cr_needed(struct xd3way *three_way, struct xdmerge *m) {
 	return result < 0 ? false : result != 0;
 }
 
-static int fill_conflict_hunk(struct xd3way *three_way,
-			      const char *name1,
-			      const char *name2,
-			      const char *name3,
-			      int size, int i, int style,
-			      struct xdmerge *m, char *dest, int marker_size)
+static usize fill_conflict_hunk(struct xd3way *three_way,
+			      u8 const* name1,
+			      u8 const* name2,
+			      u8 const* name3,
+			      usize size, usize i, u64 style,
+			      struct xdmerge *m, u8 *dest, usize marker_size)
 {
-	int marker1_size = (name1 ? strlen(name1) + 1 : 0);
-	int marker2_size = (name2 ? strlen(name2) + 1 : 0);
-	int marker3_size = (name3 ? strlen(name3) + 1 : 0);
+	usize marker1_size = (name1 ? strlen(name1) + 1 : 0);
+	usize marker2_size = (name2 ? strlen(name2) + 1 : 0);
+	usize marker3_size = (name3 ? strlen(name3) + 1 : 0);
 	bool needs_cr = is_cr_needed(three_way, m);
 
 	if (marker_size <= 0)
