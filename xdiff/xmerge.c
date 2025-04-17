@@ -83,31 +83,7 @@ extern usize xdl_cleanup_merge(struct xdmerge *c);
 
 extern bool xdl_merge_lines_equal(struct xd3way *three_way, usize i1, usize i2, usize line_count);
 
-static usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, bool needs_cr, bool add_nl, u8 *dest) {
-	usize size = 0;
-
-	if (count < 1)
-		return 0;
-
-	for (usize i = 0; i < count; size += record->ptr[off + i++].size)
-		if (dest)
-			memcpy(dest + size, record->ptr[off + i].ptr, record->ptr[off + i].size);
-	if (add_nl) {
-		usize i = record->ptr[off + count - 1].size;
-		if (i == 0 || record->ptr[off + count - 1].ptr[i - 1] != '\n') {
-			if (needs_cr) {
-				if (dest)
-					dest[size] = '\r';
-				size++;
-			}
-
-			if (dest)
-				dest[size] = '\n';
-			size++;
-		}
-	}
-	return size;
-}
+extern usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, bool needs_cr, bool add_nl, u8 *dest);
 
 
 /*

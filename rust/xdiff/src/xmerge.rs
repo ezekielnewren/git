@@ -1,4 +1,5 @@
-use crate::xtypes::xd3way;
+use interop::ivec::IVec;
+use crate::xtypes::{xd3way, xrecord};
 
 #[repr(C)]
 struct xdmerge {
@@ -58,4 +59,42 @@ unsafe extern "C" fn xdl_merge_lines_equal(three_way: *mut xd3way, i1: usize, i2
 	}
 
 	true
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_recs_copy(record: *mut IVec<xrecord>, off: usize, count: usize, needs_cr: bool, add_nl: bool, dest: *mut u8) -> usize {
+	let record = IVec::from_raw_mut(record);
+
+	let mut size = 0;
+
+	if count < 1 {
+		return 0;
+	}
+
+	for i in 0..count {
+		let rec = &record[off + i];
+		if !dest.is_null() {
+			libc::memcpy(dest.add(size) as *mut libc::c_void, rec.as_ptr() as *mut libc::c_void, rec.len());
+		}
+		size += rec.len();
+	}
+	if add_nl {
+		let slice = record[off + count - 1].as_ref();
+		if slice.len() == 0 || slice[slice.len() - 1] != b'\n' {
+			if needs_cr {
+				if !dest.is_null() {
+					*dest.add(size) = b'\r';
+				}
+				size += 1;
+			}
+
+			if !dest.is_null() {
+				*dest.add(size) = b'\n';
+			}
+			size += 1;
+		}
+	}
+
+	size
 }
