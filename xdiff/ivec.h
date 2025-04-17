@@ -43,6 +43,7 @@ void ivec_reserve(void* self, usize additional);
 void ivec_shrink_to_fit(void* self);
 void ivec_resize(void* self, usize new_length, void* default_value);
 void ivec_push(void* self, void* value);
+void ivec_extend_from_slice(void* self, void const* ptr, usize size);
 bool ivec_equal(void* self, void* other);
 void ivec_free(void* self);
 

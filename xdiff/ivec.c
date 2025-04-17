@@ -86,6 +86,21 @@ void ivec_push(void* self, void* value) {
 	this->length++;
 }
 
+void ivec_extend_from_slice(void* self, void const* ptr, usize size) {
+	rawivec_t *this = self;
+	u8* dst;
+
+	if (size == 0)
+		return;
+
+	if (this->length + size > this->capacity) {
+		ivec_reserve(self, this->capacity - this->length + size);
+	}
+	dst = (u8*) this->ptr + this->length * this->element_size;
+	memcpy(dst, ptr, size * this->element_size);
+	this->length += size;
+}
+
 bool ivec_equal(void* self, void* other) {
 	rawivec_t *lhs = self;
 	rawivec_t *rhs = other;
