@@ -87,17 +87,7 @@ extern usize xdl_recs_copy(struct ivec_xrecord *record, usize off, usize count, 
 
 extern i32 is_eol_crlf(struct ivec_xrecord *record, usize i);
 
-static bool is_cr_needed(struct xd3way *three_way, struct xdmerge *m) {
-	/* Match post-images' preceding, or first, lines' end-of-line style */
-	i32 result = is_eol_crlf(&three_way->side1.record, m->i1 ? m->i1 - 1 : 0);
-	if (result)
-		result = is_eol_crlf(&three_way->side2.record, m->i2 ? m->i2 - 1 : 0);
-	/* Look at pre-image's first line, unless we already settled on LF */
-	if (result)
-		result = is_eol_crlf(&three_way->base.record, 0);
-	/* If still undecided, use LF-only */
-	return result < 0 ? false : result != 0;
-}
+extern bool is_cr_needed(struct xd3way *three_way, struct xdmerge *m);
 
 static usize fill_conflict_hunk(struct xd3way *three_way,
 			      u8 const* name1,

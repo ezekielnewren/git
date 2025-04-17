@@ -30,6 +30,20 @@ struct xdmerge {
 }
 
 
+impl xdmerge {
+
+	unsafe fn from_raw_mut<'a>(m: *mut xdmerge) -> &'a mut xdmerge {
+		if m.is_null() {
+			panic!("null pointer");
+		}
+
+		&mut *m
+	}
+
+}
+
+
+
 #[no_mangle]
 unsafe extern "C" fn xdl_cleanup_merge(mut c: *mut xdmerge) -> usize {
 	let mut count = 0;
@@ -129,4 +143,23 @@ unsafe extern "C" fn is_eol_crlf(record: *mut IVec<xrecord>, i: usize) -> i32 {
 	/* Determine eol from second-to-last line */
 	line = record[i - 1].as_ref();
 	(line.len() > 1 && line[line.len() - 2] == b'\r') as i32
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn is_cr_needed(three_way: *mut xd3way, m: *mut xdmerge) -> bool {
+	let three_way = xd3way::from_raw_mut(three_way);
+	let m = xdmerge::from_raw_mut(m);
+
+	/* Match post-images' preceding, or first, lines' end-of-line style */
+	let mut result = is_eol_crlf(&mut three_way.side1.record, m.i1.checked_sub(1).unwrap_or(0));
+	if result != 0 {
+		result = is_eol_crlf(&mut three_way.side2.record, m.i2.checked_sub(1).unwrap_or(0));
+	}
+	/* Look at pre-image's first line, unless we already settled on LF */
+	if result != 0 {
+		result = is_eol_crlf(&mut three_way.base.record, 0);
+	}
+	/* If still undecided, use LF-only */
+	result > 0
 }
