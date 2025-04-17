@@ -28,3 +28,19 @@ struct xdmerge {
 	chg0: usize,
 }
 
+
+#[no_mangle]
+unsafe extern "C" fn xdl_cleanup_merge(mut c: *mut xdmerge) -> usize {
+	let mut count = 0;
+    while !c.is_null() {
+		if (*c).mode == 0 {
+			count += 1;
+        }
+		let next_c = (*c).next;
+		libc::free(c as *mut libc::c_void);
+        c = next_c;
+	}
+
+	count
+}
+

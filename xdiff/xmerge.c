@@ -79,20 +79,7 @@ static int xdl_append_merge(struct xdmerge **merge, int mode,
 	return 0;
 }
 
-static int xdl_cleanup_merge(struct xdmerge *c)
-{
-	int count = 0;
-	struct xdmerge *next_c;
-
-	/* were there conflicts? */
-	for (; c; c = next_c) {
-		if (c->mode == 0)
-			count++;
-		next_c = c->next;
-		free(c);
-	}
-	return count;
-}
+extern usize xdl_cleanup_merge(struct xdmerge *c);
 
 static bool xdl_merge_lines_equal(struct xd3way *three_way, usize i1, usize i2, usize line_count) {
 	for (usize i = 0; i < line_count; i++) {
