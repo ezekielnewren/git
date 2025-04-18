@@ -34,21 +34,7 @@ struct xdpsplit {
 };
 
 
-static struct xdchange *xdl_add_change(struct xdchange *xscr, isize i1, isize i2, isize chg1, isize chg2) {
-	struct xdchange *xch;
-
-	if (!(xch = (struct xdchange *) xdl_malloc(sizeof(struct xdchange))))
-		return NULL;
-
-	xch->next = xscr;
-	xch->i1 = i1;
-	xch->i2 = i2;
-	xch->chg1 = chg1;
-	xch->chg2 = chg2;
-	xch->ignore = false;
-
-	return xch;
-}
+extern struct xdchange *xdl_add_change(struct xdchange *xscr, isize i1, isize i2, isize chg1, isize chg2);
 
 
 /*
@@ -211,29 +197,29 @@ extern int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g);
 extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
 
 
-int xdl_build_script(struct xdpair *pair, struct xdchange **xscr) {
-	struct xdchange *cscr = NULL, *xch;
-	long i1, i2, l1, l2;
-
-	/*
-	 * Trivial. Collects "groups" of changes and creates an edit script.
-	 */
-	for (i1 = pair->lhs.record->length, i2 = pair->rhs.record->length; i1 >= 0 || i2 >= 0; i1--, i2--)
-		if (pair->lhs.consider.ptr[SENTINEL + i1 - 1] || pair->rhs.consider.ptr[SENTINEL + i2 - 1]) {
-			for (l1 = i1; pair->lhs.consider.ptr[SENTINEL + i1 - 1]; i1--);
-			for (l2 = i2; pair->rhs.consider.ptr[SENTINEL + i2 - 1]; i2--);
-
-			if (!(xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2))) {
-				xdl_free_script(cscr);
-				return -1;
-			}
-			cscr = xch;
-		}
-
-	*xscr = cscr;
-
-	return 0;
-}
+// i32 xdl_build_script(struct xdpair *pair, struct xdchange **xscr) {
+// 	struct xdchange *cscr = NULL, *xch;
+// 	long i1, i2, l1, l2;
+//
+// 	/*
+// 	 * Trivial. Collects "groups" of changes and creates an edit script.
+// 	 */
+// 	for (i1 = pair->lhs.record->length, i2 = pair->rhs.record->length; i1 >= 0 || i2 >= 0; i1--, i2--)
+// 		if (pair->lhs.consider.ptr[SENTINEL + i1 - 1] || pair->rhs.consider.ptr[SENTINEL + i2 - 1]) {
+// 			for (l1 = i1; pair->lhs.consider.ptr[SENTINEL + i1 - 1]; i1--);
+// 			for (l2 = i2; pair->rhs.consider.ptr[SENTINEL + i2 - 1]; i2--);
+//
+// 			if (!(xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2))) {
+// 				xdl_free_script(cscr);
+// 				return -1;
+// 			}
+// 			cscr = xch;
+// 		}
+//
+// 	*xscr = cscr;
+//
+// 	return 0;
+// }
 
 
 void xdl_free_script(struct xdchange *xscr) {

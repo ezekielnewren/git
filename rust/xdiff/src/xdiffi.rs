@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::ops::Range;
 use interop::ivec::IVec;
+use interop::xmalloc;
 use crate::get_file_context;
 use crate::xdiff::*;
 use crate::xhistogram::{do_histogram_diff};
@@ -131,6 +132,21 @@ pub(crate) struct xdchange {
     pub(crate) chg1: isize,
     pub(crate) chg2: isize,
     pub(crate) ignore: bool,
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_add_change(xscr: *mut xdchange, i1: isize, i2: isize, chg1: isize, chg2: isize) -> *mut xdchange {
+	let xch = &mut *(xmalloc(size_of::<xdchange>()) as *mut xdchange);
+
+	xch.next = xscr;
+	xch.i1 = i1;
+	xch.i2 = i2;
+	xch.chg1 = chg1;
+	xch.chg2 = chg2;
+	xch.ignore = false;
+
+	xch
 }
 
 
