@@ -100,43 +100,43 @@ struct split_measurement {
 	/*
 	 * Is the split at the end of the file (aside from any blank lines)?
 	 */
-	int end_of_file;
+	isize end_of_file;
 
 	/*
 	 * How much is the line immediately following the split indented (or -1
 	 * if the line is blank):
 	 */
-	int indent;
+	isize indent;
 
 	/*
 	 * How many consecutive lines above the split are blank?
 	 */
-	int pre_blank;
+	isize pre_blank;
 
 	/*
 	 * How much is the nearest non-blank line above the split indented (or
 	 * -1 if there is no such line)?
 	 */
-	int pre_indent;
+	isize pre_indent;
 
 	/*
 	 * How many lines after the line following the split are blank?
 	 */
-	int post_blank;
+	isize post_blank;
 
 	/*
 	 * How much is the nearest non-blank line after the line following the
 	 * split indented (or -1 if there is no such line)?
 	 */
-	int post_indent;
+	isize post_indent;
 };
 
 struct split_score {
 	/* The effective indent of this split (smaller is preferred). */
-	int effective_indent;
+	isize effective_indent;
 
 	/* Penalty for this split (smaller is preferred). */
-	int penalty;
+	isize penalty;
 };
 
 /*
