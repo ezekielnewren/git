@@ -1,4 +1,6 @@
+use std::io::repeat;
 use interop::ivec::IVec;
+use crate::xdiff::{DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL_MERGE_ZEALOUS_DIFF3};
 use crate::xtypes::{xd3way, xrecord};
 
 #[repr(C)]
@@ -77,8 +79,8 @@ unsafe extern "C" fn xdl_merge_lines_equal(three_way: *mut xd3way, i1: usize, i2
 
 
 #[no_mangle]
-unsafe extern "C" fn xdl_recs_copy(record: *mut IVec<xrecord>, off: usize, count: usize, needs_cr: bool, add_nl: bool, buffer: *mut IVec<u8>) {
-	let record = IVec::from_raw_mut(record);
+unsafe extern "C" fn xdl_recs_copy(record: *const IVec<xrecord>, off: usize, count: usize, needs_cr: bool, add_nl: bool, buffer: *mut IVec<u8>) {
+	let record = IVec::from_raw(record);
 	let buffer = IVec::from_raw_mut(buffer);
 
 	if count < 1 {
@@ -149,4 +151,84 @@ unsafe extern "C" fn is_cr_needed(three_way: *mut xd3way, m: *mut xdmerge) -> bo
 	}
 	/* If still undecided, use LF-only */
 	result > 0
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn fill_conflict_hunk(three_way: *mut xd3way,
+										name1: *const u8,
+										name2: *const u8,
+										name3: *const u8,
+										i: usize, style: u64,
+										m: *mut xdmerge, buffer: *mut IVec<u8>, mut marker_size: usize) {
+	let three_way = xd3way::from_raw_mut(three_way);
+	let m = xdmerge::from_raw_mut(m);
+	let buffer = IVec::from_raw_mut(buffer);
+
+	let to_slice = |v: *const u8| {
+		if v.is_null() {
+			None
+		} else {
+			let size = libc::strlen(v as *const libc::c_char) as usize;
+			Some(std::slice::from_raw_parts(v, size))
+		}
+	};
+
+	let name1 = to_slice(name1);
+	let name2 = to_slice(name2);
+	let name3 = to_slice(name3);
+	let needs_cr = is_cr_needed(three_way, m);
+
+	if marker_size == 0 {
+		marker_size = DEFAULT_CONFLICT_MARKER_SIZE;
+	}
+
+	/* Before conflicting part */
+	xdl_recs_copy(&mut three_way.side1.record, i, m.i1 - i, false, false, buffer);
+
+	buffer.extend(std::iter::repeat(b'<').take(marker_size));
+	if let Some(name) = name1 {
+		buffer.push(b' ');
+		buffer.extend_from_slice(name);
+	}
+	if needs_cr {
+		buffer.push(b'\r');
+	}
+	buffer.push(b'\n');
+
+	/* Postimage from side #1 */
+	xdl_recs_copy(&three_way.side1.record, m.i1, m.chg1, needs_cr, true, buffer);
+
+	if style == XDL_MERGE_DIFF3 || style == XDL_MERGE_ZEALOUS_DIFF3 {
+		/* Shared preimage */
+		buffer.extend(std::iter::repeat(b'|').take(marker_size));
+		if let Some(name) = name3 {
+			buffer.push(b' ');
+			buffer.extend_from_slice(name);
+		}
+		if needs_cr {
+			buffer.push(b'\r');
+		}
+		buffer.push(b'\n');
+		xdl_recs_copy(&three_way.base.record, m.i0, m.chg0, needs_cr, true, buffer);
+	}
+
+	buffer.extend(std::iter::repeat(b'=').take(marker_size));
+	if needs_cr {
+		buffer.push(b'\r');
+	}
+	buffer.push(b'\n');
+
+	/* Postimage from side #2 */
+	xdl_recs_copy(&three_way.side2.record, m.i2, m.chg2, needs_cr, true, buffer);
+
+	buffer.extend(std::iter::repeat(b'>').take(marker_size));
+	if let Some(name) = name2 {
+		buffer.push(b' ');
+		buffer.extend_from_slice(name);
+	}
+	if needs_cr {
+		buffer.push(b'\r');
+	}
+	buffer.push(b'\n');
 }

@@ -89,93 +89,12 @@ extern i32 is_eol_crlf(struct ivec_xrecord *record, usize i);
 
 extern bool is_cr_needed(struct xd3way *three_way, struct xdmerge *m);
 
-static void fill_conflict_hunk(struct xd3way *three_way,
+extern void fill_conflict_hunk(struct xd3way *three_way,
 			      u8 const* name1,
 			      u8 const* name2,
 			      u8 const* name3,
 			      usize i, u64 style,
-			      struct xdmerge *m, struct ivec_u8* buffer, usize marker_size)
-{
-	usize marker1_size = (name1 ? strlen(name1) + 1 : 0);
-	usize marker2_size = (name2 ? strlen(name2) + 1 : 0);
-	usize marker3_size = (name3 ? strlen(name3) + 1 : 0);
-	bool needs_cr = is_cr_needed(three_way, m);
-
-	if (marker_size <= 0)
-		marker_size = DEFAULT_CONFLICT_MARKER_SIZE;
-
-	/* Before conflicting part */
-	xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, false, false, buffer);
-
-	u8 value = '<';
-	for (usize j = 0; j < marker_size; j++) {
-		ivec_push(buffer, &value);
-	}
-	if (marker1_size > 0) {
-		value = ' ';
-		ivec_push(buffer, &value);
-		ivec_extend_from_slice(buffer, name1, marker1_size - 1);
-	}
-	if (needs_cr) {
-		value = '\r';
-		ivec_push(buffer, &value);
-	}
-	value = '\n';
-	ivec_push(buffer, &value);
-
-	/* Postimage from side #1 */
-	xdl_recs_copy(&three_way->side1.record, m->i1, m->chg1, needs_cr, true, buffer);
-
-	if (style == XDL_MERGE_DIFF3 || style == XDL_MERGE_ZEALOUS_DIFF3) {
-		/* Shared preimage */
-		value = '|';
-		for (usize j = 0; j < marker_size; j++) {
-			ivec_push(buffer, &value);
-		}
-		if (marker3_size) {
-			value = ' ';
-			ivec_push(buffer, &value);
-			ivec_extend_from_slice(buffer, name3, marker3_size - 1);
-		}
-		if (needs_cr) {
-			value = '\r';
-			ivec_push(buffer, &value);
-		}
-		value = '\n';
-		ivec_push(buffer, &value);
-		xdl_recs_copy(&three_way->base.record, m->i0, m->chg0, needs_cr, true, buffer);
-	}
-
-	value = '=';
-	for (usize j = 0; j < marker_size; j++) {
-		ivec_push(buffer, &value);
-	}
-	if (needs_cr) {
-		value = '\r';
-		ivec_push(buffer, &value);
-	}
-	value = '\n';
-	ivec_push(buffer, &value);
-
-	/* Postimage from side #2 */
-	xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, needs_cr, true, buffer);
-
-	value = '>';
-	for (usize j = 0; j < marker_size; j++) {
-		ivec_push(buffer, &value);
-	}
-	if (marker2_size > 0) {
-		value = ' ';
-		ivec_push(buffer, &value);
-		ivec_extend_from_slice(buffer, name2, marker2_size - 1);
-	}
-	if (needs_cr) {
-		value = '\r';
-		ivec_push(buffer, &value);
-	}
-	value = '\n';
-	ivec_push(buffer, &value);
-}
+			      struct xdmerge *m, struct ivec_u8* buffer, usize marker_size);
 
 static void xdl_fill_merge_buffer(struct xd3way *three_way,
 				 u8 const* name1,

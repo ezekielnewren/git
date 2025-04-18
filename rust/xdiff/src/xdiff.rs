@@ -45,8 +45,8 @@ pub const XDL_MERGE_FAVOR_THEIRS: usize = 2;
 pub const XDL_MERGE_FAVOR_UNION: usize = 3;
 
 /* merge output styles */
-pub const XDL_MERGE_DIFF3: usize = 1;
-pub const XDL_MERGE_ZEALOUS_DIFF3: usize = 2;
+pub const XDL_MERGE_DIFF3: u64 = 1;
+pub const XDL_MERGE_ZEALOUS_DIFF3: u64 = 2;
 
 pub const DEFAULT_CONFLICT_MARKER_SIZE: usize = 7;
 
