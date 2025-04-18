@@ -197,15 +197,6 @@ extern int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g);
 extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
 
 
-void xdl_free_script(struct xdchange *xscr) {
-	struct xdchange *xch;
-
-	while ((xch = xscr) != NULL) {
-		xscr = xscr->next;
-		free(xch);
-	}
-}
-
 static int xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, xdemitcb_t *ecb,
 			      xdemitconf_t const *xecfg)
 {

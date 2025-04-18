@@ -190,6 +190,16 @@ unsafe extern "C" fn xdl_build_script(pair: *mut xdpair, xscr: *mut *mut xdchang
 }
 
 
+#[no_mangle]
+unsafe extern "C" fn xdl_free_script(mut xscr: *mut xdchange) {
+	while !xscr.is_null() {
+		let next = (*xscr).next;
+		libc::free(xscr as *mut libc::c_void);
+		xscr = next;
+	}
+}
+
+
 /*
  * Represent a group of changed lines in an xdfile_t (i.e., a contiguous group
  * of lines that was inserted or deleted from the corresponding version of the
