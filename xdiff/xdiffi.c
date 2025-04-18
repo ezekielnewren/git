@@ -394,7 +394,7 @@ i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 			 * each direction. If it bumps into any other changes, merge
 			 * them.
 			 */
-			do {
+			while (1) {
 				groupsize = g.end - g.start;
 
 				/*
@@ -429,7 +429,11 @@ i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 					if (go.end > go.start)
 						end_matching_other = g.end;
 				}
-			} while (groupsize != g.end - g.start);
+
+				if (groupsize == g.end - g.start) {
+					break;
+				}
+			}
 
 			/*
 			 * If the group can be shifted, then we can possibly use this
