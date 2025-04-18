@@ -96,44 +96,13 @@ extern void fill_conflict_hunk(struct xd3way *three_way,
 			      usize i, u64 style,
 			      struct xdmerge *m, struct ivec_u8* buffer, usize marker_size);
 
-static void xdl_fill_merge_buffer(struct xd3way *three_way,
+extern void xdl_fill_merge_buffer(struct xd3way *three_way,
 				 u8 const* name1,
 				 u8 const* name2,
 				 u8 const* ancestor_name,
 				 u8 favor,
 				 struct xdmerge *m, struct ivec_u8* buffer, u64 style,
-				 usize marker_size)
-{
-	usize i = 0;
-
-	for (; m; m = m->next) {
-		if (favor && !m->mode)
-			m->mode = favor;
-
-		if (m->mode == 0)
-			fill_conflict_hunk(three_way, name1, name2,
-						  ancestor_name,
-						  i, style, m, buffer,
-						  marker_size);
-		else if (m->mode & 3) {
-			/* Before conflicting part */
-			xdl_recs_copy(&three_way->side1.record, i, m->i1 - i, false, false, buffer);
-			/* Postimage from side #1 */
-			if (m->mode & 1) {
-				bool needs_cr = is_cr_needed(three_way, m);
-
-				xdl_recs_copy(&three_way->side1.record, m->i1, m->chg1, needs_cr, (m->mode & 2), buffer);
-			}
-			/* Postimage from side #2 */
-			if (m->mode & 2)
-				xdl_recs_copy(&three_way->side2.record, m->i2, m->chg2, false, false, buffer);
-		} else {
-			continue;
-		}
-		i = m->i1 + m->chg1;
-	}
-	xdl_recs_copy(&three_way->side1.record, i, three_way->side1.record.length - i, false, false, buffer);
-}
+				 usize marker_size);
 
 /*
  * Remove any common lines from the beginning and end of the conflicted region.

@@ -232,3 +232,52 @@ unsafe extern "C" fn fill_conflict_hunk(three_way: *mut xd3way,
 	}
 	buffer.push(b'\n');
 }
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_fill_merge_buffer(three_way: *mut xd3way,
+										   name1: *const u8,
+										   name2: *const u8,
+										   ancestor_name: *const u8,
+										   favor: u8,
+										   mut merge: *mut xdmerge, buffer: *mut IVec<u8>, style: u64,
+										   marker_size: usize
+) {
+	let three_way = xd3way::from_raw_mut(three_way);
+	let buffer = IVec::from_raw_mut(buffer);
+
+	let mut i = 0;
+	while !merge.is_null() {
+		let m = &mut *merge;
+		if favor != 0 && m.mode == 0 {
+			m.mode = favor;
+		}
+
+		if m.mode == 0 {
+			fill_conflict_hunk(three_way, name1, name2,
+						  ancestor_name,
+						  i, style, m, buffer,
+						  marker_size);
+		} else if (m.mode & 3) != 0 {
+			/* Before conflicting part */
+			xdl_recs_copy(&three_way.side1.record, i, m.i1 - i, false, false, buffer);
+			/* Postimage from side #1 */
+			if (m.mode & 1) != 0 {
+				let needs_cr = is_cr_needed(three_way, m);
+
+				xdl_recs_copy(&three_way.side1.record, m.i1, m.chg1, needs_cr, (m.mode & 2) != 0, buffer);
+			}
+			/* Postimage from side #2 */
+			if (m.mode & 2) != 0 {
+				xdl_recs_copy(&three_way.side2.record, m.i2, m.chg2, false, false, buffer);
+			}
+		} else {
+			merge = m.next;
+			continue;
+		}
+		i = m.i1 + m.chg1;
+
+		merge = m.next;
+	}
+	xdl_recs_copy(&three_way.side1.record, i, three_way.side1.record.len() - i, false, false, buffer);
+}
