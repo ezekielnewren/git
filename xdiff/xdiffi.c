@@ -356,13 +356,13 @@ struct xdlgroup {
 	 * The index of the first changed line in the group, or the index of
 	 * the unchanged line above which the (empty) group is located.
 	 */
-	long start;
+	isize start;
 
 	/*
 	 * The index of the first unchanged line after the group. For an empty
 	 * group, end is equal to start.
 	 */
-	long end;
+	isize end;
 };
 
 /*
