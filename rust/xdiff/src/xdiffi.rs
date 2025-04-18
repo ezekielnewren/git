@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::ops::Range;
 use interop::ivec::IVec;
 use crate::get_file_context;
@@ -388,6 +389,17 @@ unsafe extern "C" fn score_add_split(m: *const split_measurement, s: *mut split_
 			};
 		}
 	}
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn score_cmp(s1: *mut split_score, s2: *mut split_score) -> isize {
+	let s1 = &mut *s1;
+	let s2 = &mut *s2;
+
+	let cmp_indents: Ordering = s1.effective_indent.cmp(&s2.effective_indent);
+
+	INDENT_WEIGHT * (cmp_indents as isize) + (s1.penalty - s2.penalty)
 }
 
 
