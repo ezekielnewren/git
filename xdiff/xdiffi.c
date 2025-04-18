@@ -406,9 +406,11 @@ i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 				end_matching_other = -1;
 
 				/* Shift the group backward as much as possible: */
-				while (!group_slide_up(ctx, &g))
-					if (group_previous(ctx_out, &go))
+				while (!group_slide_up(ctx, &g)) {
+					if (group_previous(ctx_out, &go)) {
 						BUG("group sync broken sliding up");
+					}
+				}
 
 				/*
 				 * This is this highest that this group can be shifted.
@@ -416,18 +418,22 @@ i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 				 */
 				earliest_end = g.end;
 
-				if (go.end > go.start)
+				if (go.end > go.start) {
 					end_matching_other = g.end;
+				}
 
 				/* Now shift the group forward as far as possible: */
 				while (1) {
-					if (group_slide_down(ctx, &g))
+					if (group_slide_down(ctx, &g)) {
 						break;
-					if (group_next(ctx_out, &go))
+					}
+					if (group_next(ctx_out, &go)) {
 						BUG("group sync broken sliding down");
+					}
 
-					if (go.end > go.start)
+					if (go.end > go.start) {
 						end_matching_other = g.end;
+					}
 				}
 
 				if (groupsize == g.end - g.start) {
@@ -452,12 +458,14 @@ i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 				 * other file that it can align with.
 				 */
 				while (go.end == go.start) {
-					if (group_slide_up(ctx, &g))
+					if (group_slide_up(ctx, &g)) {
 						BUG("match disappeared");
-					if (group_previous(ctx_out, &go))
+					}
+					if (group_previous(ctx_out, &go)) {
 						BUG("group sync broken sliding to match");
+					}
 				}
-			} else if (flags & XDF_INDENT_HEURISTIC) {
+			} else if ((flags & XDF_INDENT_HEURISTIC) != 0) {
 				/*
 				 * Indent heuristic: a group of pure add/delete lines
 				 * implies two splits, one between the end of the
@@ -474,10 +482,12 @@ i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 				struct split_score best_score;
 
 				shift = earliest_end;
-				if (g.end - groupsize - 1 > shift)
+				if (g.end - groupsize - 1 > shift) {
 					shift = g.end - groupsize - 1;
-				if (g.end - INDENT_HEURISTIC_MAX_SLIDING > shift)
+				}
+				if (g.end - INDENT_HEURISTIC_MAX_SLIDING > shift) {
 					shift = g.end - INDENT_HEURISTIC_MAX_SLIDING;
+				}
 				for (; shift <= g.end; shift++) {
 					struct split_measurement m;
 					struct split_score score = {0, 0};
@@ -495,23 +505,28 @@ i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 				}
 
 				while (g.end > best_shift) {
-					if (group_slide_up(ctx, &g))
+					if (group_slide_up(ctx, &g)) {
 						BUG("best shift unreached");
-					if (group_previous(ctx_out, &go))
+					}
+					if (group_previous(ctx_out, &go)) {
 						BUG("group sync broken sliding to blank line");
+					}
 				}
 			}
 		}
 
 		/* Move past the just-processed group: */
-		if (group_next(ctx, &g))
+		if (group_next(ctx, &g)) {
 			break;
-		if (group_next(ctx_out, &go))
+		}
+		if (group_next(ctx_out, &go)) {
 			BUG("group sync broken moving to next group");
+		}
 	}
 
-	if (!group_next(ctx_out, &go))
+	if (!group_next(ctx_out, &go)) {
 		BUG("group sync broken at end of file");
+	}
 
 	return 0;
 }
