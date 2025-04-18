@@ -14,6 +14,80 @@ const XDL_SNAKE_CNT: isize = 20;
 const XDL_K_HEUR: isize = 4;
 
 
+/*
+ * If a line is indented more than this, get_indent() just returns this value.
+ * This avoids having to do absurd amounts of work for data that are not
+ * human-readable text, and also ensures that the output of get_indent fits
+ * within an int.
+ */
+const MAX_INDENT: isize = 200;
+
+/*
+ * If more than this number of consecutive blank rows are found, just return
+ * this value. This avoids requiring O(N^2) work for pathological cases, and
+ * also ensures that the output of score_split fits in an int.
+ */
+const MAX_BLANKS: isize = 20;
+
+
+/*
+ * The empirically-determined weight factors used by score_split() below.
+ * Larger values means that the position is a less favorable place to split.
+ *
+ * Note that scores are only ever compared against each other, so multiplying
+ * all of these weight/penalty values by the same factor wouldn't change the
+ * heuristic's behavior. Still, we need to set that arbitrary scale *somehow*.
+ * In practice, these numbers are chosen to be large enough that they can be
+ * adjusted relative to each other with sufficient precision despite using
+ * integer math.
+ */
+
+/* Penalty if there are no non-blank lines before the split */
+const START_OF_FILE_PENALTY: isize = 1;
+
+/* Penalty if there are no non-blank lines after the split */
+const END_OF_FILE_PENALTY: isize = 21;
+
+/* Multiplier for the number of blank lines around the split */
+const TOTAL_BLANK_WEIGHT: isize = -30;
+
+/* Multiplier for the number of blank lines after the split */
+const POST_BLANK_WEIGHT: isize = 6;
+
+/*
+ * Penalties applied if the line is indented more than its predecessor
+ */
+const RELATIVE_INDENT_PENALTY: isize = -4;
+const RELATIVE_INDENT_WITH_BLANK_PENALTY: isize = 10;
+
+/*
+ * Penalties applied if the line is indented less than both its predecessor and
+ * its successor
+ */
+const RELATIVE_OUTDENT_PENALTY: isize = 24;
+const RELATIVE_OUTDENT_WITH_BLANK_PENALTY: isize = 17;
+
+/*
+ * Penalties applied if the line is indented less than its predecessor but not
+ * less than its successor
+ */
+const RELATIVE_DEDENT_PENALTY: isize = 23;
+const RELATIVE_DEDENT_WITH_BLANK_PENALTY: isize = 17;
+
+/*
+ * We only consider whether the sum of the effective indents for splits are
+ * less than (-1), equal to (0), or greater than (+1) each other. The resulting
+ * value is multiplied by the following weight and combined with the penalty to
+ * determine the better of two scores.
+ */
+const INDENT_WEIGHT: isize = 60;
+
+/*
+ * How far do we slide a hunk at most?
+ */
+const INDENT_HEURISTIC_MAX_SLIDING: isize = 100;
+
+
 #[repr(C)]
 pub(crate) struct xdpsplit {
     pub(crate) i1: isize,
