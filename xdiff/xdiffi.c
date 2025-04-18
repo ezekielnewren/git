@@ -376,10 +376,10 @@ extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
  * This also helps in finding joinable change groups and reducing the diff
  * size.
  */
-int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, u64 flags) {
+i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, u64 flags) {
 	struct xdlgroup g, go;
-	long earliest_end, end_matching_other;
-	long groupsize;
+	isize earliest_end, end_matching_other;
+	isize groupsize;
 
 	group_init(ctx, &g);
 	group_init(ctx_out, &go);
@@ -388,119 +388,117 @@ int xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_
 		/*
 		 * If the group is empty in the to-be-compacted file, skip it:
 		 */
-		if (g.end == g.start)
-			goto next;
-
-		/*
-		 * Now shift the change up and then down as far as possible in
-		 * each direction. If it bumps into any other changes, merge
-		 * them.
-		 */
-		do {
-			groupsize = g.end - g.start;
-
+		if (g.end != g.start) {
 			/*
-			 * Keep track of the last "end" index that causes this
-			 * group to align with a group of changed lines in the
-			 * other file. -1 indicates that we haven't found such
-			 * a match yet:
+			 * Now shift the change up and then down as far as possible in
+			 * each direction. If it bumps into any other changes, merge
+			 * them.
 			 */
-			end_matching_other = -1;
+			do {
+				groupsize = g.end - g.start;
 
-			/* Shift the group backward as much as possible: */
-			while (!group_slide_up(ctx, &g))
-				if (group_previous(ctx_out, &go))
-					BUG("group sync broken sliding up");
+				/*
+				 * Keep track of the last "end" index that causes this
+				 * group to align with a group of changed lines in the
+				 * other file. -1 indicates that we haven't found such
+				 * a match yet:
+				 */
+				end_matching_other = -1;
 
-			/*
-			 * This is this highest that this group can be shifted.
-			 * Record its end index:
-			 */
-			earliest_end = g.end;
+				/* Shift the group backward as much as possible: */
+				while (!group_slide_up(ctx, &g))
+					if (group_previous(ctx_out, &go))
+						BUG("group sync broken sliding up");
 
-			if (go.end > go.start)
-				end_matching_other = g.end;
-
-			/* Now shift the group forward as far as possible: */
-			while (1) {
-				if (group_slide_down(ctx, &g))
-					break;
-				if (group_next(ctx_out, &go))
-					BUG("group sync broken sliding down");
+				/*
+				 * This is this highest that this group can be shifted.
+				 * Record its end index:
+				 */
+				earliest_end = g.end;
 
 				if (go.end > go.start)
 					end_matching_other = g.end;
-			}
-		} while (groupsize != g.end - g.start);
 
-		/*
-		 * If the group can be shifted, then we can possibly use this
-		 * freedom to produce a more intuitive diff.
-		 *
-		 * The group is currently shifted as far down as possible, so
-		 * the heuristics below only have to handle upwards shifts.
-		 */
+				/* Now shift the group forward as far as possible: */
+				while (1) {
+					if (group_slide_down(ctx, &g))
+						break;
+					if (group_next(ctx_out, &go))
+						BUG("group sync broken sliding down");
 
-		if (g.end == earliest_end) {
-			/* no shifting was possible */
-		} else if (end_matching_other != -1) {
-			/*
-			 * Move the possibly merged group of changes back to
-			 * line up with the last group of changes from the
-			 * other file that it can align with.
-			 */
-			while (go.end == go.start) {
-				if (group_slide_up(ctx, &g))
-					BUG("match disappeared");
-				if (group_previous(ctx_out, &go))
-					BUG("group sync broken sliding to match");
-			}
-		} else if (flags & XDF_INDENT_HEURISTIC) {
-			/*
-			 * Indent heuristic: a group of pure add/delete lines
-			 * implies two splits, one between the end of the
-			 * "before" context and the start of the group, and
-			 * another between the end of the group and the
-			 * beginning of the "after" context. Some splits are
-			 * aesthetically better and some are worse. We compute
-			 * a badness "score" for each split, and add the scores
-			 * for the two splits to define a "score" for each
-			 * position that the group can be shifted to. Then we
-			 * pick the shift with the lowest score.
-			 */
-			long shift, best_shift = -1;
-			struct split_score best_score;
-
-			shift = earliest_end;
-			if (g.end - groupsize - 1 > shift)
-				shift = g.end - groupsize - 1;
-			if (g.end - INDENT_HEURISTIC_MAX_SLIDING > shift)
-				shift = g.end - INDENT_HEURISTIC_MAX_SLIDING;
-			for (; shift <= g.end; shift++) {
-				struct split_measurement m;
-				struct split_score score = {0, 0};
-
-				measure_split(ctx, shift, &m);
-				score_add_split(&m, &score);
-				measure_split(ctx, shift - groupsize, &m);
-				score_add_split(&m, &score);
-				if (best_shift == -1 ||
-				    score_cmp(&score, &best_score) <= 0) {
-					best_score.effective_indent = score.effective_indent;
-					best_score.penalty = score.penalty;
-					best_shift = shift;
+					if (go.end > go.start)
+						end_matching_other = g.end;
 				}
-			}
+			} while (groupsize != g.end - g.start);
 
-			while (g.end > best_shift) {
-				if (group_slide_up(ctx, &g))
-					BUG("best shift unreached");
-				if (group_previous(ctx_out, &go))
-					BUG("group sync broken sliding to blank line");
+			/*
+			 * If the group can be shifted, then we can possibly use this
+			 * freedom to produce a more intuitive diff.
+			 *
+			 * The group is currently shifted as far down as possible, so
+			 * the heuristics below only have to handle upwards shifts.
+			 */
+
+			if (g.end == earliest_end) {
+				/* no shifting was possible */
+			} else if (end_matching_other != -1) {
+				/*
+				 * Move the possibly merged group of changes back to
+				 * line up with the last group of changes from the
+				 * other file that it can align with.
+				 */
+				while (go.end == go.start) {
+					if (group_slide_up(ctx, &g))
+						BUG("match disappeared");
+					if (group_previous(ctx_out, &go))
+						BUG("group sync broken sliding to match");
+				}
+			} else if (flags & XDF_INDENT_HEURISTIC) {
+				/*
+				 * Indent heuristic: a group of pure add/delete lines
+				 * implies two splits, one between the end of the
+				 * "before" context and the start of the group, and
+				 * another between the end of the group and the
+				 * beginning of the "after" context. Some splits are
+				 * aesthetically better and some are worse. We compute
+				 * a badness "score" for each split, and add the scores
+				 * for the two splits to define a "score" for each
+				 * position that the group can be shifted to. Then we
+				 * pick the shift with the lowest score.
+				 */
+				isize shift, best_shift = -1;
+				struct split_score best_score;
+
+				shift = earliest_end;
+				if (g.end - groupsize - 1 > shift)
+					shift = g.end - groupsize - 1;
+				if (g.end - INDENT_HEURISTIC_MAX_SLIDING > shift)
+					shift = g.end - INDENT_HEURISTIC_MAX_SLIDING;
+				for (; shift <= g.end; shift++) {
+					struct split_measurement m;
+					struct split_score score = {0, 0};
+
+					measure_split(ctx, shift, &m);
+					score_add_split(&m, &score);
+					measure_split(ctx, shift - groupsize, &m);
+					score_add_split(&m, &score);
+					if (best_shift == -1 ||
+					    score_cmp(&score, &best_score) <= 0) {
+						best_score.effective_indent = score.effective_indent;
+						best_score.penalty = score.penalty;
+						best_shift = shift;
+					    }
+				}
+
+				while (g.end > best_shift) {
+					if (group_slide_up(ctx, &g))
+						BUG("best shift unreached");
+					if (group_previous(ctx_out, &go))
+						BUG("group sync broken sliding to blank line");
+				}
 			}
 		}
 
-	next:
 		/* Move past the just-processed group: */
 		if (group_next(ctx, &g))
 			break;
