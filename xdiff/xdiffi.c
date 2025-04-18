@@ -366,38 +366,8 @@ struct xdlgroup {
 };
 
 extern void group_init(struct xd_file_context *ctx, struct xdlgroup *g);
-
-/*
- * Move g to describe the next (possibly empty) group in xdf and return 0. If g
- * is already at the end of the file, do nothing and return -1.
- */
-static inline int group_next(struct xd_file_context *ctx, struct xdlgroup *g)
-{
-	if (g->end == (isize) ctx->record->length)
-		return -1;
-
-	g->start = g->end + 1;
-	for (g->end = g->start; ctx->consider.ptr[SENTINEL + g->end]; g->end++)
-		;
-
-	return 0;
-}
-
-/*
- * Move g to describe the previous (possibly empty) group in xdf and return 0.
- * If g is already at the beginning of the file, do nothing and return -1.
- */
-static inline int group_previous(struct xd_file_context *ctx, struct xdlgroup *g)
-{
-	if (g->start == 0)
-		return -1;
-
-	g->end = g->start - 1;
-	for (g->start = g->end; ctx->consider.ptr[SENTINEL + g->start - 1]; g->start--)
-		;
-
-	return 0;
-}
+extern int group_next(struct xd_file_context *ctx, struct xdlgroup *g);
+extern int group_previous(struct xd_file_context *ctx, struct xdlgroup *g);
 
 /*
  * If g can be slid toward the end of the file, do so, and if it bumps into a

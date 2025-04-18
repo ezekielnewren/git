@@ -721,6 +721,51 @@ unsafe extern "C" fn group_init(ctx: *const xd_file_context, g: *mut xdlgroup) {
 }
 
 
+/*
+ * Move g to describe the next (possibly empty) group in xdf and return 0. If g
+ * is already at the end of the file, do nothing and return -1.
+ */
+#[no_mangle]
+unsafe extern "C" fn group_next(ctx: *const xd_file_context, g: *mut xdlgroup) -> i32 {
+	let ctx = xd_file_context::from_raw(ctx);
+	let g: &mut xdlgroup = &mut *g;
+
+	if g.end as usize == (*ctx.record).len() {
+		return -1;
+	}
+
+	g.start = g.end + 1;
+	g.end = g.start;
+	while ctx.consider[SENTINEL + g.end as usize] != NO {
+		g.end += 1;
+	}
+
+	0
+}
+
+
+/*
+ * Move g to describe the previous (possibly empty) group in xdf and return 0.
+ * If g is already at the beginning of the file, do nothing and return -1.
+ */
+#[no_mangle]
+unsafe extern "C" fn group_previous(ctx: *const xd_file_context, g: *mut xdlgroup) -> i32 {
+	let ctx = xd_file_context::from_raw(ctx);
+	let g = &mut *g;
+
+	if g.start == 0 {
+		return -1;
+	}
+
+	g.end = g.start - 1;
+	g.start = g.end;
+	while ctx.consider[SENTINEL + g.start as usize - 1] != NO {
+		g.start -= 1;
+	}
+
+	0
+}
+
 
 #[cfg(test)]
 mod tests {
