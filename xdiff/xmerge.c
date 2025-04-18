@@ -104,30 +104,7 @@ extern void xdl_fill_merge_buffer(struct xd3way *three_way,
 				 struct xdmerge *m, struct ivec_u8* buffer, u64 style,
 				 usize marker_size);
 
-/*
- * Remove any common lines from the beginning and end of the conflicted region.
- */
-static void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, struct xdmerge *m) {
-	u64 *mph1 = three_way->side1.minimal_perfect_hash.ptr;
-	u64 *mph2 = three_way->side2.minimal_perfect_hash.ptr;
-	for (; m; m = m->next) {
-		/* let's handle just the conflicts */
-		if (m->mode) {
-			continue;
-		}
-
-		while (m->chg1 && m->chg2 && mph1[m->i1] == mph2[m->i2]) {
-			m->chg1--;
-			m->chg2--;
-			m->i1++;
-			m->i2++;
-		}
-		while (m->chg1 && m->chg2 && mph1[m->i1 + m->chg1 - 1] == mph2[m->i2 + m->chg2 - 1]) {
-			m->chg1--;
-			m->chg2--;
-		}
-	}
-}
+extern void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, struct xdmerge *m);
 
 /*
  * Sometimes, changes are not quite identical, but differ in only a few

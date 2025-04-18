@@ -281,3 +281,36 @@ unsafe extern "C" fn xdl_fill_merge_buffer(three_way: *mut xd3way,
 	}
 	xdl_recs_copy(&three_way.side1.record, i, three_way.side1.record.len() - i, false, false, buffer);
 }
+
+/*
+ * Remove any common lines from the beginning and end of the conflicted region.
+ */
+#[no_mangle]
+unsafe extern "C" fn xdl_refine_zdiff3_conflicts(three_way: *mut xd3way, mut merge: *mut xdmerge) {
+	let three_way = xd3way::from_raw_mut(three_way);
+
+	let mph1 = three_way.side1.minimal_perfect_hash.as_slice();
+	let mph2 = three_way.side2.minimal_perfect_hash.as_slice();
+
+	while !merge.is_null() {
+		let m = xdmerge::from_raw_mut(merge);
+		/* let's handle just the conflicts */
+		if m.mode != 0 {
+			merge = m.next;
+			continue;
+		}
+
+		while m.chg1 != 0 && m.chg2 != 0 && mph1[m.i1] == mph2[m.i2] {
+			m.chg1 -= 1;
+			m.chg2 -= 1;
+			m.i1 += 1;
+			m.i2 += 1;
+		}
+		while m.chg1 != 0 && m.chg2 != 0 && mph1[m.i1 + m.chg1 - 1] == mph2[m.i2 + m.chg2 - 1] {
+			m.chg1 -= 1;
+			m.chg2 -= 1;
+		}
+
+		merge = m.next;
+	}
+}
