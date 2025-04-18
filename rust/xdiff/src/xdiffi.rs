@@ -90,6 +90,54 @@ pub(crate) struct xdlgroup {
 }
 
 
+/* Characteristics measured about a hypothetical split position. */
+#[repr(C)]
+struct split_measurement {
+	/*
+	 * Is the split at the end of the file (aside from any blank lines)?
+	 */
+	end_of_file: isize,
+
+	/*
+	 * How much is the line immediately following the split indented (or -1
+	 * if the line is blank):
+	 */
+	indent: isize,
+
+	/*
+	 * How many consecutive lines above the split are blank?
+	 */
+	pre_blank: isize,
+
+	/*
+	 * How much is the nearest non-blank line above the split indented (or
+	 * -1 if there is no such line)?
+	 */
+	pre_indent: isize,
+
+	/*
+	 * How many lines after the line following the split are blank?
+	 */
+	post_blank: isize,
+
+	/*
+	 * How much is the nearest non-blank line after the line following the
+	 * split indented (or -1 if there is no such line)?
+	 */
+	post_indent: isize,
+}
+
+
+#[repr(C)]
+struct split_score {
+	/* The effective indent of this split (smaller is preferred). */
+	effective_indent: isize,
+
+	/* Penalty for this split (smaller is preferred). */
+	penalty: isize,
+}
+
+
 fn get_mph(ctx: &FileContext, index: usize) -> u64 {
 	ctx.minimal_perfect_hash[ctx.rindex[index]]
 }
