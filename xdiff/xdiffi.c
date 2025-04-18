@@ -368,48 +368,8 @@ struct xdlgroup {
 extern void group_init(struct xd_file_context *ctx, struct xdlgroup *g);
 extern int group_next(struct xd_file_context *ctx, struct xdlgroup *g);
 extern int group_previous(struct xd_file_context *ctx, struct xdlgroup *g);
-
-/*
- * If g can be slid toward the end of the file, do so, and if it bumps into a
- * following group, expand this group to include it. Return 0 on success or -1
- * if g cannot be slid down.
- */
-static int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g)
-{
-	if (g->end < (isize) ctx->record->length &&
-	    ctx->minimal_perfect_hash->ptr[g->start] == ctx->minimal_perfect_hash->ptr[g->end]) {
-		ctx->consider.ptr[SENTINEL + g->start++] = NO;
-		ctx->consider.ptr[SENTINEL + g->end++] = YES;
-
-		while (ctx->consider.ptr[SENTINEL + g->end])
-			g->end++;
-
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-/*
- * If g can be slid toward the beginning of the file, do so, and if it bumps
- * into a previous group, expand this group to include it. Return 0 on success
- * or -1 if g cannot be slid up.
- */
-static int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g)
-{
-	if (g->start > 0 &&
-	    ctx->minimal_perfect_hash->ptr[g->start - 1] == ctx->minimal_perfect_hash->ptr[g->end - 1]) {
-		ctx->consider.ptr[SENTINEL + --g->start] = YES;
-		ctx->consider.ptr[SENTINEL + --g->end] = NO;
-
-		while (ctx->consider.ptr[SENTINEL + g->start - 1])
-			g->start--;
-
-		return 0;
-	} else {
-		return -1;
-	}
-}
+extern int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g);
+extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
 
 /*
  * Move back and forward change groups for a consistent and pretty diff output.

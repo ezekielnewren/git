@@ -767,6 +767,61 @@ unsafe extern "C" fn group_previous(ctx: *const xd_file_context, g: *mut xdlgrou
 }
 
 
+/*
+ * If g can be slid toward the end of the file, do so, and if it bumps into a
+ * following group, expand this group to include it. Return 0 on success or -1
+ * if g cannot be slid down.
+ */
+#[no_mangle]
+unsafe extern "C" fn group_slide_down(ctx: *mut xd_file_context, g: *mut xdlgroup) -> i32 {
+	let ctx = xd_file_context::from_raw_mut(ctx);
+	let g = &mut *g;
+	let mph = (*ctx.minimal_perfect_hash).as_slice();
+
+	if (g.end as usize) < mph.len() && mph[g.start as usize] == mph[g.end as usize] {
+		ctx.consider[SENTINEL + g.start as usize] = NO;
+		g.start += 1;
+		ctx.consider[SENTINEL + g.end as usize] = YES;
+		g.end += 1;
+
+		while ctx.consider[SENTINEL + g.end as usize] != NO {
+			g.end += 1;
+		}
+
+		return 0;
+	}
+
+	-1
+}
+
+/*
+ * If g can be slid toward the beginning of the file, do so, and if it bumps
+ * into a previous group, expand this group to include it. Return 0 on success
+ * or -1 if g cannot be slid up.
+ */
+#[no_mangle]
+unsafe extern "C" fn group_slide_up(ctx: *mut xd_file_context, g: *mut xdlgroup) -> i32 {
+	let ctx = xd_file_context::from_raw_mut(ctx);
+	let g = &mut *g;
+	let mph = (*ctx.minimal_perfect_hash).as_slice();
+
+	if g.start > 0 && mph[g.start as usize - 1] == mph[g.end as usize - 1] {
+		g.start -= 1;
+		ctx.consider[SENTINEL + g.start as usize] = YES;
+		g.end -= 1;
+		ctx.consider[SENTINEL + g.end as usize] = NO;
+
+		while ctx.consider[SENTINEL + g.start as usize - 1] != NO {
+			g.start -= 1;
+		}
+
+		return 0;
+	}
+
+	-1
+}
+
+
 #[cfg(test)]
 mod tests {
 
