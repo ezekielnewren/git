@@ -153,6 +153,7 @@ pub struct xd_file_context {
     pub rindex: IVec<usize>,
 }
 
+
 impl Default for xd_file_context {
     fn default() -> Self {
         Self {
@@ -167,16 +168,37 @@ impl Default for xd_file_context {
 
 impl xd_file_context {
 
+    fn test_invariants(&self) {
+        unsafe {
+            (*self.minimal_perfect_hash).test_invariants();
+            (*self.record).test_invariants();
+        }
+        self.consider.test_invariants();
+        self.rindex.test_invariants();
+    }
+
     pub(crate) unsafe fn from_raw_mut<'a>(ctx: *mut xd_file_context) -> &'a mut xd_file_context {
         if ctx.is_null() {
             panic!("null pointer");
         }
 
         let out = &mut *ctx;
-        (*out.minimal_perfect_hash).test_invariants();
-        (*out.record).test_invariants();
-        out.consider.test_invariants();
-        out.rindex.test_invariants();
+
+        #[cfg(debug_assertions)]
+        out.test_invariants();
+
+        out
+    }
+
+    pub(crate) unsafe fn from_raw<'a>(ctx: *const xd_file_context) -> &'a xd_file_context {
+        if ctx.is_null() {
+            panic!("null pointer");
+        }
+
+        let out = &*ctx;
+
+        #[cfg(debug_assertions)]
+        out.test_invariants();
 
         out
     }

@@ -58,6 +58,38 @@ pub(crate) struct xdchange {
     pub(crate) ignore: bool,
 }
 
+
+/*
+ * Represent a group of changed lines in an xdfile_t (i.e., a contiguous group
+ * of lines that was inserted or deleted from the corresponding version of the
+ * file). We consider there to be such a group at the beginning of the file, at
+ * the end of the file, and between any two unchanged lines, though most such
+ * groups will usually be empty.
+ *
+ * If the first line in a group is equal to the line following the group, then
+ * the group can be slid down. Similarly, if the last line in a group is equal
+ * to the line preceding the group, then the group can be slid up. See
+ * group_slide_down() and group_slide_up().
+ *
+ * Note that loops that are testing for changed lines in xdf->rchg do not need
+ * index bounding since the array is prepared with a zero at position -1 and N.
+ */
+#[repr(C)]
+pub(crate) struct xdlgroup {
+	/*
+	 * The index of the first changed line in the group, or the index of
+	 * the unchanged line above which the (empty) group is located.
+	 */
+	start: isize,
+
+	/*
+	 * The index of the first unchanged line after the group. For an empty
+	 * group, end is equal to start.
+	 */
+	end: isize,
+}
+
+
 fn get_mph(ctx: &FileContext, index: usize) -> u64 {
 	ctx.minimal_perfect_hash[ctx.rindex[index]]
 }
@@ -671,6 +703,23 @@ pub(crate) fn do_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 
 	classic_diff(xpp.flags, pair)
 }
+
+
+/*
+ * Initialize g to point at the first group in xdf.
+ */
+#[no_mangle]
+unsafe extern "C" fn group_init(ctx: *const xd_file_context, g: *mut xdlgroup) {
+	let ctx = xd_file_context::from_raw(ctx);
+	let g = &mut *g;
+
+	g.start = 0;
+	g.end = 0;
+	while ctx.consider[SENTINEL + g.end as usize] != 0 {
+		g.end += 1;
+	}
+}
+
 
 
 #[cfg(test)]

@@ -365,15 +365,7 @@ struct xdlgroup {
 	isize end;
 };
 
-/*
- * Initialize g to point at the first group in xdf.
- */
-static void group_init(struct xd_file_context *ctx, struct xdlgroup *g)
-{
-	g->start = g->end = 0;
-	while (ctx->consider.ptr[SENTINEL + g->end])
-		g->end++;
-}
+extern void group_init(struct xd_file_context *ctx, struct xdlgroup *g);
 
 /*
  * Move g to describe the next (possibly empty) group in xdf and return 0. If g
