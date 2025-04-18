@@ -41,7 +41,7 @@ struct xdchange {
 extern i32 xdl_do_classic_diff(u64 flags, struct xdpair *pair);
 extern i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair);
 extern i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, u64 flags);
-int xdl_build_script(struct xdpair *pair, struct xdchange **xscr);
+extern i32 xdl_build_script(struct xdpair *pair, struct xdchange **xscr);
 void xdl_free_script(struct xdchange *xscr);
 int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
 		  xdemitconf_t const *xecfg);

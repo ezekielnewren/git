@@ -150,6 +150,46 @@ unsafe extern "C" fn xdl_add_change(xscr: *mut xdchange, i1: isize, i2: isize, c
 }
 
 
+#[no_mangle]
+unsafe extern "C" fn xdl_build_script(pair: *mut xdpair, xscr: *mut *mut xdchange) -> i32 {
+	let pair = xdpair::from_raw_mut(pair);
+	let xscr = &mut *xscr;
+
+	let mut cscr: *mut xdchange = std::ptr::null_mut();
+	let mut xch: *mut xdchange = std::ptr::null_mut();
+
+	let mut i1: isize = (*pair.lhs.record).len() as isize;
+	let mut i2: isize = (*pair.rhs.record).len() as isize;
+
+	/*
+	 * Trivial. Collects "groups" of changes and creates an edit script.
+	 */
+	while i1 >= 0 || i2 >= 0 {
+		if pair.lhs.consider[SENTINEL + i1 as usize - 1] != NO || pair.rhs.consider[SENTINEL + i2 as usize - 1] != NO {
+			let l1 = i1;
+			while pair.lhs.consider[SENTINEL + i1 as usize - 1] != NO {
+				i1 -= 1;
+			}
+
+			let l2 = i2;
+			while pair.rhs.consider[SENTINEL + i2 as usize - 1] != NO {
+				i2 -= 1;
+			}
+
+			xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2);
+			cscr = xch;
+		}
+
+		i1 -= 1;
+		i2 -= 1;
+	}
+
+	*xscr = cscr;
+
+	0
+}
+
+
 /*
  * Represent a group of changed lines in an xdfile_t (i.e., a contiguous group
  * of lines that was inserted or deleted from the corresponding version of the

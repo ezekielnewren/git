@@ -197,31 +197,6 @@ extern int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g);
 extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
 
 
-// i32 xdl_build_script(struct xdpair *pair, struct xdchange **xscr) {
-// 	struct xdchange *cscr = NULL, *xch;
-// 	long i1, i2, l1, l2;
-//
-// 	/*
-// 	 * Trivial. Collects "groups" of changes and creates an edit script.
-// 	 */
-// 	for (i1 = pair->lhs.record->length, i2 = pair->rhs.record->length; i1 >= 0 || i2 >= 0; i1--, i2--)
-// 		if (pair->lhs.consider.ptr[SENTINEL + i1 - 1] || pair->rhs.consider.ptr[SENTINEL + i2 - 1]) {
-// 			for (l1 = i1; pair->lhs.consider.ptr[SENTINEL + i1 - 1]; i1--);
-// 			for (l2 = i2; pair->rhs.consider.ptr[SENTINEL + i2 - 1]; i2--);
-//
-// 			if (!(xch = xdl_add_change(cscr, i1, i2, l1 - i1, l2 - i2))) {
-// 				xdl_free_script(cscr);
-// 				return -1;
-// 			}
-// 			cscr = xch;
-// 		}
-//
-// 	*xscr = cscr;
-//
-// 	return 0;
-// }
-
-
 void xdl_free_script(struct xdchange *xscr) {
 	struct xdchange *xch;
 
