@@ -6,7 +6,7 @@ use crate::xhistogram::{do_histogram_diff};
 use crate::xpatience::{do_patience_diff};
 use crate::xprepare::safe_2way_slice;
 use crate::xtypes::*;
-use crate::xutils::xdl_bogosqrt;
+use crate::xutils::*;
 
 const XDL_MAX_COST_MIN: isize = 256;
 const XDL_HEUR_MIN_COST: isize = 256;
@@ -209,6 +209,36 @@ struct split_score {
 
 	/* Penalty for this split (smaller is preferred). */
 	penalty: isize,
+}
+
+
+/*
+ * Return the amount of indentation of the specified line, treating TAB as 8
+ * columns. Return -1 if line is empty or contains only whitespace. Clamp the
+ * output value at MAX_INDENT.
+ */
+#[no_mangle]
+unsafe extern "C" fn get_indent(rec: *const xrecord) -> isize {
+	let line = (*rec).as_ref();
+
+	let mut ret = 0;
+	for byte in line.iter().copied() {
+		if !XDL_ISSPACE(byte) {
+			return ret;
+		} else if byte == b' ' {
+			ret += 1;
+		} else if byte == b'\t' {
+			ret += 8 - ret % 8;
+		}
+		/* ignore other whitespace characters */
+
+		if ret >= MAX_INDENT {
+			return MAX_INDENT;
+		}
+	}
+
+	/* The line contains only whitespace. */
+	-1
 }
 
 

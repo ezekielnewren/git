@@ -59,34 +59,7 @@ static struct xdchange *xdl_add_change(struct xdchange *xscr, isize i1, isize i2
  */
 #define MAX_INDENT 200
 
-/*
- * Return the amount of indentation of the specified line, treating TAB as 8
- * columns. Return -1 if line is empty or contains only whitespace. Clamp the
- * output value at MAX_INDENT.
- */
-static int get_indent(struct xrecord *rec)
-{
-	long i;
-	int ret = 0;
-
-	for (i = 0; i < (isize) rec->size; i++) {
-		char c = rec->ptr[i];
-
-		if (!XDL_ISSPACE(c))
-			return ret;
-		else if (c == ' ')
-			ret += 1;
-		else if (c == '\t')
-			ret += 8 - ret % 8;
-		/* ignore other whitespace characters */
-
-		if (ret >= MAX_INDENT)
-			return MAX_INDENT;
-	}
-
-	/* The line contains only whitespace. */
-	return -1;
-}
+extern isize get_indent(struct xrecord *rec);
 
 /*
  * If more than this number of consecutive blank rows are found, just return
