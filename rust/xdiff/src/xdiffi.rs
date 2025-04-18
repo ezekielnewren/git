@@ -165,6 +165,23 @@ pub(crate) struct xdlgroup {
 }
 
 
+impl xdlgroup {
+
+	fn new(ctx: &xd_file_context) -> Self {
+		let mut g = Self {
+			start: 0,
+			end: 0,
+		};
+
+		while ctx.consider[SENTINEL + g.end as usize] != 0 {
+			g.end += 1;
+		}
+
+		g
+	}
+}
+
+
 /* Characteristics measured about a hypothetical split position. */
 #[repr(C)]
 struct split_measurement {
@@ -393,9 +410,9 @@ unsafe extern "C" fn score_add_split(m: *const split_measurement, s: *mut split_
 
 
 #[no_mangle]
-unsafe extern "C" fn score_cmp(s1: *mut split_score, s2: *mut split_score) -> isize {
-	let s1 = &mut *s1;
-	let s2 = &mut *s2;
+unsafe extern "C" fn score_cmp(s1: *const split_score, s2: *const split_score) -> isize {
+	let s1 = &*s1;
+	let s2 = &*s2;
 
 	let cmp_indents: Ordering = s1.effective_indent.cmp(&s2.effective_indent);
 
@@ -1019,22 +1036,6 @@ pub(crate) fn do_diff(xpp: &xpparam_t, pair: &mut xdpair) -> i32 {
 
 
 /*
- * Initialize g to point at the first group in xdf.
- */
-#[no_mangle]
-unsafe extern "C" fn group_init(ctx: *const xd_file_context, g: *mut xdlgroup) {
-	let ctx = xd_file_context::from_raw(ctx);
-	let g = &mut *g;
-
-	g.start = 0;
-	g.end = 0;
-	while ctx.consider[SENTINEL + g.end as usize] != 0 {
-		g.end += 1;
-	}
-}
-
-
-/*
  * Move g to describe the next (possibly empty) group in xdf and return 0. If g
  * is already at the end of the file, do nothing and return -1.
  */
@@ -1132,6 +1133,186 @@ unsafe extern "C" fn group_slide_up(ctx: *mut xd_file_context, g: *mut xdlgroup)
 	}
 
 	-1
+}
+
+
+/*
+ * Move back and forward change groups for a consistent and pretty diff output.
+ * This also helps in finding joinable change groups and reducing the diff
+ * size.
+ */
+#[no_mangle]
+unsafe extern "C" fn xdl_change_compact(ctx: *mut xd_file_context, ctx_out: *mut xd_file_context, flags: u64) -> i32 {
+	let ctx = xd_file_context::from_raw_mut(ctx);
+	let ctx_out = xd_file_context::from_raw_mut(ctx_out);
+
+	let mut g = xdlgroup::new(ctx);
+	let mut go = xdlgroup::new(ctx_out);
+
+	let mut earliest_end: isize;
+	let mut end_matching_other: isize;
+	let mut groupsize: isize;
+
+	loop {
+		/*
+		 * If the group is empty in the to-be-compacted file, skip it:
+		 */
+		if g.end != g.start {
+			/*
+			 * Now shift the change up and then down as far as possible in
+			 * each direction. If it bumps into any other changes, merge
+			 * them.
+			 */
+			loop {
+				groupsize = g.end - g.start;
+
+				/*
+				 * Keep track of the last "end" index that causes this
+				 * group to align with a group of changed lines in the
+				 * other file. -1 indicates that we haven't found such
+				 * a match yet:
+				 */
+				end_matching_other = -1;
+
+				/* Shift the group backward as much as possible: */
+				while group_slide_up(ctx, &mut g) == 0 {
+					if group_previous(ctx_out, &mut go) != 0 {
+						panic!("group sync broken sliding up");
+					}
+				}
+
+				/*
+				 * This is this highest that this group can be shifted.
+				 * Record its end index:
+				 */
+				earliest_end = g.end;
+
+				if go.end > go.start {
+					end_matching_other = g.end;
+				}
+
+				/* Now shift the group forward as far as possible: */
+				loop {
+					if group_slide_down(ctx, &mut g) != 0 {
+						break;
+					}
+					if group_next(ctx_out, &mut go) != 0 {
+						panic!("group sync broken sliding down");
+					}
+
+					if go.end > go.start {
+						end_matching_other = g.end;
+					}
+				}
+
+				if groupsize == g.end - g.start {
+					break;
+				}
+			}
+
+			/*
+			 * If the group can be shifted, then we can possibly use this
+			 * freedom to produce a more intuitive diff.
+			 *
+			 * The group is currently shifted as far down as possible, so
+			 * the heuristics below only have to handle upwards shifts.
+			 */
+
+			if g.end == earliest_end {
+				/* no shifting was possible */
+			} else if end_matching_other != -1 {
+				/*
+				 * Move the possibly merged group of changes back to
+				 * line up with the last group of changes from the
+				 * other file that it can align with.
+				 */
+				while go.end == go.start {
+					if group_slide_up(ctx, &mut g) != 0 {
+						panic!("match disappeared");
+					}
+					if group_previous(ctx_out, &mut go) != 0 {
+						panic!("group sync broken sliding to match");
+					}
+				}
+			} else if (flags & XDF_INDENT_HEURISTIC) != 0 {
+				/*
+				 * Indent heuristic: a group of pure add/delete lines
+				 * implies two splits, one between the end of the
+				 * "before" context and the start of the group, and
+				 * another between the end of the group and the
+				 * beginning of the "after" context. Some splits are
+				 * aesthetically better and some are worse. We compute
+				 * a badness "score" for each split, and add the scores
+				 * for the two splits to define a "score" for each
+				 * position that the group can be shifted to. Then we
+				 * pick the shift with the lowest score.
+				 */
+				let mut best_shift = -1;
+				let mut best_score = split_score {
+					effective_indent: 0,
+					penalty: 0,
+				};
+
+				let mut shift = earliest_end;
+				if g.end - groupsize - 1 > shift {
+					shift = g.end - groupsize - 1;
+				}
+				if g.end - INDENT_HEURISTIC_MAX_SLIDING > shift {
+					shift = g.end - INDENT_HEURISTIC_MAX_SLIDING;
+				}
+				while shift <= g.end {
+					let mut m = split_measurement {
+						end_of_file: false,
+						indent: 0,
+						pre_blank: 0,
+						pre_indent: 0,
+						post_blank: 0,
+						post_indent: 0,
+					};
+					let mut score = split_score {
+						effective_indent: 0,
+						penalty: 0,
+					};
+
+					measure_split(ctx, shift, &mut m);
+					score_add_split(&m, &mut score);
+					measure_split(ctx, shift - groupsize, &mut m);
+					score_add_split(&m, &mut score);
+					if best_shift == -1 ||
+					    score_cmp(&score, &best_score) <= 0 {
+						best_score.effective_indent = score.effective_indent;
+						best_score.penalty = score.penalty;
+						best_shift = shift;
+					    }
+
+					shift += 1;
+				}
+
+				while g.end > best_shift {
+					if group_slide_up(ctx, &mut g) != 0 {
+						panic!("best shift unreached");
+					}
+					if group_previous(ctx_out, &mut go) != 0 {
+						panic!("group sync broken sliding to blank line");
+					}
+				}
+			}
+		}
+
+		/* Move past the just-processed group: */
+		if group_next(ctx, &mut g) != 0 {
+			break;
+		}
+		if group_next(ctx_out, &mut go) != 0 {
+			panic!("group sync broken moving to next group");
+		}
+	}
+
+	if !group_next(ctx_out, &mut go) != 0 {
+		panic!("group sync broken at end of file");
+	}
+
+	0
 }
 
 
