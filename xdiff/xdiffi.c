@@ -73,7 +73,7 @@ struct split_measurement {
 	/*
 	 * Is the split at the end of the file (aside from any blank lines)?
 	 */
-	isize end_of_file;
+	bool end_of_file;
 
 	/*
 	 * How much is the line immediately following the split indented (or -1

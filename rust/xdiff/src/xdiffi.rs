@@ -170,7 +170,7 @@ struct split_measurement {
 	/*
 	 * Is the split at the end of the file (aside from any blank lines)?
 	 */
-	end_of_file: isize,
+	end_of_file: bool,
 
 	/*
 	 * How much is the line immediately following the split indented (or -1
@@ -252,10 +252,10 @@ unsafe extern "C" fn measure_split(ctx: *const xd_file_context, split: isize, m:
 	let m = &mut *m;
 
 	if (split as usize) >= record.len() {
-		m.end_of_file = 1;
+		m.end_of_file = true;
 		m.indent = -1;
 	} else {
-		m.end_of_file = 0;
+		m.end_of_file = false;
 		m.indent = get_indent(&record[split as usize]);
 	}
 
