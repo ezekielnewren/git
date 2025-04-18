@@ -242,6 +242,54 @@ unsafe extern "C" fn get_indent(rec: *const xrecord) -> isize {
 }
 
 
+/*
+ * Fill m with information about a hypothetical split of xdf above line split.
+ */
+#[no_mangle]
+unsafe extern "C" fn measure_split(ctx: *const xd_file_context, split: isize, m: *mut split_measurement) {
+	let ctx = xd_file_context::from_raw(ctx);
+	let record = (*ctx.record).as_slice();
+	let m = &mut *m;
+
+	if (split as usize) >= record.len() {
+		m.end_of_file = 1;
+		m.indent = -1;
+	} else {
+		m.end_of_file = 0;
+		m.indent = get_indent(&record[split as usize]);
+	}
+
+	m.pre_blank = 0;
+	m.pre_indent = -1;
+	// for (i = split - 1; i >= 0; i--) {
+	for i in (0..split as usize).rev() {
+		m.pre_indent = get_indent(&record[i]);
+		if m.pre_indent != -1 {
+			break;
+		}
+		m.pre_blank += 1;
+		if m.pre_blank == MAX_BLANKS {
+			m.pre_indent = 0;
+			break;
+		}
+	}
+
+	m.post_blank = 0;
+	m.post_indent = -1;
+	for i in split as usize + 1..record.len() {
+		m.post_indent = get_indent(&record[i]);
+		if m.post_indent != -1 {
+			break;
+		}
+		m.post_blank += 1;
+		if m.post_blank == MAX_BLANKS {
+			m.post_indent = 0;
+			break;
+		}
+	}
+}
+
+
 fn get_mph(ctx: &FileContext, index: usize) -> u64 {
 	ctx.minimal_perfect_hash[ctx.rindex[index]]
 }

@@ -112,48 +112,7 @@ struct split_score {
 	isize penalty;
 };
 
-/*
- * Fill m with information about a hypothetical split of xdf above line split.
- */
-static void measure_split(const struct xd_file_context *ctx, isize split,
-			  struct split_measurement *m)
-{
-	isize i;
-
-	if (split >= (isize) ctx->record->length) {
-		m->end_of_file = 1;
-		m->indent = -1;
-	} else {
-		m->end_of_file = 0;
-		m->indent = get_indent(&ctx->record->ptr[split]);
-	}
-
-	m->pre_blank = 0;
-	m->pre_indent = -1;
-	for (i = split - 1; i >= 0; i--) {
-		m->pre_indent = get_indent(&ctx->record->ptr[i]);
-		if (m->pre_indent != -1)
-			break;
-		m->pre_blank += 1;
-		if (m->pre_blank == MAX_BLANKS) {
-			m->pre_indent = 0;
-			break;
-		}
-	}
-
-	m->post_blank = 0;
-	m->post_indent = -1;
-	for (i = split + 1; i < (isize) ctx->record->length; i++) {
-		m->post_indent = get_indent(&ctx->record->ptr[i]);
-		if (m->post_indent != -1)
-			break;
-		m->post_blank += 1;
-		if (m->post_blank == MAX_BLANKS) {
-			m->post_indent = 0;
-			break;
-		}
-	}
-}
+static void measure_split(const struct xd_file_context *ctx, isize split, struct split_measurement *m);
 
 /*
  * The empirically-determined weight factors used by score_split() below.
