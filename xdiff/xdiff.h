@@ -143,13 +143,13 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 struct xmparam {
 	xpparam_t xpp;
-	int marker_size;
-	int level;
-	int favor;
-	int style;
-	const char *ancestor;	/* label for orig */
-	const char *file1;	/* label for mf1 */
-	const char *file2;	/* label for mf2 */
+	i32 marker_size;
+	i32 level;
+	i32 favor;
+	i32 style;
+	u8 const* ancestor;	/* label for orig */
+	u8 const* file1;	/* label for mf1 */
+	u8 const* file2;	/* label for mf2 */
 };
 
 #define DEFAULT_CONFLICT_MARKER_SIZE 7
