@@ -104,13 +104,13 @@ impl mmfile {
 
 
 #[repr(C)]
-struct xmparam {
-    xpp: xpparam_t,
-	marker_size: i32,
-	level: i32,
-	favor: i32,
-	style: i32,
-	ancestor: *const u8, /* label for orig */
-	file1: *const u8,    /* label for mf1 */
-	file2: *const u8,    /* label for mf2 */
+pub(crate) struct xmparam {
+    pub(crate) xpp: xpparam_t,
+	pub(crate) marker_size: i32,
+	pub(crate) level: i32,
+	pub(crate) favor: i32,
+	pub(crate) style: i32,
+	pub(crate) ancestor: *const u8, /* label for orig */
+	pub(crate) file1: *const u8,    /* label for mf1 */
+	pub(crate) file2: *const u8,    /* label for mf2 */
 }
