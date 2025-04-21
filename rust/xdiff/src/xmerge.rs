@@ -334,7 +334,7 @@ impl<'a> Iterator for xdmerge_iter<'a> {
 		if self.cur.is_null() {
 			return None;
 		}
-		
+
 		let t = self.cur;
 		self.cur = unsafe { (*self.cur).next };
 		Some(unsafe { &mut *t })
@@ -348,12 +348,12 @@ impl<'a> xdmerge_iter<'a> {
 			_marker: PhantomData,
 		}
 	}
-	
+
 	fn set(&mut self, immediate: *mut xdmerge) -> &mut xdmerge {
 		self.cur = immediate;
 		unsafe { &mut *self.cur }
 	}
-	
+
 }
 
 
@@ -369,10 +369,10 @@ unsafe extern "C" fn xdl_refine_conflicts(three_way: *mut xd3way, merge: *mut xd
 
 	let mut it = xdmerge_iter::new(merge);
 	while let Some(mut m) = it.next() {
-		
+
 		let mut two_way = xd2way::default();
 		let mut xscr: *mut xdchange = std::ptr::null_mut();
-		
+
 		let i1 = m.i1;
 		let i2 = m.i2;
 
@@ -388,10 +388,10 @@ unsafe extern "C" fn xdl_refine_conflicts(three_way: *mut xd3way, merge: *mut xd
 
 		let range1 = m.i1..m.i1 + m.chg1;
 		let range2 = m.i2..m.i2 + m.chg2;
-		
+
 		let lhs = FileContext::new(&mut three_way.pair1.rhs);
 		let rhs = FileContext::new(&mut three_way.pair2.rhs);
-		
+
 		safe_2way_slice(&lhs, range1, &rhs, range2, three_way.minimal_perfect_hash_size, &mut two_way);
 		if xdl_do_diff(xpp, &mut two_way.pair) < 0 {
 			return -1;
@@ -400,7 +400,7 @@ unsafe extern "C" fn xdl_refine_conflicts(three_way: *mut xd3way, merge: *mut xd
 		xdl_change_compact(&mut two_way.pair.lhs, &mut two_way.pair.rhs, xpp.flags);
 		xdl_change_compact(&mut two_way.pair.rhs, &mut two_way.pair.lhs, xpp.flags);
 		xdl_build_script(&mut two_way.pair, &mut xscr);
-		
+
 		let start = xscr;
 		m.i1 = (*xscr).i1 as usize + i1;
 		m.chg1 = (*xscr).chg1 as usize;
@@ -408,12 +408,12 @@ unsafe extern "C" fn xdl_refine_conflicts(three_way: *mut xd3way, merge: *mut xd
 		m.chg2 = (*xscr).chg2 as usize;
 		while !(*xscr).next.is_null() {
 			let m2 = unsafe { &mut *(xmalloc(size_of::<xdmerge>()) as *mut xdmerge) };
-			
+
 			xscr = (*xscr).next;
 			m2.next = m.next;
 			m.next = m2;
 			m = it.set(m2); // i.e. m = m2;
-			
+
 			m.mode = 0;
 			m.i1 = (*xscr).i1 as usize + i1;
 			m.chg1 = (*xscr).chg1 as usize;
