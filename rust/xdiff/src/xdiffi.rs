@@ -135,6 +135,20 @@ pub(crate) struct xdchange {
 }
 
 
+impl Default for xdchange {
+	fn default() -> Self {
+		Self {
+			next: std::ptr::null_mut(),
+			i1: 0,
+			i2: 0,
+			chg1: 0,
+			chg2: 0,
+			ignore: false,
+		}
+	}
+}
+
+
 #[no_mangle]
 unsafe extern "C" fn xdl_add_change(xscr: *mut xdchange, i1: isize, i2: isize, chg1: isize, chg2: isize) -> *mut xdchange {
 	let xch = &mut *(xmalloc(size_of::<xdchange>()) as *mut xdchange);
@@ -151,7 +165,7 @@ unsafe extern "C" fn xdl_add_change(xscr: *mut xdchange, i1: isize, i2: isize, c
 
 
 #[no_mangle]
-unsafe extern "C" fn xdl_build_script(pair: *mut xdpair, xscr: *mut *mut xdchange) -> i32 {
+pub(crate) unsafe extern "C" fn xdl_build_script(pair: *mut xdpair, xscr: *mut *mut xdchange) -> i32 {
 	let pair = xdpair::from_raw_mut(pair);
 	let xscr = &mut *xscr;
 
@@ -191,7 +205,7 @@ unsafe extern "C" fn xdl_build_script(pair: *mut xdpair, xscr: *mut *mut xdchang
 
 
 #[no_mangle]
-unsafe extern "C" fn xdl_free_script(mut xscr: *mut xdchange) {
+pub(crate) unsafe extern "C" fn xdl_free_script(mut xscr: *mut xdchange) {
 	while !xscr.is_null() {
 		let next = (*xscr).next;
 		libc::free(xscr as *mut libc::c_void);
@@ -1208,7 +1222,7 @@ unsafe extern "C" fn group_slide_up(ctx: *mut xd_file_context, g: *mut xdlgroup)
  * size.
  */
 #[no_mangle]
-unsafe extern "C" fn xdl_change_compact(ctx: *mut xd_file_context, ctx_out: *mut xd_file_context, flags: u64) -> i32 {
+pub(crate) unsafe extern "C" fn xdl_change_compact(ctx: *mut xd_file_context, ctx_out: *mut xd_file_context, flags: u64) -> i32 {
 	let ctx = xd_file_context::from_raw_mut(ctx);
 	let ctx_out = xd_file_context::from_raw_mut(ctx_out);
 

@@ -1,7 +1,12 @@
 use std::io::repeat;
+use std::marker::PhantomData;
 use interop::ivec::IVec;
-use crate::xdiff::{DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL_MERGE_ZEALOUS_DIFF3};
-use crate::xtypes::{xd3way, xrecord};
+use interop::xmalloc;
+use crate::xdiff::{xpparam_t, DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL_MERGE_ZEALOUS_DIFF3};
+use crate::xdiffi::{xdchange, xdl_build_script, xdl_change_compact, xdl_free_script};
+use crate::xdl_do_diff;
+use crate::xprepare::safe_2way_slice;
+use crate::xtypes::{xd2way, xd3way, xrecord, FileContext};
 
 #[repr(C)]
 struct xdmerge {
@@ -313,4 +318,109 @@ unsafe extern "C" fn xdl_refine_zdiff3_conflicts(three_way: *mut xd3way, mut mer
 
 		merge = m.next;
 	}
+}
+
+
+struct xdmerge_iter<'a> {
+	cur: *mut xdmerge,
+	_marker: PhantomData<&'a mut xdmerge>,
+}
+
+impl<'a> Iterator for xdmerge_iter<'a> {
+	type Item = &'a mut xdmerge;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if self.cur.is_null() {
+			return None;
+		}
+		
+		let t = self.cur;
+		self.cur = unsafe { (*self.cur).next };
+		Some(unsafe { &mut *t })
+	}
+}
+
+impl<'a> xdmerge_iter<'a> {
+	fn new(start: *mut xdmerge) -> Self {
+		Self {
+			cur: start,
+			_marker: PhantomData,
+		}
+	}
+	
+	fn set(&mut self, immediate: *mut xdmerge) -> &mut xdmerge {
+		self.cur = immediate;
+		unsafe { &mut *self.cur }
+	}
+	
+}
+
+
+
+/*
+ * Sometimes, changes are not quite identical, but differ in only a few
+ * lines. Try hard to show only these few lines as conflicting.
+ */
+#[no_mangle]
+unsafe extern "C" fn xdl_refine_conflicts(three_way: *mut xd3way, merge: *mut xdmerge, xpp: *const xpparam_t) -> i32 {
+	let three_way = xd3way::from_raw_mut(three_way);
+	let xpp = &*xpp;
+
+	let mut it = xdmerge_iter::new(merge);
+	while let Some(mut m) = it.next() {
+		
+		let mut two_way = xd2way::default();
+		let mut xscr: *mut xdchange = std::ptr::null_mut();
+		
+		let i1 = m.i1;
+		let i2 = m.i2;
+
+		/* let's handle just the conflicts */
+		if m.mode != 0 {
+			continue;
+		}
+
+		/* no sense refining a conflict when one side is empty */
+		if m.chg1 == 0 || m.chg2 == 0 {
+			continue;
+		}
+
+		let range1 = m.i1..m.i1 + m.chg1;
+		let range2 = m.i2..m.i2 + m.chg2;
+		
+		let lhs = FileContext::new(&mut three_way.pair1.rhs);
+		let rhs = FileContext::new(&mut three_way.pair2.rhs);
+		
+		safe_2way_slice(&lhs, range1, &rhs, range2, three_way.minimal_perfect_hash_size, &mut two_way);
+		if xdl_do_diff(xpp, &mut two_way.pair) < 0 {
+			return -1;
+		}
+
+		xdl_change_compact(&mut two_way.pair.lhs, &mut two_way.pair.rhs, xpp.flags);
+		xdl_change_compact(&mut two_way.pair.rhs, &mut two_way.pair.lhs, xpp.flags);
+		xdl_build_script(&mut two_way.pair, &mut xscr);
+		
+		let start = xscr;
+		m.i1 = (*xscr).i1 as usize + i1;
+		m.chg1 = (*xscr).chg1 as usize;
+		m.i2 = (*xscr).i2 as usize + i2;
+		m.chg2 = (*xscr).chg2 as usize;
+		while !(*xscr).next.is_null() {
+			let m2 = unsafe { &mut *(xmalloc(size_of::<xdmerge>()) as *mut xdmerge) };
+			
+			xscr = (*xscr).next;
+			m2.next = m.next;
+			m.next = m2;
+			m = it.set(m2); // i.e. m = m2;
+			
+			m.mode = 0;
+			m.i1 = (*xscr).i1 as usize + i1;
+			m.chg1 = (*xscr).chg1 as usize;
+			m.i2 = (*xscr).i2 as usize + i2;
+			m.chg2 = (*xscr).chg2 as usize;
+		}
+		xdl_free_script(start);
+	}
+
+	0
 }

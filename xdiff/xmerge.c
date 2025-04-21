@@ -106,73 +106,7 @@ extern void xdl_fill_merge_buffer(struct xd3way *three_way,
 
 extern void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, struct xdmerge *m);
 
-/*
- * Sometimes, changes are not quite identical, but differ in only a few
- * lines. Try hard to show only these few lines as conflicting.
- */
-static int xdl_refine_conflicts(struct xd3way *three_way, struct xdmerge *m, xpparam_t const *xpp) {
-	for (; m; m = m->next) {
-		struct xd2way two_way;
-		struct xdchange *xscr, *x;
-		struct xrange range1, range2;
-		int i1 = m->i1, i2 = m->i2;
-
-		/* let's handle just the conflicts */
-		if (m->mode)
-			continue;
-
-		/* no sense refining a conflict when one side is empty */
-		if (m->chg1 == 0 || m->chg2 == 0)
-			continue;
-
-		range1.start = m->i1;
-		range1.end = m->i1 + m->chg1;
-
-		range2.start = m->i2;
-		range2.end = m->i2 + m->chg2;
-
-		xdl_2way_slice(&three_way->pair1.rhs, range1, &three_way->pair2.rhs, range2, three_way->minimal_perfect_hash_size, &two_way);
-		if (xdl_do_diff(xpp, &two_way.pair) < 0)
-			return -1;
-		if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
-		    xdl_change_compact(&two_way.pair.rhs, &two_way.pair.lhs, xpp->flags) < 0 ||
-		    xdl_build_script(&two_way.pair, &xscr) < 0) {
-			xdl_2way_free(&two_way);
-			return -1;
-		}
-		if (!xscr) {
-			/* If this happens, the changes are identical. */
-			xdl_2way_free(&two_way);
-			m->mode = 4;
-			continue;
-		}
-		x = xscr;
-		m->i1 = xscr->i1 + i1;
-		m->chg1 = xscr->chg1;
-		m->i2 = xscr->i2 + i2;
-		m->chg2 = xscr->chg2;
-		while (xscr->next) {
-			struct xdmerge *m2 = xdl_malloc(sizeof(struct xdmerge));
-			if (!m2) {
-				xdl_2way_free(&two_way);
-				xdl_free_script(x);
-				return -1;
-			}
-			xscr = xscr->next;
-			m2->next = m->next;
-			m->next = m2;
-			m = m2;
-			m->mode = 0;
-			m->i1 = xscr->i1 + i1;
-			m->chg1 = xscr->chg1;
-			m->i2 = xscr->i2 + i2;
-			m->chg2 = xscr->chg2;
-		}
-		xdl_2way_free(&two_way);
-		xdl_free_script(x);
-	}
-	return 0;
-}
+extern int xdl_refine_conflicts(struct xd3way *three_way, struct xdmerge *m, xpparam_t const *xpp);
 
 static int line_contains_alnum(const char *ptr, long size)
 {
