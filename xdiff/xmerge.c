@@ -49,9 +49,9 @@ struct xdmerge {
 
 
 static i32 xdl_append_merge(struct xdmerge **merge, u8 mode,
-			    isize i0, isize chg0,
-			    isize i1, isize chg1,
-			    isize i2, isize chg2)
+			    usize i0, usize chg0,
+			    usize i1, usize chg1,
+			    usize i2, usize chg2)
 {
 	struct xdmerge *m = *merge;
 	if (m != NULL && (i1 <= m->i1 + m->chg1 || i2 <= m->i2 + m->chg2)) {
