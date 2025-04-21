@@ -98,19 +98,19 @@ extern i32 xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
  *
  * returns < 0 on error, == 0 for no conflicts, else number of conflicts
  */
-static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
+static i32 xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		struct xdchange *xscr2,
 		struct xmparam const *xmp, struct ivec_u8* buffer)
 {
 	struct xdmerge *changes, *c;
 	xpparam_t const *xpp = &xmp->xpp;
-	const char *const ancestor_name = xmp->ancestor;
-	const char *const name1 = xmp->file1;
-	const char *const name2 = xmp->file2;
-	int i0, i1, i2, chg0, chg1, chg2;
-	int level = xmp->level;
-	int style = xmp->style;
-	int favor = xmp->favor;
+	u8 const* ancestor_name = xmp->ancestor;
+	u8 const* name1 = xmp->file1;
+	u8 const* name2 = xmp->file2;
+	usize i0, i1, i2, chg0, chg1, chg2;
+	i32 level = xmp->level;
+	i32 style = xmp->style;
+	i32 favor = xmp->favor;
 
 	/*
 	 * XDL_MERGE_DIFF3 does not attempt to refine conflicts by looking
@@ -178,8 +178,8 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 					xscr1->i2, xscr2->i2,
 					xscr1->chg2)) {
 			/* conflict */
-			int off = xscr1->i1 - xscr2->i1;
-			int ffo = off + xscr1->chg1 - xscr2->chg1;
+			isize off = xscr1->i1 - xscr2->i1;
+			isize ffo = off + xscr1->chg1 - xscr2->chg1;
 
 			i0 = xscr1->i1;
 			i1 = xscr1->i2;
@@ -258,7 +258,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		return -1;
 	}
 	/* output */
-	int marker_size = xmp->marker_size;
+	i32 marker_size = xmp->marker_size;
 	xdl_fill_merge_buffer(three_way, name1, name2,
 			      ancestor_name, favor, changes,
 			      buffer, style, marker_size);
