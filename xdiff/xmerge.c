@@ -112,41 +112,8 @@ extern bool lines_contain_alnum(struct xdpair *pair, usize i, usize chg);
 
 extern void xdl_merge_two_conflicts(struct xdmerge *m);
 
-/*
- * If there are less than 3 non-conflicting lines between conflicts,
- * it appears simpler -- because it takes up less (or as many) lines --
- * if the lines are moved into the conflicts.
- */
-static i32 xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
-				      bool simplify_if_no_alnum)
-{
-	i32 result = 0;
-
-	if (m == NULL) {
-		return result;
-	}
-	for (;;) {
-		struct xdmerge *next_m = m->next;
-		isize begin, end;
-
-		if (next_m == NULL) {
-			return result;
-		}
-
-		begin = m->i1 + m->chg1;
-		end = next_m->i1;
-
-		if (m->mode != 0 || next_m->mode != 0 ||
-		    (end - begin > 3 &&
-		     (!simplify_if_no_alnum ||
-		      lines_contain_alnum(pair1, begin, end - begin)))) {
-			m = next_m;
-		} else {
-			result++;
-			xdl_merge_two_conflicts(m);
-		}
-	}
-}
+extern i32 xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
+				      bool simplify_if_no_alnum);
 
 /*
  * level == 0: mark all overlapping changes as conflict

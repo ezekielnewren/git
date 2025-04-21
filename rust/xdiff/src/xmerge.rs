@@ -448,12 +448,49 @@ unsafe extern "C" fn lines_contain_alnum(pair: *mut xdpair, i: usize, chg: usize
 #[no_mangle]
 unsafe extern "C" fn xdl_merge_two_conflicts(m: *mut xdmerge) {
 	let m = &mut *m;
-	
+
 	let next_m = &mut *m.next;
 	m.chg1 = next_m.i1 + next_m.chg1 - m.i1;
 	m.chg2 = next_m.i2 + next_m.chg2 - m.i2;
 	m.next = next_m.next;
-	
+
 	libc::free(next_m as *mut xdmerge as *mut libc::c_void);
+}
+
+
+/*
+ * If there are less than 3 non-conflicting lines between conflicts,
+ * it appears simpler -- because it takes up less (or as many) lines --
+ * if the lines are moved into the conflicts.
+ */
+#[no_mangle]
+unsafe extern "C" fn xdl_simplify_non_conflicts(pair1: *mut xdpair, m: *mut xdmerge,
+				      simplify_if_no_alnum: bool) -> i32 {
+	let mut result: i32 = 0;
+
+	if m.is_null() {
+		return result;
+	}
+	
+	let mut m = &mut *m;
+	loop {
+		if m.next.is_null() {
+			return result;
+		}
+		let next_m = unsafe { &mut *m.next };
+
+		let begin = m.i1 + m.chg1;
+		let end = next_m.i1;
+
+		if m.mode != 0 || next_m.mode != 0 ||
+			(end - begin > 3 &&
+			(!simplify_if_no_alnum ||
+			lines_contain_alnum(pair1, begin, end - begin))) {
+			m = next_m;
+		} else {
+			result += 1;
+			xdl_merge_two_conflicts(m);
+		}
+	}
 }
 
