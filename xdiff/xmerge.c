@@ -117,19 +117,21 @@ extern void xdl_merge_two_conflicts(struct xdmerge *m);
  * it appears simpler -- because it takes up less (or as many) lines --
  * if the lines are moved into the conflicts.
  */
-static int xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
-				      int simplify_if_no_alnum)
+static i32 xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
+				      bool simplify_if_no_alnum)
 {
-	int result = 0;
+	i32 result = 0;
 
-	if (!m)
+	if (m == NULL) {
 		return result;
+	}
 	for (;;) {
 		struct xdmerge *next_m = m->next;
-		int begin, end;
+		isize begin, end;
 
-		if (!next_m)
+		if (next_m == NULL) {
 			return result;
+		}
 
 		begin = m->i1 + m->chg1;
 		end = next_m->i1;
