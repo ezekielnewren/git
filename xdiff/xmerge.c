@@ -110,18 +110,7 @@ extern int xdl_refine_conflicts(struct xd3way *three_way, struct xdmerge *m, xpp
 
 extern bool lines_contain_alnum(struct xdpair *pair, usize i, usize chg);
 
-/*
- * This function merges m and m->next, marking everything between those hunks
- * as conflicting, too.
- */
-static void xdl_merge_two_conflicts(struct xdmerge *m)
-{
-	struct xdmerge *next_m = m->next;
-	m->chg1 = next_m->i1 + next_m->chg1 - m->i1;
-	m->chg2 = next_m->i2 + next_m->chg2 - m->i2;
-	m->next = next_m->next;
-	free(next_m);
-}
+extern void xdl_merge_two_conflicts(struct xdmerge *m);
 
 /*
  * If there are less than 3 non-conflicting lines between conflicts,

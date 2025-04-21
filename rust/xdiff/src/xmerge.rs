@@ -430,13 +430,30 @@ unsafe extern "C" fn xdl_refine_conflicts(three_way: *mut xd3way, merge: *mut xd
 #[no_mangle]
 unsafe extern "C" fn lines_contain_alnum(pair: *mut xdpair, i: usize, chg: usize) -> bool {
 	let pair = xdpair::from_raw_mut(pair);
-	
+
 	for record in &(*pair.rhs.record).as_slice()[i..i + chg] {
 		if record.as_ref().iter().any(|c| XDL_ISALNUM(*c)) {
 			return true;
 		}
 	}
-	
+
 	false
+}
+
+
+/*
+ * This function merges m and m->next, marking everything between those hunks
+ * as conflicting, too.
+ */
+#[no_mangle]
+unsafe extern "C" fn xdl_merge_two_conflicts(m: *mut xdmerge) {
+	let m = &mut *m;
+	
+	let next_m = &mut *m.next;
+	m.chg1 = next_m.i1 + next_m.chg1 - m.i1;
+	m.chg2 = next_m.i2 + next_m.chg2 - m.i2;
+	m.next = next_m.next;
+	
+	libc::free(next_m as *mut xdmerge as *mut libc::c_void);
 }
 
