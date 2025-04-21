@@ -110,7 +110,7 @@ static enum ll_merge_result ll_xdl_merge(const struct ll_merge_driver *drv_unuse
 			int marker_size)
 {
 	enum ll_merge_result ret;
-	xmparam_t xmp;
+	struct xmparam xmp;
 	int status;
 	assert(opts);
 

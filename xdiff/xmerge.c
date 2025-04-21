@@ -100,7 +100,7 @@ extern i32 xdl_simplify_non_conflicts(struct xdpair *pair1, struct xdmerge *m,
  */
 static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 		struct xdchange *xscr2,
-		xmparam_t const *xmp, struct ivec_u8* buffer)
+		struct xmparam const *xmp, struct ivec_u8* buffer)
 {
 	struct xdmerge *changes, *c;
 	xpparam_t const *xpp = &xmp->xpp;
@@ -266,7 +266,7 @@ static int xdl_do_merge(struct xd3way *three_way, struct xdchange *xscr1,
 }
 
 int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
-		xmparam_t const *xmp, mmbuffer_t *result)
+		struct xmparam const *xmp, mmbuffer_t *result)
 {
 	struct xdchange *xscr1 = NULL, *xscr2 = NULL;
 	struct xd3way three_way;
