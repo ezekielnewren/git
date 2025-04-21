@@ -2,7 +2,7 @@ use std::io::repeat;
 use std::marker::PhantomData;
 use interop::ivec::IVec;
 use interop::xmalloc;
-use crate::xdiff::{xpparam_t, DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL_MERGE_ZEALOUS_DIFF3};
+use crate::xdiff::{xmparam, xpparam_t, DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL_MERGE_EAGER, XDL_MERGE_MINIMAL, XDL_MERGE_ZEALOUS, XDL_MERGE_ZEALOUS_DIFF3};
 use crate::xdiffi::{xdchange, xdl_build_script, xdl_change_compact, xdl_free_script};
 use crate::xdl_do_diff;
 use crate::xprepare::safe_2way_slice;
@@ -526,5 +526,198 @@ unsafe extern "C" fn xdl_append_merge(merge: *mut *mut xdmerge, mode: u8,
 	}
 
 	0
+}
+
+
+/*
+ * level == 0: mark all overlapping changes as conflict
+ * level == 1: mark overlapping changes as conflict only if not identical
+ * level == 2: analyze non-identical changes for minimal conflict set
+ * level == 3: analyze non-identical changes for minimal conflict set, but
+ *             treat hunks not containing any letter or number as conflicting
+ *
+ * returns < 0 on error, == 0 for no conflicts, else number of conflicts
+ */
+#[no_mangle]
+unsafe extern "C" fn xdl_do_merge(three_way: *mut xd3way, mut xscr1: *mut xdchange,
+		mut xscr2: *mut xdchange,
+		xmp: *const xmparam, buffer: *mut IVec<u8>
+) -> i32 {
+	let three_way = xd3way::from_raw_mut(three_way);
+	let xmp = &*xmp;
+	let buffer = IVec::from_raw_mut(buffer);
+	
+	let xpp = &xmp.xpp;
+	let mut level = xmp.level as usize;
+
+	/*
+	 * XDL_MERGE_DIFF3 does not attempt to refine conflicts by looking
+	 * at common areas of sides 1 & 2, because the base (side 0) does
+	 * not match and is being shown.  Similarly, simplification of
+	 * non-conflicts is also skipped due to the skipping of conflict
+	 * refinement.
+	 *
+	 * XDL_MERGE_ZEALOUS_DIFF3, on the other hand, will attempt to
+	 * refine conflicts looking for common areas of sides 1 & 2.
+	 * However, since the base is being shown and does not match,
+	 * it will only look for common areas at the beginning or end
+	 * of the conflict block.  Since XDL_MERGE_ZEALOUS_DIFF3's
+	 * conflict refinement is much more limited in this fashion, the
+	 * conflict simplification will be skipped.
+	 */
+	if xmp.style as u64 == XDL_MERGE_DIFF3 || xmp.style as u64 == XDL_MERGE_ZEALOUS_DIFF3 {
+		/*
+		 * "diff3 -m" output does not make sense for anything
+		 * more aggressive than XDL_MERGE_EAGER.
+		 */
+		if XDL_MERGE_EAGER < level {
+			level = XDL_MERGE_EAGER;
+		}
+	}
+
+	// c = changes = NULL;
+	let mut changes: *mut xdmerge = std::ptr::null_mut();
+	let mut c: *mut xdmerge = std::ptr::null_mut();
+	
+	let mut i0: usize;
+	let mut i1: usize;
+	let mut i2: usize;
+	let mut chg0: usize;
+	let mut chg1: usize;
+	let mut chg2: usize;
+	
+	while !xscr1.is_null() && !xscr2.is_null() {
+		if changes.is_null() {
+			changes = c;
+		}
+		if (*xscr1).i1 + (*xscr1).chg1 < (*xscr2).i1 {
+			i0 = (*xscr1).i1 as usize;
+			i1 = (*xscr1).i2 as usize;
+			i2 = ((*xscr2).i2 - (*xscr2).i1 + (*xscr1).i1) as usize;
+			chg0 = (*xscr1).chg1 as usize;
+			chg1 = (*xscr1).chg2 as usize;
+			chg2 = (*xscr1).chg1 as usize;
+			if xdl_append_merge(&mut c, 1u8,
+					     i0, chg0, i1, chg1, i2, chg2) != 0 {
+				xdl_cleanup_merge(changes);
+				return -1;
+			}
+			xscr1 = (*xscr1).next;
+			continue;
+		}
+		if (*xscr2).i1 + (*xscr2).chg1 < (*xscr1).i1 {
+			i0 = (*xscr2).i1 as usize;
+			i1 = ((*xscr1).i2 - (*xscr1).i1 + (*xscr2).i1) as usize;
+			i2 = (*xscr2).i2 as usize;
+			chg0 = (*xscr2).chg1 as usize;
+			chg1 = (*xscr2).chg1 as usize;
+			chg2 = (*xscr2).chg2 as usize;
+			if xdl_append_merge(&mut c, 2,
+					     i0, chg0, i1, chg1, i2, chg2) != 0 {
+				xdl_cleanup_merge(changes);
+				return -1;
+			}
+			xscr2 = (*xscr2).next;
+			continue;
+		}
+		if level == XDL_MERGE_MINIMAL || (*xscr1).i1 != (*xscr2).i1 ||
+				(*xscr1).chg1 != (*xscr2).chg1 ||
+				(*xscr1).chg2 != (*xscr2).chg2 ||
+				!xdl_merge_lines_equal(three_way,
+					(*xscr1).i2 as usize, (*xscr2).i2 as usize,
+					(*xscr1).chg2 as usize) {
+			/* conflict */
+			let off = (*xscr1).i1 - (*xscr2).i1;
+			let ffo = off + (*xscr1).chg1 - (*xscr2).chg1;
+
+			i0 = (*xscr1).i1 as usize;
+			i1 = (*xscr1).i2 as usize;
+			i2 = (*xscr2).i2 as usize;
+			if off > 0 {
+				i0 -= off as usize;
+				i1 -= off as usize;
+			} else {
+				i2 += off as usize;
+			}
+			chg0 = ((*xscr1).i1 + (*xscr1).chg1) as usize - i0;
+			chg1 = ((*xscr1).i2 + (*xscr1).chg2) as usize - i1;
+			chg2 = ((*xscr2).i2 + (*xscr2).chg2) as usize - i2;
+			if ffo < 0 {
+				chg0 -= ffo as usize;
+				chg1 -= ffo as usize;
+			} else {
+				chg2 += ffo as usize;
+			}
+			if xdl_append_merge(&mut c, 0,
+					     i0, chg0, i1, chg1, i2, chg2) != 0 {
+				xdl_cleanup_merge(changes);
+				return -1;
+			}
+		}
+
+		i1 = ((*xscr1).i1 + (*xscr1).chg1) as usize;
+		i2 = ((*xscr2).i1 + (*xscr2).chg1) as usize;
+
+		if i1 >= i2 {
+			xscr2 = (*xscr2).next;
+		}
+		if i2 >= i1 {
+			xscr1 = (*xscr1).next;
+		}
+	}
+	while !xscr1.is_null() {
+		if changes.is_null() {
+			changes = c;
+		}
+		i0 = (*xscr1).i1 as usize;
+		i1 = (*xscr1).i2 as usize;
+		i2 = (*xscr1).i1 as usize + three_way.side2.record.len() - three_way.base.record.len();
+		chg0 = (*xscr1).chg1 as usize;
+		chg1 = (*xscr1).chg2 as usize;
+		chg2 = (*xscr1).chg1 as usize;
+		if xdl_append_merge(&mut c, 1,
+				     i0, chg0, i1, chg1, i2, chg2) != 0 {
+			xdl_cleanup_merge(changes);
+			return -1;
+		}
+		xscr1 = (*xscr1).next;
+	}
+	while !xscr2.is_null() {
+		if changes.is_null() {
+			changes = c;
+		}
+		i0 = (*xscr2).i1 as usize;
+		i1 = (*xscr2).i1 as usize + three_way.side1.record.len() - three_way.base.record.len();
+		i2 = (*xscr2).i2 as usize;
+		chg0 = (*xscr2).chg1 as usize;
+		chg1 = (*xscr2).chg1 as usize;
+		chg2 = (*xscr2).chg2 as usize;
+		if xdl_append_merge(&mut c, 2,
+				     i0, chg0, i1, chg1, i2, chg2) != 0 {
+			xdl_cleanup_merge(changes);
+			return -1;
+		}
+		xscr2 = (*xscr2).next;
+	}
+	if changes.is_null() {
+		changes = c;
+	}
+	/* refine conflicts */
+	if xmp.style as u64 == XDL_MERGE_ZEALOUS_DIFF3 {
+		xdl_refine_zdiff3_conflicts(three_way, changes);
+	} else if (XDL_MERGE_ZEALOUS <= level &&
+		   (xdl_refine_conflicts(three_way, changes, xpp) < 0 ||
+		    xdl_simplify_non_conflicts(&mut three_way.pair1, changes,
+					       XDL_MERGE_ZEALOUS < level) < 0)) {
+		xdl_cleanup_merge(changes);
+		return -1;
+	}
+	/* output */
+	let marker_size = xmp.marker_size;
+	xdl_fill_merge_buffer(three_way, xmp.file1, xmp.file2,
+			      xmp.ancestor, xmp.favor as u8, changes,
+			      buffer, xmp.style as u64, marker_size as usize);
+	
+	xdl_cleanup_merge(changes) as i32
 }
 
