@@ -48,39 +48,10 @@ struct xdmerge {
 };
 
 
-static i32 xdl_append_merge(struct xdmerge **merge, u8 mode,
+extern i32 xdl_append_merge(struct xdmerge **merge, u8 mode,
 			    usize i0, usize chg0,
 			    usize i1, usize chg1,
-			    usize i2, usize chg2)
-{
-	struct xdmerge *m = *merge;
-	if (m != NULL && (i1 <= m->i1 + m->chg1 || i2 <= m->i2 + m->chg2)) {
-		if (mode != m->mode) {
-			m->mode = 0;
-		}
-		m->chg0 = i0 + chg0 - m->i0;
-		m->chg1 = i1 + chg1 - m->i1;
-		m->chg2 = i2 + chg2 - m->i2;
-	} else {
-		m = xmalloc(sizeof(struct xdmerge));
-		if (m == NULL) {
-			return -1;
-		}
-		m->next = NULL;
-		m->mode = mode;
-		m->i0 = i0;
-		m->chg0 = chg0;
-		m->i1 = i1;
-		m->chg1 = chg1;
-		m->i2 = i2;
-		m->chg2 = chg2;
-		if (*merge != NULL) {
-			(*merge)->next = m;
-		}
-		*merge = m;
-	}
-	return 0;
-}
+			    usize i2, usize chg2);
 
 extern usize xdl_cleanup_merge(struct xdmerge *c);
 

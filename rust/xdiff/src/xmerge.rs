@@ -471,7 +471,7 @@ unsafe extern "C" fn xdl_simplify_non_conflicts(pair1: *mut xdpair, m: *mut xdme
 	if m.is_null() {
 		return result;
 	}
-	
+
 	let mut m = &mut *m;
 	loop {
 		if m.next.is_null() {
@@ -492,5 +492,39 @@ unsafe extern "C" fn xdl_simplify_non_conflicts(pair1: *mut xdpair, m: *mut xdme
 			xdl_merge_two_conflicts(m);
 		}
 	}
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_append_merge(merge: *mut *mut xdmerge, mode: u8,
+			    i0: usize, chg0: usize,
+			    i1: usize, chg1: usize,
+			    i2: usize, chg2: usize
+) -> i32 {
+	let mut m = *merge;
+	if !m.is_null() && (i1 <= (*m).i1 + (*m).chg1 || i2 <= (*m).i2 + (*m).chg2) {
+		if (mode != (*m).mode) {
+			(*m).mode = 0;
+		}
+		(*m).chg0 = i0 + chg0 - (*m).i0;
+		(*m).chg1 = i1 + chg1 - (*m).i1;
+		(*m).chg2 = i2 + chg2 - (*m).i2;
+	} else {
+		m = xmalloc(size_of::<xdmerge>()) as *mut xdmerge;
+		(*m).next = std::ptr::null_mut();
+		(*m).mode = mode;
+		(*m).i0 = i0;
+		(*m).chg0 = chg0;
+		(*m).i1 = i1;
+		(*m).chg1 = chg1;
+		(*m).i2 = i2;
+		(*m).chg2 = chg2;
+		if !(*merge).is_null() {
+			(*(*merge)).next = m;
+		}
+		*merge = m;
+	}
+
+	0
 }
 
