@@ -11,6 +11,15 @@ pub(crate) fn XDL_ISSPACE(v: u8) -> bool {
     }
 }
 
+
+pub(crate) fn XDL_ISALNUM(v: u8) -> bool {
+    match v {
+        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' => true,
+        _ => false,
+    }
+}
+
+
 pub struct LineReader {
     cur: *const u8,
     size: usize,

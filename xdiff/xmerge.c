@@ -108,24 +108,7 @@ extern void xdl_refine_zdiff3_conflicts(struct xd3way *three_way, struct xdmerge
 
 extern int xdl_refine_conflicts(struct xd3way *three_way, struct xdmerge *m, xpparam_t const *xpp);
 
-static bool line_contains_alnum(u8 const* ptr, usize size) {
-	while (size--) {
-		if (isalnum(ptr++)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-static bool lines_contain_alnum(struct xdpair *pair, usize i, usize chg) {
-	for (; chg; chg--, i++) {
-		if (line_contains_alnum(pair->rhs.record->ptr[i].ptr,
-				pair->rhs.record->ptr[i].size)) {
-			return true;
-		}
-	}
-	return false;
-}
+extern bool lines_contain_alnum(struct xdpair *pair, usize i, usize chg);
 
 /*
  * This function merges m and m->next, marking everything between those hunks

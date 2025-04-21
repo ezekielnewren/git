@@ -6,7 +6,8 @@ use crate::xdiff::{xpparam_t, DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL
 use crate::xdiffi::{xdchange, xdl_build_script, xdl_change_compact, xdl_free_script};
 use crate::xdl_do_diff;
 use crate::xprepare::safe_2way_slice;
-use crate::xtypes::{xd2way, xd3way, xrecord, FileContext};
+use crate::xtypes::{xd2way, xd3way, xdpair, xrecord, FileContext};
+use crate::xutils::XDL_ISALNUM;
 
 #[repr(C)]
 struct xdmerge {
@@ -424,3 +425,18 @@ unsafe extern "C" fn xdl_refine_conflicts(three_way: *mut xd3way, merge: *mut xd
 
 	0
 }
+
+
+#[no_mangle]
+unsafe extern "C" fn lines_contain_alnum(pair: *mut xdpair, i: usize, chg: usize) -> bool {
+	let pair = xdpair::from_raw_mut(pair);
+	
+	for record in &(*pair.rhs.record).as_slice()[i..i + chg] {
+		if record.as_ref().iter().any(|c| XDL_ISALNUM(*c)) {
+			return true;
+		}
+	}
+	
+	false
+}
+
