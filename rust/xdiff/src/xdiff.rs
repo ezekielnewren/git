@@ -102,6 +102,41 @@ impl mmfile {
 
 }
 
+pub struct mmbuffer {
+    pub ptr: *const libc::c_char,
+    pub size: libc::c_long,
+}
+
+
+impl mmbuffer {
+    pub(crate) fn from_slice(p0: &[u8]) -> Self {
+        Self {
+            ptr: p0.as_ptr() as *const libc::c_char,
+            size: p0.len() as libc::c_long,
+        }
+    }
+}
+
+impl mmbuffer {
+
+    pub unsafe fn from_raw<'a>(mf: *const mmbuffer) -> &'a [u8] {
+        if (*mf).ptr.is_null() {
+            &[]
+        } else {
+            std::slice::from_raw_parts((*mf).ptr as *const u8, (*mf).size as usize)
+        }
+    }
+
+    pub unsafe fn from_raw_mut<'a>(mf: *mut mmbuffer) -> &'a mut [u8] {
+        if (*mf).ptr.is_null() {
+            &mut []
+        } else {
+            std::slice::from_raw_parts_mut((*mf).ptr as *mut u8, (*mf).size as usize)
+        }
+    }
+
+}
+
 
 #[repr(C)]
 pub(crate) struct xmparam {
