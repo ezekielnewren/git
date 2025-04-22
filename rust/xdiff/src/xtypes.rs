@@ -245,6 +245,7 @@ macro_rules! get_file_context {
 
 
 #[repr(C)]
+#[derive(Default)]
 pub struct xd2way {
     pub lhs: xdfile,
     pub rhs: xdfile,

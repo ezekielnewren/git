@@ -76,10 +76,6 @@ struct region {
 	end2: usize,
 }
 
-fn fall_back_to_classic_diff(_: u64, _: &mut xdpair, _: usize, _: usize, _: usize, _: usize) -> i32 {
-	unimplemented!();
-}
-
 
 fn scan_a(index: &mut histindex, pair: &mut xdpair, line1: usize, count1: usize) -> i32 {
     let lhs = FileContext::new(&mut pair.lhs);

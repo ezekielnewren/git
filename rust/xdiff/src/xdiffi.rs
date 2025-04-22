@@ -1,7 +1,9 @@
+use std::ops::Range;
 use interop::ivec::IVec;
 use crate::get_file_context;
 use crate::xdiff::*;
-use crate::xtypes::{xdpair, FileContext};
+use crate::xprepare::safe_2way_slice;
+use crate::xtypes::{xd2way, xdpair, FileContext};
 use crate::xutils::xdl_bogosqrt;
 
 const XDL_MAX_COST_MIN: isize = 256;
@@ -624,6 +626,35 @@ pub(crate) fn classic_diff(flags: u64, pair: &mut xdpair) -> i32 {
 	recs_cmp(&mut lhs, 0, a, &mut rhs, 0, b,
 			   kvd_off, &mut kvdf, &mut kvdb, (flags & XDF_NEED_MINIMAL) != 0,
 			   &mut xenv)
+}
+
+
+/// The indexedness of the ranges are based on the LINE_SHIFT constant.
+/// When this function was written LINE_SHIFT had a value of 1,
+/// which means the ranges use 1-based indexing.
+pub(crate) fn classic_diff_with_range(flags: u64, pair: &mut xdpair, mut range1: Range<usize>, mut range2: Range<usize>) -> i32 {
+	let (lhs, rhs) = get_file_context!(pair);
+
+	let mut two_way = xd2way::default();
+	let r1 = range1.start - LINE_SHIFT..range1.end - LINE_SHIFT;
+	let r2 = range2.start - LINE_SHIFT..range2.end - LINE_SHIFT;
+	safe_2way_slice(&lhs, r1, &rhs, r2, pair.minimal_perfect_hash_size, &mut two_way);
+
+	let result = classic_diff(flags, &mut two_way.pair);
+
+	range1.start += SENTINEL - LINE_SHIFT;
+	range1.end += SENTINEL - LINE_SHIFT;
+	let dst = &mut lhs.consider.as_mut_slice()[range1.clone()];
+	let src = &two_way.pair.lhs.consider.as_slice()[SENTINEL..SENTINEL + range1.len()];
+	dst.copy_from_slice(src);
+
+	range2.start += SENTINEL - LINE_SHIFT;
+	range2.end += SENTINEL - LINE_SHIFT;
+	let dst = &mut rhs.consider.as_mut_slice()[range2.clone()];
+	let src = &two_way.pair.rhs.consider.as_slice()[SENTINEL..SENTINEL + range2.len()];
+	dst.copy_from_slice(src);
+
+	result
 }
 
 
