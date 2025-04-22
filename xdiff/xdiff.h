@@ -154,7 +154,7 @@ struct xmparam {
 
 #define DEFAULT_CONFLICT_MARKER_SIZE 7
 
-int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
+extern i32 xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 		struct xmparam const *xmp, mmbuffer_t *result);
 
 #ifdef __cplusplus

@@ -2,10 +2,10 @@ use std::io::repeat;
 use std::marker::PhantomData;
 use interop::ivec::IVec;
 use interop::xmalloc;
-use crate::xdiff::{xmparam, xpparam_t, DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL_MERGE_EAGER, XDL_MERGE_MINIMAL, XDL_MERGE_ZEALOUS, XDL_MERGE_ZEALOUS_DIFF3};
+use crate::xdiff::{mmbuffer, mmfile, xmparam, xpparam_t, DEFAULT_CONFLICT_MARKER_SIZE, XDL_MERGE_DIFF3, XDL_MERGE_EAGER, XDL_MERGE_MINIMAL, XDL_MERGE_ZEALOUS, XDL_MERGE_ZEALOUS_DIFF3};
 use crate::xdiffi::{xdchange, xdl_build_script, xdl_change_compact, xdl_free_script};
 use crate::xdl_do_diff;
-use crate::xprepare::safe_2way_slice;
+use crate::xprepare::{safe_2way_slice, safe_3way_prepare};
 use crate::xtypes::{xd2way, xd3way, xdpair, xrecord, FileContext};
 use crate::xutils::XDL_ISALNUM;
 
@@ -546,7 +546,7 @@ unsafe extern "C" fn xdl_do_merge(three_way: *mut xd3way, mut xscr1: *mut xdchan
 	let three_way = xd3way::from_raw_mut(three_way);
 	let xmp = &*xmp;
 	let buffer = IVec::from_raw_mut(buffer);
-	
+
 	let xpp = &xmp.xpp;
 	let mut level = xmp.level as usize;
 
@@ -578,14 +578,14 @@ unsafe extern "C" fn xdl_do_merge(three_way: *mut xd3way, mut xscr1: *mut xdchan
 	// c = changes = NULL;
 	let mut changes: *mut xdmerge = std::ptr::null_mut();
 	let mut c: *mut xdmerge = std::ptr::null_mut();
-	
+
 	let mut i0: usize;
 	let mut i1: usize;
 	let mut i2: usize;
 	let mut chg0: usize;
 	let mut chg1: usize;
 	let mut chg2: usize;
-	
+
 	while !xscr1.is_null() && !xscr2.is_null() {
 		if changes.is_null() {
 			changes = c;
@@ -717,7 +717,68 @@ unsafe extern "C" fn xdl_do_merge(three_way: *mut xd3way, mut xscr1: *mut xdchan
 	xdl_fill_merge_buffer(three_way, xmp.file1, xmp.file2,
 			      xmp.ancestor, xmp.favor as u8, changes,
 			      buffer, xmp.style as u64, marker_size as usize);
-	
+
 	xdl_cleanup_merge(changes) as i32
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_merge(orig: *const mmfile, mf1: *const mmfile, mf2: *const mmfile,
+		xmp: *const xmparam, result: *mut mmbuffer
+) -> i32 {
+	let orig = mmfile::from_raw(orig);
+	let mf1 = mmfile::from_raw(mf1);
+	let mf2 = mmfile::from_raw(mf2);
+	let xmp = &*xmp;
+	
+	let mut xscr1: *mut xdchange = std::ptr::null_mut();
+	let mut xscr2: *mut xdchange = std::ptr::null_mut();
+	let mut three_way = xd3way::default();
+	let mut buffer = IVec::<u8>::new();
+	let mut status = -1;
+
+	(*result).ptr = std::ptr::null_mut();
+	(*result).size = 0;
+
+	safe_3way_prepare(orig, mf1, mf2, xmp.xpp.flags, &mut three_way);
+
+	if xdl_do_diff(&xmp.xpp, &mut three_way.pair1) < 0 {
+		return -1;
+	}
+
+	if xdl_do_diff(&xmp.xpp, &mut three_way.pair2) < 0 {
+		return status;
+	}
+
+	if xdl_change_compact(&mut three_way.pair1.lhs, &mut three_way.pair1.rhs, xmp.xpp.flags) < 0 ||
+	    xdl_change_compact(&mut three_way.pair1.rhs, &mut three_way.pair1.lhs, xmp.xpp.flags) < 0 ||
+	    xdl_build_script(&mut three_way.pair1, &mut xscr1) < 0 {
+		return status;
+	}
+
+	if xdl_change_compact(&mut three_way.pair2.lhs, &mut three_way.pair2.rhs, xmp.xpp.flags) < 0 ||
+	    xdl_change_compact(&mut three_way.pair2.rhs, &mut three_way.pair2.lhs, xmp.xpp.flags) < 0 ||
+	    xdl_build_script(&mut three_way.pair2, &mut xscr2) < 0 {
+		return status;
+	}
+
+	if xscr1.is_null() {
+		status = 0;
+		buffer.extend_from_slice(mf2);
+	} else if xscr2.is_null() {
+		status = 0;
+		buffer.extend_from_slice(mf1);
+	} else {
+		status = xdl_do_merge(&mut three_way, xscr1, xscr2, xmp, &mut buffer);
+	}
+	buffer.shrink_to_fit();
+	(*result).ptr = buffer.as_mut_ptr() as *mut libc::c_char;
+	(*result).size = buffer.len() as libc::c_long;
+	std::mem::forget(buffer);
+	
+	xdl_free_script(xscr1);
+	xdl_free_script(xscr2);
+
+	status
 }
 
