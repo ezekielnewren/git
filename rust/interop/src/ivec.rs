@@ -265,6 +265,20 @@ impl<T> IVec<T> {
         self._resize(new_length, default_value, true);
     }
 
+    pub fn insert(&mut self, index: usize, value: T) {
+        if self.length == self.capacity {
+            self.reserve(1);
+        }
+        
+        unsafe {
+            let src = &self._buffer()[index] as *const T;
+            let dst = src.add(1) as *mut T;
+            let len = self.length - index;
+            std::ptr::copy(src, dst, len);
+            std::ptr::write(self.ptr.add(index), value);
+        }
+    }
+    
     pub fn push(&mut self, value: T) {
         if self.length == self.capacity {
             self.reserve(1);
