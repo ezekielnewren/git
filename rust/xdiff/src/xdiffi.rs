@@ -4,9 +4,10 @@ use interop::ivec::IVec;
 use interop::xmalloc;
 use crate::get_file_context;
 use crate::xdiff::*;
+use crate::xemit::emit_func_t;
 use crate::xhistogram::{do_histogram_diff};
 use crate::xpatience::{do_patience_diff};
-use crate::xprepare::safe_2way_slice;
+use crate::xprepare::{safe_2way_prepare, safe_2way_slice};
 use crate::xtypes::*;
 use crate::xutils::*;
 
@@ -1391,6 +1392,76 @@ pub(crate) unsafe extern "C" fn xdl_change_compact(ctx: *mut xd_file_context, ct
 	if !group_next(ctx_out, &mut go) != 0 {
 		panic!("group sync broken at end of file");
 	}
+
+	0
+}
+
+
+extern "C" {
+	#[no_mangle]
+	fn xdl_call_hunk_func(pair: *mut xdpair, xscr: *mut xdchange, ecb: *const xdemitcb,
+						  xecfg: *const xdemitconf) -> i32;
+
+	#[no_mangle]
+	fn xdl_emit_diff(pair: *mut xdpair, xscr: *mut xdchange, ecb: *const xdemitcb,
+					 xecfg: *const xdemitconf) -> i32;
+
+
+	#[no_mangle]
+	fn xdl_mark_ignorable_lines(xscr: *mut xdchange, pair: *mut xdpair, flags: u64);
+
+	#[no_mangle]
+	fn xdl_mark_ignorable_regex(xscr: *mut xdchange, pair: *mut xdpair, xpp: *const xpparam_t);
+
+}
+
+
+#[no_mangle]
+pub(crate) unsafe extern "C" fn xdl_diff(mf1: *const mmfile, mf2: *const mmfile, xpp: *const xpparam_t,
+	     xecfg: *const xdemitconf, ecb: *const xdemitcb) -> i32 {
+	let mf1 = mmfile::from_raw(mf1);
+	let mf2 = mmfile::from_raw(mf2);
+	let xpp = &*xpp;
+
+	// struct xdchange *xscr;
+	let mut xscr: *mut xdchange = std::ptr::null_mut();
+
+	// struct xd2way two_way;
+	let mut two_way = xd2way::default();
+	let ef: emit_func_t = if !(*xecfg).hunk_func.is_null() {
+		xdl_call_hunk_func
+	} else {
+		xdl_emit_diff
+	};
+
+	safe_2way_prepare(mf1, mf2, xpp.flags, &mut two_way);
+
+	if do_diff(xpp, &mut two_way.pair) < 0 {
+		return -1;
+	}
+
+	xdl_change_compact(&mut two_way.pair.lhs, &mut two_way.pair.rhs, xpp.flags);
+	xdl_change_compact(&mut two_way.pair.rhs, &mut two_way.pair.lhs, xpp.flags);
+	xdl_build_script(&mut two_way.pair, &mut xscr);
+
+	if !xscr.is_null() {
+		if (xpp.flags & XDF_IGNORE_BLANK_LINES) != 0 {
+			xdl_mark_ignorable_lines(xscr, &mut two_way.pair, xpp.flags);
+		}
+
+		if !xpp.ignore_regex.is_null() {
+			xdl_mark_ignorable_regex(xscr, &mut two_way.pair, xpp);
+		}
+
+		if ef(&mut two_way.pair, xscr, ecb, xecfg) < 0 {
+
+			xdl_free_script(xscr);
+			// xdl_2way_free(&two_way);
+			return -1;
+		}
+		xdl_free_script(xscr);
+	}
+	// xdl_2way_free(&two_way);
 
 	0
 }

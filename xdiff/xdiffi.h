@@ -48,4 +48,10 @@ int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *e
 extern int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair);
 extern i32 xdl_do_histogram_diff(u64 flags, struct xdpair *pair);
 
+i32 xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct xdemitcb *ecb,
+				  struct xdemitconf const *xecfg);
+void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, u64 flags);
+i32 record_matches_regex(struct xrecord *rec, xpparam_t const *xpp);
+void xdl_mark_ignorable_regex(struct xdchange *xscr, const struct xdpair *pair, xpparam_t const *xpp);
+
 #endif /* #if !defined(XDIFFI_H) */

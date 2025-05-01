@@ -197,7 +197,7 @@ extern int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g);
 extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
 
 
-static int xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct xdemitcb *ecb,
+i32 xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct xdemitcb *ecb,
 			      struct xdemitconf const *xecfg)
 {
 	struct xdchange *xch, *xche;
@@ -214,7 +214,7 @@ static int xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr,
 	return 0;
 }
 
-static void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, u64 flags) {
+void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, u64 flags) {
 	struct xdchange *xch;
 
 	for (xch = xscr; xch; xch = xch->next) {
@@ -235,7 +235,7 @@ static void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair,
 	}
 }
 
-static int record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
+i32 record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
 	regmatch_t regmatch;
 	size_t i;
 
@@ -247,7 +247,7 @@ static int record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
 	return 0;
 }
 
-static void xdl_mark_ignorable_regex(struct xdchange *xscr, const struct xdpair *pair,
+void xdl_mark_ignorable_regex(struct xdchange *xscr, const struct xdpair *pair,
 				     xpparam_t const *xpp)
 {
 	struct xdchange *xch;
@@ -275,40 +275,40 @@ static void xdl_mark_ignorable_regex(struct xdchange *xscr, const struct xdpair 
 	}
 }
 
-i32 xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-	     struct xdemitconf const *xecfg, struct xdemitcb *ecb) {
-	struct xdchange *xscr;
-	struct xd2way two_way;
-	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
-
-	xdl_2way_prepare(mf1, mf2, xpp->flags, &two_way);
-
-	if (xdl_do_diff(xpp, &two_way.pair) < 0) {
-		return -1;
-	}
-	if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
-	    xdl_change_compact(&two_way.pair.rhs, &two_way.pair.lhs, xpp->flags) < 0 ||
-	    xdl_build_script(&two_way.pair, &xscr) < 0) {
-
-		xdl_2way_free(&two_way);
-		return -1;
-	}
-	if (xscr) {
-		if (xpp->flags & XDF_IGNORE_BLANK_LINES)
-			xdl_mark_ignorable_lines(xscr, &two_way.pair, xpp->flags);
-
-		if (xpp->ignore_regex)
-			xdl_mark_ignorable_regex(xscr, &two_way.pair, xpp);
-
-		if (ef(&two_way.pair, xscr, ecb, xecfg) < 0) {
-
-			xdl_free_script(xscr);
-			xdl_2way_free(&two_way);
-			return -1;
-		}
-		xdl_free_script(xscr);
-	}
-	xdl_2way_free(&two_way);
-
-	return 0;
-}
+// i32 xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
+// 	     struct xdemitconf const *xecfg, struct xdemitcb *ecb) {
+// 	struct xdchange *xscr;
+// 	struct xd2way two_way;
+// 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;
+//
+// 	xdl_2way_prepare(mf1, mf2, xpp->flags, &two_way);
+//
+// 	if (xdl_do_diff(xpp, &two_way.pair) < 0) {
+// 		return -1;
+// 	}
+// 	if (xdl_change_compact(&two_way.pair.lhs, &two_way.pair.rhs, xpp->flags) < 0 ||
+// 	    xdl_change_compact(&two_way.pair.rhs, &two_way.pair.lhs, xpp->flags) < 0 ||
+// 	    xdl_build_script(&two_way.pair, &xscr) < 0) {
+//
+// 		xdl_2way_free(&two_way);
+// 		return -1;
+// 	}
+// 	if (xscr) {
+// 		if (xpp->flags & XDF_IGNORE_BLANK_LINES)
+// 			xdl_mark_ignorable_lines(xscr, &two_way.pair, xpp->flags);
+//
+// 		if (xpp->ignore_regex)
+// 			xdl_mark_ignorable_regex(xscr, &two_way.pair, xpp);
+//
+// 		if (ef(&two_way.pair, xscr, ecb, xecfg) < 0) {
+//
+// 			xdl_free_script(xscr);
+// 			xdl_2way_free(&two_way);
+// 			return -1;
+// 		}
+// 		xdl_free_script(xscr);
+// 	}
+// 	xdl_2way_free(&two_way);
+//
+// 	return 0;
+// }
