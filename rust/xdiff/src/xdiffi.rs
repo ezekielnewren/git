@@ -1423,10 +1423,8 @@ pub(crate) unsafe extern "C" fn xdl_diff(mf1: *const mmfile, mf2: *const mmfile,
 	let mf2 = mmfile::from_raw(mf2);
 	let xpp = &*xpp;
 
-	// struct xdchange *xscr;
 	let mut xscr: *mut xdchange = std::ptr::null_mut();
 
-	// struct xd2way two_way;
 	let mut two_way = xd2way::default();
 	let ef: emit_func_t = if !(*xecfg).hunk_func.is_null() {
 		xdl_call_hunk_func
@@ -1456,12 +1454,10 @@ pub(crate) unsafe extern "C" fn xdl_diff(mf1: *const mmfile, mf2: *const mmfile,
 		if ef(&mut two_way.pair, xscr, ecb, xecfg) < 0 {
 
 			xdl_free_script(xscr);
-			// xdl_2way_free(&two_way);
 			return -1;
 		}
 		xdl_free_script(xscr);
 	}
-	// xdl_2way_free(&two_way);
 
 	0
 }

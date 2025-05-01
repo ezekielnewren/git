@@ -138,7 +138,7 @@ typedef struct s_bdiffparam {
 void *xdl_mmfile_first(mmfile_t *mmf, long *size);
 long xdl_mmfile_size(mmfile_t *mmf);
 
-int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
+extern i32 xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     struct xdemitconf const *xecfg, struct xdemitcb *ecb);
 
 struct xmparam {
