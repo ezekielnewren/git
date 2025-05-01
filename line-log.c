@@ -317,8 +317,8 @@ struct collect_diff_cbdata {
 	struct diff_ranges *diff;
 };
 
-static int collect_diff_cb(long start_a, long count_a,
-			   long start_b, long count_b,
+static i32 collect_diff_cb(isize start_a, isize count_a,
+			   isize start_b, isize count_b,
 			   void *data)
 {
 	struct collect_diff_cbdata *d = data;

@@ -115,8 +115,8 @@ typedef struct s_xdemitcb {
 
 typedef long (*find_func_t)(const char *line, long line_len, char *buffer, long buffer_size, void *priv);
 
-typedef int (*xdl_emit_hunk_consume_func_t)(long start_a, long count_a,
-					    long start_b, long count_b,
+typedef i32 (*xdl_emit_hunk_consume_func_t)(isize start_a, isize count_a,
+					    isize start_b, isize count_b,
 					    void *cb_data);
 
 typedef struct s_xdemitconf {

@@ -1919,8 +1919,8 @@ struct blame_chunk_cb_data {
 };
 
 /* diff chunks are from parent to target */
-static int blame_chunk_cb(long start_a, long count_a,
-			  long start_b, long count_b, void *data)
+static i32 blame_chunk_cb(isize start_a, isize count_a,
+			  isize start_b, isize count_b, void *data)
 {
 	struct blame_chunk_cb_data *d = data;
 	if (start_a - start_b != d->offset)
@@ -2073,8 +2073,8 @@ struct handle_split_cb_data {
 	long tlno;
 };
 
-static int handle_split_cb(long start_a, long count_a,
-			   long start_b, long count_b, void *data)
+static i32 handle_split_cb(isize start_a, isize count_a,
+			   isize start_b, isize count_b, void *data)
 {
 	struct handle_split_cb_data *d = data;
 	handle_split(d->sb, d->ent, d->tlno, d->plno, start_b, d->parent,
