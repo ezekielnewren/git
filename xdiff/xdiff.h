@@ -113,7 +113,7 @@ typedef struct s_xdemitcb {
 	int (*out_line)(void *, mmbuffer_t *, int);
 } xdemitcb_t;
 
-typedef long (*find_func_t)(const char *line, long line_len, char *buffer, long buffer_size, void *priv);
+typedef isize (*find_func_t)(u8 const* line, isize line_len, u8* buffer, isize buffer_size, void *priv);
 
 typedef i32 (*xdl_emit_hunk_consume_func_t)(isize start_a, isize count_a,
 					    isize start_b, isize count_b,
