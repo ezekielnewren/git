@@ -106,11 +106,11 @@ typedef struct s_xpparam {
 
 struct xdemitcb {
 	void *priv;
-	int (*out_hunk)(void *,
-			long old_begin, long old_nr,
-			long new_begin, long new_nr,
-			const char *func, long funclen);
-	int (*out_line)(void *, mmbuffer_t *, int);
+	i32 (*out_hunk)(void *,
+			isize old_begin, isize old_nr,
+			isize new_begin, isize new_nr,
+			u8 const* func, isize funclen);
+	i32 (*out_line)(void *, mmbuffer_t *, i32);
 };
 
 typedef isize (*find_func_t)(u8 const* line, isize line_len, u8* buffer, isize buffer_size, void *priv);
