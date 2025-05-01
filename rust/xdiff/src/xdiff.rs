@@ -154,6 +154,23 @@ impl mmbuffer {
 }
 
 
+type xdemitcb_out_hunk_func = unsafe extern "C" fn(p0: *mut libc::c_void,
+old_begin: isize, old_nr: isize,
+new_begin: isize, new_nr: isize,
+func: *const u8, funclen: isize) -> i32;
+
+type xdemitcb_out_line_func = unsafe extern "C" fn(p0: *mut libc::c_void, p1: *mut mmbuffer, p2: i32) -> i32;
+
+
+#[repr(C)]
+pub(crate) struct xdemitcb {
+	private: *mut libc::c_void,
+    out_hunk: *mut xdemitcb_out_hunk_func,
+    out_line: *mut xdemitcb_out_line_func,
+}
+
+
+
 #[repr(C)]
 pub(crate) struct xmparam {
     pub(crate) xpp: xpparam_t,
