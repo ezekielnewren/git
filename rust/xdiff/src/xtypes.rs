@@ -52,7 +52,6 @@ impl xrecord {
         self.ptr
     }
 
-    /// Length of the line excluding end of line bytes.
     pub fn len(&self) -> usize {
         self.size
     }
@@ -68,6 +67,20 @@ impl xrecord {
             std::str::from_utf8_unchecked(self.as_ref())
         }
     }
+    
+    pub fn is_blank_line(&self, flags: u64) -> bool {
+        let mut line = self.as_ref();
+        if line.len() > 0 && line[line.len() - 1] == b'\n' {
+            line = &line[..line.len() - 1];
+        }
+        
+        for _ in WhitespaceIter::new(line, flags) {
+            return false;
+        }
+        
+        true
+    }
+    
 }
 
 pub struct xrecord_he {

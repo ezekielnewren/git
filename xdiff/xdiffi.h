@@ -50,6 +50,5 @@ extern i32 xdl_do_histogram_diff(u64 flags, struct xdpair *pair);
 
 i32 xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct xdemitcb *ecb,
 				  struct xdemitconf const *xecfg);
-void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, u64 flags);
 
 #endif /* #if !defined(XDIFFI_H) */

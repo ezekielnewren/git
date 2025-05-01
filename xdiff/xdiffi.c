@@ -214,25 +214,5 @@ i32 xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct
 	return 0;
 }
 
-void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, u64 flags) {
-	struct xdchange *xch;
-
-	for (xch = xscr; xch; xch = xch->next) {
-		bool ignore = true;
-		struct xrecord *rec;
-
-		rec = &pair->lhs.record->ptr[xch->i1];
-		for (usize i = 0; i < xch->chg1 && ignore; i++) {
-			ignore = xdl_blankline((const char*) rec[i].ptr, rec[i].size, flags);
-		}
-
-		rec = &pair->rhs.record->ptr[xch->i2];
-		for (usize i = 0; i < xch->chg2 && ignore; i++) {
-			ignore = xdl_blankline((const char*)rec[i].ptr, rec[i].size, flags);
-		}
-
-		xch->ignore = ignore;
-	}
-}
 
 

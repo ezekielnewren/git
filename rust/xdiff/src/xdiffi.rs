@@ -1407,10 +1407,38 @@ extern "C" {
 					 xecfg: *const xdemitconf) -> i32;
 
 
-	#[no_mangle]
-	fn xdl_mark_ignorable_lines(xscr: *mut xdchange, pair: *mut xdpair, flags: u64);
+}
 
 
+fn xdl_mark_ignorable_lines(xscr: *mut xdchange, pair: &mut xdpair, flags: u64) {
+	let lhs = unsafe { (*pair.lhs.record).as_slice() };
+	let rhs = unsafe { (*pair.rhs.record).as_slice() };
+	
+	let mut _xch = xscr;
+	while !_xch.is_null() {
+		let xch = unsafe { &mut *_xch };
+		
+		let mut ignore = true;
+
+		for i in 0..xch.chg1 as usize {
+			if !ignore {
+				break;
+			}
+			let rec = &lhs[xch.i1 as usize + i];
+			ignore = rec.is_blank_line(flags);
+		}
+
+		for i in 0..xch.chg2 as usize {
+			if !ignore {
+				break;
+			}
+			let rec = &rhs[xch.i2 as usize + i];
+			ignore = rec.is_blank_line(flags);
+		}
+
+		xch.ignore = ignore;
+		_xch = xch.next;
+	}
 }
 
 
