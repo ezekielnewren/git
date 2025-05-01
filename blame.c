@@ -318,7 +318,7 @@ static int diff_hunks(mmfile_t *file_a, mmfile_t *file_b,
 {
 	xpparam_t xpp = {0};
 	struct xdemitconf xecfg = {0};
-	xdemitcb_t ecb = {NULL};
+	struct xdemitcb ecb = {NULL};
 
 	xpp.flags = xdl_opts;
 	xecfg.hunk_func = hunk_func;

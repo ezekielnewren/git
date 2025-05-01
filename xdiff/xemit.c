@@ -30,7 +30,7 @@ static long xdl_get_rec(struct xd_file_context *ctx, long ri, char const **rec) 
 }
 
 
-static int xdl_emit_record(struct xd_file_context *ctx, long ri, char const *pre, xdemitcb_t *ecb) {
+static int xdl_emit_record(struct xd_file_context *ctx, long ri, char const *pre, struct xdemitcb *ecb) {
 	long size, psize = strlen(pre);
 	char const *rec;
 
@@ -163,7 +163,7 @@ static int is_empty_rec(struct xd_file_context *ctx, long ri)
 	return !len;
 }
 
-int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
+int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *ecb,
 		  struct xdemitconf const *xecfg) {
 	long s1, s2, e1, e2, lctx;
 	struct xdchange *xch, *xche;

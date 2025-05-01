@@ -37,7 +37,7 @@ long xdl_bogosqrt(long n) {
 
 
 int xdl_emit_diffrec(char const *rec, long size, char const *pre, long psize,
-		     xdemitcb_t *ecb) {
+		     struct xdemitcb *ecb) {
 	int i = 2;
 	mmbuffer_t mb[3];
 
@@ -117,7 +117,7 @@ int xdl_num_out(char *out, long val) {
 
 static int xdl_format_hunk_hdr(long s1, long c1, long s2, long c2,
 			       const char *func, long funclen,
-			       xdemitcb_t *ecb) {
+			       struct xdemitcb *ecb) {
 	int nb = 0;
 	mmbuffer_t mb;
 	char buf[128];
@@ -166,7 +166,7 @@ static int xdl_format_hunk_hdr(long s1, long c1, long s2, long c2,
 
 int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 		      const char *func, long funclen,
-		      xdemitcb_t *ecb) {
+		      struct xdemitcb *ecb) {
 	if (!ecb->out_hunk)
 		return xdl_format_hunk_hdr(s1, c1, s2, c2, func, funclen, ecb);
 	if (ecb->out_hunk(ecb->priv,

@@ -38,7 +38,7 @@ typedef void (*xdiff_emit_hunk_fn)(void *data,
 				   long new_begin, long new_nr,
 				   const char *func, long funclen);
 
-int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, struct xdemitconf const *xecfg, xdemitcb_t *ecb);
+int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, struct xdemitconf const *xecfg, struct xdemitcb *ecb);
 int xdi_diff_outf(mmfile_t *mf1, mmfile_t *mf2,
 		  xdiff_emit_hunk_fn hunk_fn,
 		  xdiff_emit_line_fn line_fn,

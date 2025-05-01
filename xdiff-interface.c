@@ -116,7 +116,7 @@ static void trim_common_tail(mmfile_t *a, mmfile_t *b)
 	b->size -= trimmed - recovered;
 }
 
-int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, struct xdemitconf const *xecfg, xdemitcb_t *xecb)
+int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, struct xdemitconf const *xecfg, struct xdemitcb *xecb)
 {
 	mmfile_t a = *mf1;
 	mmfile_t b = *mf2;
@@ -138,7 +138,7 @@ int xdi_diff_outf(mmfile_t *mf1, mmfile_t *mf2,
 {
 	int ret;
 	struct xdiff_emit_state state;
-	xdemitcb_t ecb;
+	struct xdemitcb ecb;
 
 	memset(&state, 0, sizeof(state));
 	state.hunk_fn = hunk_fn;

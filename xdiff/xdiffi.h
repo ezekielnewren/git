@@ -43,7 +43,7 @@ extern i32 xdl_do_diff(xpparam_t const *xpp, struct xdpair *pair);
 extern i32 xdl_change_compact(struct xd_file_context *ctx, struct xd_file_context *ctx_out, u64 flags);
 extern i32 xdl_build_script(struct xdpair *pair, struct xdchange **xscr);
 extern void xdl_free_script(struct xdchange *xscr);
-int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
+int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *ecb,
 		  struct xdemitconf const *xecfg);
 extern int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair);
 extern i32 xdl_do_histogram_diff(u64 flags, struct xdpair *pair);

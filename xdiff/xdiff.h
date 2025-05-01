@@ -104,14 +104,14 @@ typedef struct s_xpparam {
 	size_t anchors_nr;
 } xpparam_t;
 
-typedef struct s_xdemitcb {
+struct xdemitcb {
 	void *priv;
 	int (*out_hunk)(void *,
 			long old_begin, long old_nr,
 			long new_begin, long new_nr,
 			const char *func, long funclen);
 	int (*out_line)(void *, mmbuffer_t *, int);
-} xdemitcb_t;
+};
 
 typedef isize (*find_func_t)(u8 const* line, isize line_len, u8* buffer, isize buffer_size, void *priv);
 
@@ -139,7 +139,7 @@ void *xdl_mmfile_first(mmfile_t *mmf, long *size);
 long xdl_mmfile_size(mmfile_t *mmf);
 
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-	     struct xdemitconf const *xecfg, xdemitcb_t *ecb);
+	     struct xdemitconf const *xecfg, struct xdemitcb *ecb);
 
 struct xmparam {
 	xpparam_t xpp;

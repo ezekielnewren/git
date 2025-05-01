@@ -30,7 +30,7 @@ static int diff_two(const char *file1, const char *label1,
 {
 	xpparam_t xpp;
 	struct xdemitconf xecfg;
-	xdemitcb_t ecb = { .out_line = outf };
+	struct xdemitcb ecb = { .out_line = outf };
 	mmfile_t minus, plus;
 	int ret;
 
