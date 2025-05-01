@@ -50,6 +50,22 @@ pub const XDL_MERGE_ZEALOUS_DIFF3: u64 = 2;
 
 pub const DEFAULT_CONFLICT_MARKER_SIZE: usize = 7;
 
+
+type find_func_t = unsafe extern "C" fn(line: *const u8, line_len: isize, buffer: *mut u8, buffer_size: isize, _priv: *mut libc::c_void) -> isize;
+type xdl_emit_hunk_consume_func_t = unsafe extern "C" fn(start_a: isize, count_a: isize, start_b: isize, count_b: isize, cb_data: *mut libc::c_void) -> i32;
+
+
+#[repr(C)]
+pub(crate) struct xdemitconf {
+    pub(crate) ctxlen: isize,
+    pub(crate) interhunkctxlen: isize,
+    pub(crate) flags: u64,
+    pub(crate) find_func: *const find_func_t,
+    pub(crate) find_func_priv: *mut libc::c_void,
+    pub(crate) hunk_func: *const xdl_emit_hunk_consume_func_t,
+}
+
+
 #[repr(C)]
 pub struct xpparam_t {
 	pub flags: u64,
