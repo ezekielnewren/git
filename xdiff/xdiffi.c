@@ -235,43 +235,4 @@ void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, u64 fl
 	}
 }
 
-i32 record_matches_regex(struct xrecord *rec, xpparam_t const *xpp) {
-	regmatch_t regmatch;
-	size_t i;
-
-	for (i = 0; i < xpp->ignore_regex_nr; i++)
-		if (!regexec_buf(xpp->ignore_regex[i], (const char*) rec->ptr, rec->size, 1,
-				 &regmatch, 0))
-			return 1;
-
-	return 0;
-}
-
-void xdl_mark_ignorable_regex(struct xdchange *xscr, const struct xdpair *pair,
-				     xpparam_t const *xpp)
-{
-	struct xdchange *xch;
-
-	for (xch = xscr; xch; xch = xch->next) {
-		struct xrecord *rec;
-		int ignore = 1;
-		long i;
-
-		/*
-		 * Do not override --ignore-blank-lines.
-		 */
-		if (xch->ignore)
-			continue;
-
-		rec = &pair->lhs.record->ptr[xch->i1];
-		for (i = 0; i < xch->chg1 && ignore; i++)
-			ignore = record_matches_regex(&rec[i], xpp);
-
-		rec = &pair->rhs.record->ptr[xch->i2];
-		for (i = 0; i < xch->chg2 && ignore; i++)
-			ignore = record_matches_regex(&rec[i], xpp);
-
-		xch->ignore = ignore;
-	}
-}
 

@@ -1410,9 +1410,66 @@ extern "C" {
 	#[no_mangle]
 	fn xdl_mark_ignorable_lines(xscr: *mut xdchange, pair: *mut xdpair, flags: u64);
 
-	#[no_mangle]
-	fn xdl_mark_ignorable_regex(xscr: *mut xdchange, pair: *mut xdpair, xpp: *const xpparam_t);
 
+}
+
+
+fn record_matches_regex(rec: &xrecord, xpp: &xpparam_t) -> bool {
+	for i in 0..xpp.ignore_regex_nr {
+		unsafe {
+			let preg = *xpp.ignore_regex.add(i);
+			let buf = rec.as_ptr() as *const libc::c_char;
+			let mut pmatch = libc::regmatch_t {
+				rm_so: 0,
+				rm_eo: rec.len() as libc::regoff_t,
+			};
+			if libc::regexec(preg, buf, 1, &mut pmatch, 0 | libc::REG_STARTEND) == 0 {
+				return true;
+			}
+		}
+	}
+
+	false
+}
+
+
+fn xdl_mark_ignorable_regex(xscr: *mut xdchange, pair: &mut xdpair, xpp: &xpparam_t) {
+	let lhs = unsafe { (*pair.lhs.record).as_slice() };
+	let rhs = unsafe { (*pair.rhs.record).as_slice() };
+	
+	let mut _xch: *mut xdchange = xscr;
+	while !_xch.is_null() {
+		let xch = unsafe { &mut *_xch };
+		
+		let mut ignore = true;
+
+		/*
+		 * Do not override --ignore-blank-lines.
+		 */
+		if xch.ignore {
+			_xch = xch.next;
+			continue;
+		}
+
+		for i in 0..xch.chg1 as usize {
+			if !ignore {
+				break;
+			}
+			let rec = &lhs[xch.i1 as usize + i];
+			ignore = record_matches_regex(rec, &*xpp);
+		}
+
+		for i in 0..xch.chg2 as usize {
+			if !ignore {
+				break;
+			}
+			let rec = &rhs[xch.i2 as usize + i];
+			ignore = record_matches_regex(rec, xpp);
+		}
+
+		xch.ignore = ignore;
+		_xch = xch.next;
+	}
 }
 
 
