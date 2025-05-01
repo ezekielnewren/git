@@ -120,9 +120,9 @@ typedef i32 (*xdl_emit_hunk_consume_func_t)(isize start_a, isize count_a,
 					    void *cb_data);
 
 struct xdemitconf {
-	long ctxlen;
-	long interhunkctxlen;
-	unsigned long flags;
+	isize ctxlen;
+	isize interhunkctxlen;
+	u64 flags;
 	find_func_t find_func;
 	void *find_func_priv;
 	xdl_emit_hunk_consume_func_t hunk_func;
