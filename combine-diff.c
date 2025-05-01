@@ -425,7 +425,7 @@ static void combine_diff(struct repository *r,
 	unsigned int p_lno, lno;
 	unsigned long nmask = (1UL << n);
 	xpparam_t xpp;
-	xdemitconf_t xecfg;
+	struct xdemitconf xecfg;
 	mmfile_t parent_file;
 	struct combine_diff_state state;
 	unsigned long sz;

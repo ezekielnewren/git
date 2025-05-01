@@ -198,7 +198,7 @@ extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
 
 
 static int xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, xdemitcb_t *ecb,
-			      xdemitconf_t const *xecfg)
+			      struct xdemitconf const *xecfg)
 {
 	struct xdchange *xch, *xche;
 
@@ -276,7 +276,7 @@ static void xdl_mark_ignorable_regex(struct xdchange *xscr, const struct xdpair 
 }
 
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
+	     struct xdemitconf const *xecfg, xdemitcb_t *ecb) {
 	struct xdchange *xscr;
 	struct xd2way two_way;
 	emit_func_t ef = xecfg->hunk_func ? xdl_call_hunk_func : xdl_emit_diff;

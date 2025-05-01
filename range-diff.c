@@ -305,7 +305,7 @@ static void diffsize_hunk(void *data,
 static int diffsize(const char *a, const char *b)
 {
 	xpparam_t pp = { 0 };
-	xdemitconf_t cfg = { 0 };
+	struct xdemitconf cfg = { 0 };
 	mmfile_t mf1, mf2;
 	int count = 0;
 

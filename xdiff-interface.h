@@ -38,18 +38,18 @@ typedef void (*xdiff_emit_hunk_fn)(void *data,
 				   long new_begin, long new_nr,
 				   const char *func, long funclen);
 
-int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, xdemitconf_t const *xecfg, xdemitcb_t *ecb);
+int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, struct xdemitconf const *xecfg, xdemitcb_t *ecb);
 int xdi_diff_outf(mmfile_t *mf1, mmfile_t *mf2,
 		  xdiff_emit_hunk_fn hunk_fn,
 		  xdiff_emit_line_fn line_fn,
 		  void *consume_callback_data,
-		  xpparam_t const *xpp, xdemitconf_t const *xecfg);
+		  xpparam_t const *xpp, struct xdemitconf const *xecfg);
 int read_mmfile(mmfile_t *ptr, const char *filename);
 void read_mmblob(mmfile_t *ptr, const struct object_id *oid);
 int buffer_is_binary(const char *ptr, unsigned long size);
 
-void xdiff_set_find_func(xdemitconf_t *xecfg, const char *line, int cflags);
-void xdiff_clear_find_func(xdemitconf_t *xecfg);
+void xdiff_set_find_func(struct xdemitconf *xecfg, const char *line, int cflags);
+void xdiff_clear_find_func(struct xdemitconf *xecfg);
 struct config_context;
 int parse_conflict_style_name(const char *value);
 int git_xmerge_config(const char *var, const char *value,

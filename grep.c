@@ -1328,7 +1328,7 @@ static inline void grep_attr_unlock(void)
 static int match_funcname(struct grep_opt *opt, struct grep_source *gs,
 			  const char *bol, const char *eol)
 {
-	xdemitconf_t *xecfg = opt->priv;
+	struct xdemitconf *xecfg = opt->priv;
 	if (xecfg && !xecfg->find_func) {
 		grep_source_load_driver(gs, opt->repo->index);
 		if (gs->driver->funcname.pattern) {
@@ -1575,7 +1575,7 @@ static int grep_source_1(struct grep_opt *opt, struct grep_source *gs, int colle
 	int show_function = 0;
 	struct userdiff_driver *textconv = NULL;
 	enum grep_context ctx = GREP_CONTEXT_HEAD;
-	xdemitconf_t xecfg;
+	struct xdemitconf xecfg;
 
 	if (!opt->status_only && gs->name == NULL)
 		BUG("grep call which could print a name requires "

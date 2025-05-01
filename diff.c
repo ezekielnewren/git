@@ -2145,7 +2145,7 @@ static void diff_words_fill(struct diff_words_buffer *buffer, mmfile_t *out,
 static void diff_words_show(struct diff_words_data *diff_words)
 {
 	xpparam_t xpp;
-	xdemitconf_t xecfg;
+	struct xdemitconf xecfg;
 	mmfile_t minus, plus;
 	struct diff_words_style *style = diff_words->style;
 
@@ -3706,7 +3706,7 @@ static void builtin_diff(const char *name_a,
 		const char *diffopts;
 		const char *v;
 		xpparam_t xpp;
-		xdemitconf_t xecfg;
+		struct xdemitconf xecfg;
 		struct emit_callback ecbdata;
 		const struct userdiff_funcname *pe;
 
@@ -3859,7 +3859,7 @@ static void builtin_diffstat(const char *name_a, const char *name_b,
 	else if (may_differ) {
 		/* Crazy xdl interfaces.. */
 		xpparam_t xpp;
-		xdemitconf_t xecfg;
+		struct xdemitconf xecfg;
 
 		if (fill_mmfile(o->repo, &mf1, one) < 0 ||
 		    fill_mmfile(o->repo, &mf2, two) < 0)
@@ -3939,7 +3939,7 @@ static void builtin_checkdiff(const char *name_a, const char *name_b,
 	else {
 		/* Crazy xdl interfaces.. */
 		xpparam_t xpp;
-		xdemitconf_t xecfg;
+		struct xdemitconf xecfg;
 
 		memset(&xpp, 0, sizeof(xpp));
 		memset(&xecfg, 0, sizeof(xecfg));
@@ -6471,7 +6471,7 @@ static int diff_get_patch_id(struct diff_options *options, struct object_id *oid
 
 	for (i = 0; i < q->nr; i++) {
 		xpparam_t xpp;
-		xdemitconf_t xecfg;
+		struct xdemitconf xecfg;
 		mmfile_t mf1, mf2;
 		struct diff_filepair *p = q->queue[i];
 		int len1, len2;

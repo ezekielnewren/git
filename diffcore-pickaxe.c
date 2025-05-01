@@ -46,7 +46,7 @@ static int diff_grep(mmfile_t *one, mmfile_t *two,
 {
 	struct diffgrep_cb ecbdata;
 	xpparam_t xpp;
-	xdemitconf_t xecfg;
+	struct xdemitconf xecfg;
 	int ret;
 
 	/*

@@ -121,7 +121,7 @@ static void show_diff(struct merge_list *entry)
 	unsigned long size;
 	mmfile_t src, dst;
 	xpparam_t xpp;
-	xdemitconf_t xecfg;
+	struct xdemitconf xecfg;
 	xdemitcb_t ecb = { .out_line = show_outf };
 
 	memset(&xpp, 0, sizeof(xpp));

@@ -116,7 +116,7 @@ static void trim_common_tail(mmfile_t *a, mmfile_t *b)
 	b->size -= trimmed - recovered;
 }
 
-int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, xdemitconf_t const *xecfg, xdemitcb_t *xecb)
+int xdi_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp, struct xdemitconf const *xecfg, xdemitcb_t *xecb)
 {
 	mmfile_t a = *mf1;
 	mmfile_t b = *mf2;
@@ -134,7 +134,7 @@ int xdi_diff_outf(mmfile_t *mf1, mmfile_t *mf2,
 		  xdiff_emit_hunk_fn hunk_fn,
 		  xdiff_emit_line_fn line_fn,
 		  void *consume_callback_data,
-		  xpparam_t const *xpp, xdemitconf_t const *xecfg)
+		  xpparam_t const *xpp, struct xdemitconf const *xecfg)
 {
 	int ret;
 	struct xdiff_emit_state state;
@@ -209,9 +209,7 @@ struct ff_regs {
 	} *array;
 };
 
-static long ff_regexp(const char *line, long len,
-		char *buffer, long buffer_size, void *priv)
-{
+static isize ff_regexp(u8 const* line, isize len, u8* buffer, isize buffer_size, void *priv) {
 	struct ff_regs *regs = priv;
 	regmatch_t pmatch[2];
 	int i;
@@ -246,7 +244,7 @@ static long ff_regexp(const char *line, long len,
 	return result;
 }
 
-void xdiff_set_find_func(xdemitconf_t *xecfg, const char *value, int cflags)
+void xdiff_set_find_func(struct xdemitconf *xecfg, const char *value, int cflags)
 {
 	int i;
 	struct ff_regs *regs;
@@ -282,7 +280,7 @@ void xdiff_set_find_func(xdemitconf_t *xecfg, const char *value, int cflags)
 	}
 }
 
-void xdiff_clear_find_func(xdemitconf_t *xecfg)
+void xdiff_clear_find_func(struct xdemitconf *xecfg)
 {
 	if (xecfg->find_func) {
 		int i;

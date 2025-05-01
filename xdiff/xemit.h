@@ -25,11 +25,11 @@
 
 
 typedef int (*emit_func_t)(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
-			   xdemitconf_t const *xecfg);
+			   struct xdemitconf const *xecfg);
 
-struct xdchange *xdl_get_hunk(struct xdchange **xscr, xdemitconf_t const *xecfg);
+struct xdchange *xdl_get_hunk(struct xdchange **xscr, struct xdemitconf const *xecfg);
 int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
-		  xdemitconf_t const *xecfg);
+		  struct xdemitconf const *xecfg);
 
 
 

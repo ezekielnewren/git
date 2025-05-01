@@ -49,7 +49,7 @@ static int xdl_emit_record(struct xd_file_context *ctx, long ri, char const *pre
  * inside the differential hunk according to the specified configuration.
  * Also advance xscr if the first changes must be discarded.
  */
-struct xdchange *xdl_get_hunk(struct xdchange **xscr, xdemitconf_t const *xecfg)
+struct xdchange *xdl_get_hunk(struct xdchange **xscr, struct xdemitconf const *xecfg)
 {
 	struct xdchange *xch, *xchp, *lxch;
 	long max_common = 2 * xecfg->ctxlen + xecfg->interhunkctxlen;
@@ -95,8 +95,7 @@ struct xdchange *xdl_get_hunk(struct xdchange **xscr, xdemitconf_t const *xecfg)
 }
 
 
-static long def_ff(const char *rec, long len, char *buf, long sz)
-{
+static isize def_ff(u8 const* rec, isize len, u8* buf, isize sz) {
 	if (len > 0 &&
 			(isalpha((unsigned char)*rec) || /* identifier? */
 			 *rec == '_' || /* also identifier? */
@@ -111,7 +110,7 @@ static long def_ff(const char *rec, long len, char *buf, long sz)
 	return -1;
 }
 
-static long match_func_rec(struct xd_file_context *ctx, xdemitconf_t const *xecfg, long ri,
+static long match_func_rec(struct xd_file_context *ctx, struct xdemitconf const *xecfg, long ri,
 			   char *buf, long sz)
 {
 	const char *rec;
@@ -121,7 +120,7 @@ static long match_func_rec(struct xd_file_context *ctx, xdemitconf_t const *xecf
 	return xecfg->find_func(rec, len, buf, sz, xecfg->find_func_priv);
 }
 
-static int is_func_rec(struct xd_file_context *ctx, xdemitconf_t const *xecfg, long ri)
+static int is_func_rec(struct xd_file_context *ctx, struct xdemitconf const *xecfg, long ri)
 {
 	char dummy[1];
 	return match_func_rec(ctx, xecfg, ri, dummy, sizeof(dummy)) >= 0;
@@ -132,7 +131,7 @@ struct func_line {
 	char buf[80];
 };
 
-static long get_func_line(struct xdpair *pair, xdemitconf_t const *xecfg,
+static long get_func_line(struct xdpair *pair, struct xdemitconf const *xecfg,
 			  struct func_line *func_line, long start, long limit)
 {
 	long l, size, step = (start > limit) ? -1 : 1;
@@ -165,7 +164,7 @@ static int is_empty_rec(struct xd_file_context *ctx, long ri)
 }
 
 int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, xdemitcb_t *ecb,
-		  xdemitconf_t const *xecfg) {
+		  struct xdemitconf const *xecfg) {
 	long s1, s2, e1, e2, lctx;
 	struct xdchange *xch, *xche;
 	long funclineprev = -1;

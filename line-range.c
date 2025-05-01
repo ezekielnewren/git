@@ -114,7 +114,7 @@ static const char *parse_loc(const char *spec, nth_line_fn_t nth_line,
 	}
 }
 
-static int match_funcname(xdemitconf_t *xecfg, const char *bol, const char *eol)
+static int match_funcname(struct xdemitconf *xecfg, const char *bol, const char *eol)
 {
 	if (xecfg) {
 		char buf[1];
@@ -129,7 +129,7 @@ static int match_funcname(xdemitconf_t *xecfg, const char *bol, const char *eol)
 	return 0;
 }
 
-static const char *find_funcname_matching_regexp(xdemitconf_t *xecfg, const char *start,
+static const char *find_funcname_matching_regexp(struct xdemitconf *xecfg, const char *start,
 						 regex_t *regexp)
 {
 	int reg_error;
@@ -171,7 +171,7 @@ static const char *parse_range_funcname(
 	char *pattern;
 	const char *term;
 	struct userdiff_driver *drv;
-	xdemitconf_t *xecfg = NULL;
+	struct xdemitconf *xecfg = NULL;
 	const char *start;
 	const char *p;
 	int reg_error;

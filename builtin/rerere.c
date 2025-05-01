@@ -29,7 +29,7 @@ static int diff_two(const char *file1, const char *label1,
 		const char *file2, const char *label2)
 {
 	xpparam_t xpp;
-	xdemitconf_t xecfg;
+	struct xdemitconf xecfg;
 	xdemitcb_t ecb = { .out_line = outf };
 	mmfile_t minus, plus;
 	int ret;

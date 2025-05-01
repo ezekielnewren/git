@@ -119,14 +119,14 @@ typedef i32 (*xdl_emit_hunk_consume_func_t)(isize start_a, isize count_a,
 					    isize start_b, isize count_b,
 					    void *cb_data);
 
-typedef struct s_xdemitconf {
+struct xdemitconf {
 	long ctxlen;
 	long interhunkctxlen;
 	unsigned long flags;
 	find_func_t find_func;
 	void *find_func_priv;
 	xdl_emit_hunk_consume_func_t hunk_func;
-} xdemitconf_t;
+};
 
 typedef struct s_bdiffparam {
 	long bsize;
@@ -139,7 +139,7 @@ void *xdl_mmfile_first(mmfile_t *mmf, long *size);
 long xdl_mmfile_size(mmfile_t *mmf);
 
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-	     xdemitconf_t const *xecfg, xdemitcb_t *ecb);
+	     struct xdemitconf const *xecfg, xdemitcb_t *ecb);
 
 struct xmparam {
 	xpparam_t xpp;
