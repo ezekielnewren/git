@@ -214,22 +214,22 @@ static int xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr,
 	return 0;
 }
 
-static void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, long flags)
-{
+static void xdl_mark_ignorable_lines(struct xdchange *xscr, struct xdpair *pair, u64 flags) {
 	struct xdchange *xch;
 
 	for (xch = xscr; xch; xch = xch->next) {
 		bool ignore = true;
 		struct xrecord *rec;
-		long i;
 
 		rec = &pair->lhs.record->ptr[xch->i1];
-		for (i = 0; i < xch->chg1 && ignore; i++)
+		for (usize i = 0; i < xch->chg1 && ignore; i++) {
 			ignore = xdl_blankline((const char*) rec[i].ptr, rec[i].size, flags);
+		}
 
 		rec = &pair->rhs.record->ptr[xch->i2];
-		for (i = 0; i < xch->chg2 && ignore; i++)
+		for (usize i = 0; i < xch->chg2 && ignore; i++) {
 			ignore = xdl_blankline((const char*)rec[i].ptr, rec[i].size, flags);
+		}
 
 		xch->ignore = ignore;
 	}
