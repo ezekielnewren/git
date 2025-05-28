@@ -4,7 +4,7 @@ use interop::ivec::IVec;
 use interop::xmalloc;
 use crate::get_file_context;
 use crate::xdiff::*;
-use crate::xemit::emit_func_t;
+use crate::xemit::{emit_func_t, xdl_get_hunk};
 use crate::xhistogram::{do_histogram_diff};
 use crate::xpatience::{do_patience_diff};
 use crate::xprepare::{safe_2way_prepare, safe_2way_slice};
@@ -1397,19 +1397,6 @@ pub(crate) unsafe extern "C" fn xdl_change_compact(ctx: *mut xd_file_context, ct
 }
 
 
-extern "C" {
-	#[no_mangle]
-	fn xdl_call_hunk_func(pair: *mut xdpair, xscr: *mut xdchange, ecb: *const xdemitcb,
-						  xecfg: *const xdemitconf) -> i32;
-
-	#[no_mangle]
-	fn xdl_emit_diff(pair: *mut xdpair, xscr: *mut xdchange, ecb: *const xdemitcb,
-					 xecfg: *const xdemitconf) -> i32;
-
-
-}
-
-
 fn xdl_mark_ignorable_lines(xscr: *mut xdchange, pair: &mut xdpair, flags: u64) {
 	let lhs = unsafe { (*pair.lhs.record).as_slice() };
 	let rhs = unsafe { (*pair.rhs.record).as_slice() };
@@ -1498,6 +1485,43 @@ fn xdl_mark_ignorable_regex(xscr: *mut xdchange, pair: &mut xdpair, xpp: &xppara
 		xch.ignore = ignore;
 		_xch = xch.next;
 	}
+}
+
+
+extern "C" {
+	#[no_mangle]
+	fn xdl_emit_diff(pair: *mut xdpair, xscr: *mut xdchange, ecb: *const xdemitcb,
+					 xecfg: *const xdemitconf) -> i32;
+
+
+}
+
+
+#[no_mangle]
+unsafe extern "C" fn xdl_call_hunk_func(_: *mut xdpair, xscr: *mut xdchange, ecb: *const xdemitcb,
+					  xecfg: *const xdemitconf) -> i32 {
+
+	let mut xch: *mut xdchange = xscr;
+	let mut xche: *mut xdchange = std::ptr::null_mut();
+	
+	
+	while !xch.is_null() {
+		xche = xdl_get_hunk(&mut xch, xecfg);
+		if xch.is_null() {
+			break;
+		}
+		let func_ptr: xdl_emit_hunk_consume_func_t = std::mem::transmute((*xecfg).hunk_func);
+		if func_ptr((*xch).i1, (*xche).i1 + (*xche).chg1 - (*xch).i1,
+							 (*xch).i2, (*xche).i2 + (*xche).chg2 - (*xch).i2,
+							 (*ecb).private) < 0 {
+			return -1;
+		}
+		
+		xch = (*xche).next;
+	}
+	
+	
+	0
 }
 
 

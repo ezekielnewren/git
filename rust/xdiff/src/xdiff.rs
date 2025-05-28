@@ -51,8 +51,8 @@ pub const XDL_MERGE_ZEALOUS_DIFF3: u64 = 2;
 pub const DEFAULT_CONFLICT_MARKER_SIZE: usize = 7;
 
 
-type find_func_t = unsafe extern "C" fn(line: *const u8, line_len: isize, buffer: *mut u8, buffer_size: isize, _priv: *mut libc::c_void) -> isize;
-type xdl_emit_hunk_consume_func_t = unsafe extern "C" fn(start_a: isize, count_a: isize, start_b: isize, count_b: isize, cb_data: *mut libc::c_void) -> i32;
+pub(crate) type find_func_t = unsafe extern "C" fn(line: *const u8, line_len: isize, buffer: *mut u8, buffer_size: isize, _priv: *mut libc::c_void) -> isize;
+pub(crate) type xdl_emit_hunk_consume_func_t = unsafe extern "C" fn(start_a: isize, count_a: isize, start_b: isize, count_b: isize, cb_data: *mut libc::c_void) -> i32;
 
 
 #[repr(C)]
@@ -62,7 +62,7 @@ pub(crate) struct xdemitconf {
     pub(crate) flags: u64,
     pub(crate) find_func: *const find_func_t,
     pub(crate) find_func_priv: *mut libc::c_void,
-    pub(crate) hunk_func: *const xdl_emit_hunk_consume_func_t,
+    pub(crate) hunk_func: *const std::ffi::c_void, // xdl_emit_hunk_consume_func_t,
 }
 
 
@@ -164,7 +164,7 @@ type xdemitcb_out_line_func = unsafe extern "C" fn(p0: *mut libc::c_void, p1: *m
 
 #[repr(C)]
 pub(crate) struct xdemitcb {
-	private: *mut libc::c_void,
+	pub(crate) private: *mut libc::c_void,
     out_hunk: *mut xdemitcb_out_hunk_func,
     out_line: *mut xdemitcb_out_line_func,
 }

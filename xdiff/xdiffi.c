@@ -197,22 +197,6 @@ extern int group_slide_down(struct xd_file_context *ctx, struct xdlgroup *g);
 extern int group_slide_up(struct xd_file_context *ctx, struct xdlgroup *g);
 
 
-i32 xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct xdemitcb *ecb,
-			      struct xdemitconf const *xecfg)
-{
-	struct xdchange *xch, *xche;
-
-	for (xch = xscr; xch; xch = xche->next) {
-		xche = xdl_get_hunk(&xch, xecfg);
-		if (!xch)
-			break;
-		if (xecfg->hunk_func(xch->i1, xche->i1 + xche->chg1 - xch->i1,
-				     xch->i2, xche->i2 + xche->chg2 - xch->i2,
-				     ecb->priv) < 0)
-			return -1;
-	}
-	return 0;
-}
 
 
 

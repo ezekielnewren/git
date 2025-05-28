@@ -48,7 +48,7 @@ int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *e
 extern int xdl_do_patience_diff(xpparam_t const *xpp, struct xdpair *pair);
 extern i32 xdl_do_histogram_diff(u64 flags, struct xdpair *pair);
 
-i32 xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct xdemitcb *ecb,
+extern i32 xdl_call_hunk_func(struct xdpair *pair UNUSED, struct xdchange *xscr, struct xdemitcb *ecb,
 				  struct xdemitconf const *xecfg);
 
 #endif /* #if !defined(XDIFFI_H) */
