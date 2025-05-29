@@ -22,21 +22,12 @@
 
 #include "xinclude.h"
 
-static long xdl_get_rec(struct xd_file_context *ctx, long ri, char const **rec) {
-
-	*rec = (char const *) ctx->record->ptr[ri].ptr;
-
-	return ctx->record->ptr[ri].size;
-}
-
 
 static int xdl_emit_record(struct xd_file_context *ctx, long ri, char const *pre, struct xdemitcb *ecb) {
-	long size, psize = strlen(pre);
-	char const *rec;
+	struct xrecord *record = &ctx->record->ptr[ri];
+	long psize = strlen(pre);
 
-	size = xdl_get_rec(ctx, ri, &rec);
-	if (xdl_emit_diffrec(rec, size, pre, psize, ecb) < 0) {
-
+	if (xdl_emit_diffrec(record->ptr, record->size, pre, psize, ecb) < 0) {
 		return -1;
 	}
 
@@ -64,11 +55,10 @@ static isize def_ff(u8 const* rec, isize len, u8* buf, isize sz) {
 static long match_func_rec(struct xd_file_context *ctx, struct xdemitconf const *xecfg, long ri,
 			   char *buf, long sz)
 {
-	const char *rec;
-	long len = xdl_get_rec(ctx, ri, &rec);
+	struct xrecord *record = &ctx->record->ptr[ri];
 	if (!xecfg->find_func)
-		return def_ff(rec, len, buf, sz);
-	return xecfg->find_func(rec, len, buf, sz, xecfg->find_func_priv);
+		return def_ff(record->ptr, record->size, buf, sz);
+	return xecfg->find_func(record->ptr, record->size, buf, sz, xecfg->find_func_priv);
 }
 
 static int is_func_rec(struct xd_file_context *ctx, struct xdemitconf const *xecfg, long ri)
@@ -102,16 +92,14 @@ static long get_func_line(struct xdpair *pair, struct xdemitconf const *xecfg,
 	return -1;
 }
 
-static int is_empty_rec(struct xd_file_context *ctx, long ri)
-{
-	const char *rec;
-	long len = xdl_get_rec(ctx, ri, &rec);
-
-	while (len > 0 && XDL_ISSPACE(*rec)) {
-		rec++;
-		len--;
+static bool is_empty_rec(struct xd_file_context *ctx, long ri) {
+	struct xrecord *record = &ctx->record->ptr[ri];
+	for (usize i = 0; i < record->size; i++) {
+		if (!XDL_ISSPACE(record->ptr[i])) {
+			return false;
+		}
 	}
-	return !len;
+	return true;
 }
 
 i32 xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *ecb,
