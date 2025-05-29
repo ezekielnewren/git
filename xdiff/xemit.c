@@ -114,7 +114,7 @@ static int is_empty_rec(struct xd_file_context *ctx, long ri)
 	return !len;
 }
 
-int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *ecb,
+i32 xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *ecb,
 		  struct xdemitconf const *xecfg) {
 	long s1, s2, e1, e2, lctx;
 	struct xdchange *xch, *xche;

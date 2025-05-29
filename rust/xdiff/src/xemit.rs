@@ -63,3 +63,10 @@ pub(crate) unsafe extern "C" fn xdl_get_hunk(xscr: *mut *mut xdchange, xecfg: *c
 
 	lxch
 }
+
+
+// #[no_mangle]
+// pub(crate) unsafe extern "C" fn xdl_emit_diff(pair: *mut xdpair, xscr: *mut xdchange, ecb: *mut xdemitcb,
+// 		  xecfg: *const xdemitconf) -> i32 {
+// 	todo!()
+// }
