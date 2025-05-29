@@ -127,59 +127,61 @@ int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *e
 		if (!xch)
 			break;
 
-pre_context_calculation:
-		s1 = XDL_MAX(xch->i1 - xecfg->ctxlen, 0);
-		s2 = XDL_MAX(xch->i2 - xecfg->ctxlen, 0);
+		while (true) {
+			s1 = XDL_MAX(xch->i1 - xecfg->ctxlen, 0);
+			s2 = XDL_MAX(xch->i2 - xecfg->ctxlen, 0);
 
-		if (xecfg->flags & XDL_EMIT_FUNCCONTEXT) {
-			long fs1, i1 = xch->i1;
+			if (xecfg->flags & XDL_EMIT_FUNCCONTEXT) {
+				long fs1, i1 = xch->i1;
 
-			/* Appended chunk? */
-			if (i1 >= (isize) pair->lhs.record->length) {
-				long i2 = xch->i2;
+				/* Appended chunk? */
+				if (i1 >= (isize) pair->lhs.record->length) {
+					long i2 = xch->i2;
 
-				/*
-				 * We don't need additional context if
-				 * a whole function was added.
-				 */
-				while (i2 < (isize) pair->rhs.record->length) {
-					if (is_func_rec(&pair->rhs, xecfg, i2))
-						goto post_context_calculation;
-					i2++;
+					/*
+					 * We don't need additional context if
+					 * a whole function was added.
+					 */
+					while (i2 < (isize) pair->rhs.record->length) {
+						if (is_func_rec(&pair->rhs, xecfg, i2))
+							goto post_context_calculation;
+						i2++;
+					}
+
+					/*
+					 * Otherwise get more context from the
+					 * pre-image.
+					 */
+					i1 = pair->lhs.record->length - 1;
 				}
 
-				/*
-				 * Otherwise get more context from the
-				 * pre-image.
-				 */
-				i1 = pair->lhs.record->length - 1;
-			}
+				fs1 = get_func_line(pair, xecfg, NULL, i1, -1);
+				while (fs1 > 0 && !is_empty_rec(&pair->lhs, fs1 - 1) &&
+				       !is_func_rec(&pair->lhs, xecfg, fs1 - 1))
+					fs1--;
+				if (fs1 < 0)
+					fs1 = 0;
+				if (fs1 < s1) {
+					s2 = XDL_MAX(s2 - (s1 - fs1), 0);
+					s1 = fs1;
 
-			fs1 = get_func_line(pair, xecfg, NULL, i1, -1);
-			while (fs1 > 0 && !is_empty_rec(&pair->lhs, fs1 - 1) &&
-			       !is_func_rec(&pair->lhs, xecfg, fs1 - 1))
-				fs1--;
-			if (fs1 < 0)
-				fs1 = 0;
-			if (fs1 < s1) {
-				s2 = XDL_MAX(s2 - (s1 - fs1), 0);
-				s1 = fs1;
+					/*
+					 * Did we extend context upwards into an
+					 * ignored change?
+					 */
+					while (xchp != xch &&
+					       xchp->i1 + xchp->chg1 <= s1 &&
+					       xchp->i2 + xchp->chg2 <= s2)
+						xchp = xchp->next;
 
-				/*
-				 * Did we extend context upwards into an
-				 * ignored change?
-				 */
-				while (xchp != xch &&
-				       xchp->i1 + xchp->chg1 <= s1 &&
-				       xchp->i2 + xchp->chg2 <= s2)
-					xchp = xchp->next;
-
-				/* If so, show it after all. */
-				if (xchp != xch) {
-					xch = xchp;
-					goto pre_context_calculation;
+					/* If so, show it after all. */
+					if (xchp != xch) {
+						xch = xchp;
+						continue;
+					}
 				}
 			}
+			break;
 		}
 
  post_context_calculation:

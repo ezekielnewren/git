@@ -27,7 +27,7 @@
 typedef int (*emit_func_t)(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *ecb,
 			   struct xdemitconf const *xecfg);
 
-struct xdchange *xdl_get_hunk(struct xdchange **xscr, struct xdemitconf const *xecfg);
+extern struct xdchange* xdl_get_hunk(struct xdchange **xscr, struct xdemitconf const *xecfg);
 int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *ecb,
 		  struct xdemitconf const *xecfg);
 
