@@ -142,10 +142,16 @@ int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *e
 					 * We don't need additional context if
 					 * a whole function was added.
 					 */
+					bool should_break = false;
 					while (i2 < (isize) pair->rhs.record->length) {
-						if (is_func_rec(&pair->rhs, xecfg, i2))
-							goto post_context_calculation;
+						if (is_func_rec(&pair->rhs, xecfg, i2)) {
+							should_break = true;
+							break;
+						}
 						i2++;
+					}
+					if (should_break) {
+						break;
 					}
 
 					/*
@@ -184,41 +190,43 @@ int xdl_emit_diff(struct xdpair *pair, struct xdchange *xscr, struct xdemitcb *e
 			break;
 		}
 
- post_context_calculation:
-		lctx = xecfg->ctxlen;
-		lctx = XDL_MIN(lctx, (isize) pair->lhs.record->length - (xche->i1 + xche->chg1));
-		lctx = XDL_MIN(lctx, (isize) pair->rhs.record->length - (xche->i2 + xche->chg2));
+		while (true) {
+			lctx = xecfg->ctxlen;
+			lctx = XDL_MIN(lctx, (isize) pair->lhs.record->length - (xche->i1 + xche->chg1));
+			lctx = XDL_MIN(lctx, (isize) pair->rhs.record->length - (xche->i2 + xche->chg2));
 
-		e1 = xche->i1 + xche->chg1 + lctx;
-		e2 = xche->i2 + xche->chg2 + lctx;
+			e1 = xche->i1 + xche->chg1 + lctx;
+			e2 = xche->i2 + xche->chg2 + lctx;
 
-		if (xecfg->flags & XDL_EMIT_FUNCCONTEXT) {
-			long fe1 = get_func_line(pair, xecfg, NULL,
-						 xche->i1 + xche->chg1,
-						 pair->lhs.record->length);
-			while (fe1 > 0 && is_empty_rec(&pair->lhs, fe1 - 1))
-				fe1--;
-			if (fe1 < 0)
-				fe1 = pair->lhs.record->length;
-			if (fe1 > e1) {
-				e2 = XDL_MIN(e2 + (fe1 - e1), (isize) pair->rhs.record->length);
-				e1 = fe1;
-			}
+			if (xecfg->flags & XDL_EMIT_FUNCCONTEXT) {
+				long fe1 = get_func_line(pair, xecfg, NULL,
+							 xche->i1 + xche->chg1,
+							 pair->lhs.record->length);
+				while (fe1 > 0 && is_empty_rec(&pair->lhs, fe1 - 1))
+					fe1--;
+				if (fe1 < 0)
+					fe1 = pair->lhs.record->length;
+				if (fe1 > e1) {
+					e2 = XDL_MIN(e2 + (fe1 - e1), (isize) pair->rhs.record->length);
+					e1 = fe1;
+				}
 
-			/*
-			 * Overlap with next change?  Then include it
-			 * in the current hunk and start over to find
-			 * its new end.
-			 */
-			if (xche->next) {
-				long l = XDL_MIN(xche->next->i1,
-						 (isize) pair->lhs.record->length - 1);
-				if (l - xecfg->ctxlen <= e1 ||
-				    get_func_line(pair, xecfg, NULL, l, e1) < 0) {
-					xche = xche->next;
-					goto post_context_calculation;
+				/*
+				 * Overlap with next change?  Then include it
+				 * in the current hunk and start over to find
+				 * its new end.
+				 */
+				if (xche->next) {
+					long l = XDL_MIN(xche->next->i1,
+							 (isize) pair->lhs.record->length - 1);
+					if (l - xecfg->ctxlen <= e1 ||
+					    get_func_line(pair, xecfg, NULL, l, e1) < 0) {
+						xche = xche->next;
+						continue;
+					}
 				}
 			}
+			break;
 		}
 
 		/*
