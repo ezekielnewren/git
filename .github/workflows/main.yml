@@ -114,6 +114,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: git-for-windows/setup-git-for-windows-sdk@v1
+    - name: Set up Rust (minimum 1.51)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.51.0
+        override: true
+        profile: minimal
     - name: build
       shell: bash
       env:
@@ -333,6 +339,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - run: ci/install-dependencies.sh
+
+    - name: Set up Rust (minimum 1.51)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.51.0
+        override: true
+        profile: minimal
+
     - run: ci/run-build-and-tests.sh
     - name: print test failures
       if: failure() && env.FAILED_TEST_ARTIFACTS != ''

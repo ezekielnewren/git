@@ -1415,6 +1415,8 @@ CC_LD_DYNPATH = -Wl,-rpath,
 BASIC_CFLAGS = -I.
 BASIC_LDFLAGS =
 
+BASIC_LDFLAGS += -ldl
+
 # library flags
 ARFLAGS = rcs
 PTHREAD_CFLAGS =
