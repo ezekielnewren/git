@@ -176,7 +176,7 @@ fi
 
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile default --default-toolchain 1.87.0
 export PATH="$HOME/.cargo/bin:$PATH"
+"$HOME"/.cargo/bin/cargo --version
 echo "cargo installed at: $(command -v cargo)"
-cargo --version
 
 end_group "Install dependencies"
