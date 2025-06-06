@@ -3,7 +3,11 @@
 # Build and test Git
 #
 
+echo "whoami=$(id -u)"
+
 . ${0%/*}/lib.sh
+
+echo "whoami=$(id -u)"
 
 rustup default $RUST_VERSION || exit $?
 

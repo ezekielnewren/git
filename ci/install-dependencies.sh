@@ -3,13 +3,15 @@
 # Install dependencies required to build and test Git on Linux and macOS
 #
 
+echo "whoami=$(id -u)"
+
 . ${0%/*}/lib.sh
+
+echo "whoami=$(id -u)"
 
 begin_group "Install dependencies"
 
-#echo "RUNNER_TEMP=$RUNNER_TEMP"
-#echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-#echo "GITHUB_ENV=$GITHUB_ENV"
+echo "whoami=$(id -u)"
 
 P4WHENCE=https://cdist2.perforce.com/perforce/r23.2
 LFSWHENCE=https://github.com/github/git-lfs/releases/download/v$LINUX_GIT_LFS_VERSION
