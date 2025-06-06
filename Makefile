@@ -2932,6 +2932,8 @@ $(LIB_FILE): $(LIB_OBJS)
 $(XDIFF_LIB): $(XDIFF_OBJS)
 	$(QUIET_AR)$(RM) $@ && $(AR) $(ARFLAGS) $@ $^
 
+BASIC_LDFLAGS += -ldl
+
 .PHONY: $(RUST_LIB)
 $(RUST_LIB):
 ifeq ($(DEBUG), 1)
