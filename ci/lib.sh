@@ -279,16 +279,12 @@ else
 	exit 1
 fi
 
-if [ -f $RUNNER_TEMP/.cargo/env ]; then
-  export CARGO_HOME=$HOME/.cargo
+if [ "$RUNNER_TEMP" != "" ]; then
+  export CARGO_HOME=$RUNNER_TEMP/.cargo
   export RUSTUP_HOME=$CARGO_HOME
-  mkdir -p $CARGO_HOME
-  if [ ! -f $CARGO_HOME/env ]; then
-    $RUNNER_TEMP/.cargo/bin/rustup default $RUST_VERSION
+  if [ -f $CARGO_HOME/env ]; then
+    . $CARGO_HOME/env
   fi
-
-  . $CARGO_HOME/env
-  cargo --version || exit $?
 fi
 
 MAKEFLAGS="$MAKEFLAGS --jobs=$JOBS"
