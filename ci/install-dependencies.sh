@@ -7,6 +7,10 @@
 
 begin_group "Install dependencies"
 
+#echo "RUNNER_TEMP=$RUNNER_TEMP"
+#echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+#echo "GITHUB_ENV=$GITHUB_ENV"
+
 P4WHENCE=https://cdist2.perforce.com/perforce/r23.2
 LFSWHENCE=https://github.com/github/git-lfs/releases/download/v$LINUX_GIT_LFS_VERSION
 JGITWHENCE=https://repo1.maven.org/maven2/org/eclipse/jgit/org.eclipse.jgit.pgm/6.8.0.202311291450-r/org.eclipse.jgit.pgm-6.8.0.202311291450-r.sh
@@ -165,15 +169,13 @@ else
 	echo >&2 "::warning:: JGit wasn't installed, see above for clues why"
 fi
 
-echo "RUNNER_TEMP=$RUNNER_TEMP"
-echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-echo "GITHUB_ENV=$GITHUB_ENV"
+
 
 echo "HOME=$HOME"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-echo "CARGO_HOME=$HOME/.cargo/env" >> $GITHUB_ENV
-echo "$HOME/.cargo/env" >> $GITHUB_PATH
-. ~/.cargo/env
+echo "PATH=$HOME/.cargo/bin:\$PATH" >> ~/.cargo/env
+ln -sf ~/.cargo/env $RUNNER_TEMP/rust_env
+. $RUNNER_TEMP/rust_env
 
 cargo --version || exit 1
 
