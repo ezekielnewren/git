@@ -5,9 +5,11 @@
 
 mkdir -p "$1" # in case ci/lib.sh decides to quit early
 
+. ${0%/*}/install-rust.sh
+
 . ${0%/*}/lib.sh
 
-. ${0%/*}/install-rust.sh
+cargo --version || exit $?
 
 group Build make artifacts-tar ARTIFACTS_DIRECTORY="$1"
 
