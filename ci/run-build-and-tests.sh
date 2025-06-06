@@ -5,6 +5,16 @@
 
 . ${0%/*}/lib.sh
 
+echo "RUNNER_TEMP=$RUNNER_TEMP"
+echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+echo "GITHUB_ENV=$GITHUB_ENV"
+
+echo "HOME=$HOME"
+cat "$GITHUB_PATH"
+cat "$GITHUB_ENV"
+. ~/.cargo/bin/env
+cargo --version || exit 1
+
 run_tests=t
 
 case "$jobname" in
