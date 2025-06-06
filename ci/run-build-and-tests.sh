@@ -5,6 +5,8 @@
 
 . ${0%/*}/lib.sh
 
+cargo --version || exit $?
+
 run_tests=t
 
 case "$jobname" in

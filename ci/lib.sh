@@ -1,5 +1,13 @@
 # Library of functions shared by all CI scripts
 
+if [ "$RUNNER_TEMP" != "" ]; then
+  export CARGO_HOME=$RUNNER_TEMP/.cargo
+  export RUSTUP_HOME=$CARGO_HOME
+  if [ -f $CARGO_HOME/env ]; then
+    . $CARGO_HOME/env
+  fi
+fi
+
 if test true = "$GITHUB_ACTIONS"
 then
 	begin_group () {
