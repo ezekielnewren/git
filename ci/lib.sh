@@ -229,6 +229,9 @@ then
 	JOBS=10
 
 	distro=$(echo "$CI_JOB_IMAGE" | tr : -)
+
+	export CARGO_HOME=$RUNNER_TEMP/.cargo
+  export RUSTUP_HOME=$CARGO_HOME
 elif test true = "$GITLAB_CI"
 then
 	CI_TYPE=gitlab-ci
@@ -273,10 +276,18 @@ then
 	cache_dir="$HOME/none"
 
 	distro=$(echo "$CI_JOB_IMAGE" | tr : -)
+	export CARGO_HOME=$RUNNER_TEMP/.cargo
+  export RUSTUP_HOME=$CARGO_HOME
+
 else
 	echo "Could not identify CI type" >&2
 	env >&2
 	exit 1
+fi
+
+mkdir -p $CARGO_HOME || exit $?
+if [ -f $CARGO_HOME/env ]; then
+  . $CARGO_HOME/env
 fi
 
 MAKEFLAGS="$MAKEFLAGS --jobs=$JOBS"

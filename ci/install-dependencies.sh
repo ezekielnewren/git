@@ -170,15 +170,8 @@ else
 fi
 
 
-
-echo "HOME=$HOME"
-export CARGO_HOME=$RUNNER_TEMP/.cargo
-export RUSTUP_HOME=$CARGO_HOME
-echo "CARGO_HOME=$CARGO_HOME" >> $GITHUB_ENV
-echo "RUSTUP_HOME=$RUSTUP_HOME" >> $GITHUB_ENV
-mkdir -p $CARGO_HOME || exit $?
+echo "Install rust to: $CARGO_HOME"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
 . $CARGO_HOME/env
 cargo --version || exit 1
 

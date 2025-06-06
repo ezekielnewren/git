@@ -5,14 +5,6 @@
 
 . ${0%/*}/lib.sh
 
-echo "GITHUB_ENV=$GITHUB_ENV"
-cat $GITHUB_ENV
-
-#export CARGO_HOME=$RUNNER_TEMP/.cargo
-#export RUSTUP_HOME=$CARGO_HOME
-
-. $CARGO_HOME/env
-cargo --version || exit $?
 rustup default $RUST_VERSION || exit $?
 
 run_tests=t
