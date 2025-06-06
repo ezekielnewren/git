@@ -282,6 +282,7 @@ fi
 if [ -f $RUNNER_TEMP/.cargo/env ]; then
   export CARGO_HOME=$HOME/.cargo
   export RUSTUP_HOME=$CARGO_HOME
+  mkdir -p $CARGO_HOME
   if [ ! -f $CARGO_HOME/env ]; then
     $RUNNER_TEMP/.cargo/bin/rustup default $RUST_VERSION
   fi

@@ -5,6 +5,8 @@ on: [push, pull_request]
 env:
   DEVELOPER: 1
   RUST_VERSION: 1.87.0
+  CARGO_HOME: ${{runner.temp}}/.cargo
+  RUSTUP_HOME: ${{runner.temp}}/.cargo
 
 # If more than one workflow run is triggered for the very same commit hash
 # (which happens when multiple branches pointing to the same commit), only

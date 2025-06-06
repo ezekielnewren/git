@@ -172,15 +172,11 @@ else
 fi
 
 
-export CARGO_HOME=$RUNNER_TEMP/.cargo
-export RUSTUP_HOME=$CARGO_HOME
 echo "Install rust to: $CARGO_HOME"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain none -y
 . $CARGO_HOME/env
-rustup --version || exit 1
-export CARGO_HOME=""
-export RUSTUP_HOME=""
-unset CARGO_HOME
-unset RUSTUP_HOME
+rustup default $RUST_VERSION || exit 1
+chmod 1777 $CARGO_HOME
+
 
 end_group "Install dependencies"
