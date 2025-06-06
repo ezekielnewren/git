@@ -6,6 +6,9 @@ if [ "$RUNNER_TEMP" != "" ]; then
   if [ -f $CARGO_HOME/env ]; then
     . $CARGO_HOME/env
   fi
+  echo "CARGO_HOME=$CARGO_HOME"
+else
+  echo "RUNNER_TEMP not defined refusing to define CARGO_HOME"
 fi
 
 if test true = "$GITHUB_ACTIONS"
