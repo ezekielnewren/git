@@ -172,11 +172,14 @@ fi
 
 
 echo "HOME=$HOME"
+export CARGO_HOME=$RUNNER_TEMP/.cargo
+export RUSTUP_HOME=$CARGO_HOME
+echo "CARGO_HOME=$CARGO_HOME" >> $GITHUB_ENV
+echo "RUSTUP_HOME=$RUSTUP_HOME" >> $GITHUB_ENV
+mkdir -p $CARGO_HOME || exit $?
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-echo "PATH=$HOME/.cargo/bin:\$PATH" >> ~/.cargo/env
-ln -sf ~/.cargo/env $RUNNER_TEMP/rust_env
-. $RUNNER_TEMP/rust_env
 
+. $CARGO_HOME/env
 cargo --version || exit 1
 
 end_group "Install dependencies"

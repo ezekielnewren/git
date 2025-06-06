@@ -5,15 +5,15 @@
 
 . ${0%/*}/lib.sh
 
-#echo "RUNNER_TEMP=$RUNNER_TEMP"
-#echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-#echo "GITHUB_ENV=$GITHUB_ENV"
+echo "GITHUB_ENV=$GITHUB_ENV"
+cat $GITHUB_ENV
 
-echo "HOME=$HOME"
-#cat "$GITHUB_PATH"
-#cat "$GITHUB_ENV"
-. $RUNNER_TEMP/rust_env
-cargo --version || exit 1
+#export CARGO_HOME=$RUNNER_TEMP/.cargo
+#export RUSTUP_HOME=$CARGO_HOME
+
+. $CARGO_HOME/env
+cargo --version || exit $?
+rustup default $RUST_VERSION || exit $?
 
 run_tests=t
 
