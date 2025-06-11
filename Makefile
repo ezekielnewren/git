@@ -2932,7 +2932,10 @@ $(LIB_FILE): $(LIB_OBJS)
 $(XDIFF_LIB): $(XDIFF_OBJS)
 	$(QUIET_AR)$(RM) $@ && $(AR) $(ARFLAGS) $@ $^
 
-BASIC_LDFLAGS += -ldl
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+  BASIC_LDFLAGS += -ldl
+endif
 
 .PHONY: $(RUST_LIB)
 $(RUST_LIB):
