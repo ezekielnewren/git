@@ -2940,9 +2940,9 @@ endif
 .PHONY: $(RUST_LIB)
 $(RUST_LIB):
 ifeq ($(DEBUG), 1)
-	cd rust && RUSTFLAGS="-Aunused_imports -Adead_code" cargo build --verbose
+	cd rust && cargo clean && RUSTFLAGS="-Aunused_imports -Adead_code" cargo build --verbose
 else
-	cd rust && RUSTFLAGS="-Aunused_imports -Adead_code" cargo build --verbose --release
+	cd rust && cargo clean && RUSTFLAGS="-Aunused_imports -Adead_code" cargo build --verbose --release
 endif
 
 $(REFTABLE_LIB): $(REFTABLE_OBJS)
