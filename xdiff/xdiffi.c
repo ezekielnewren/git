@@ -321,7 +321,7 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 }
 
 
-static bool xdl_clean_mmatch(uint8_t const *action, long i, long s, long e) {
+static bool xdl_clean_mmatch(uint8_t const *action, long i, long s, size_t e) {
 	long r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
@@ -362,7 +362,7 @@ static bool xdl_clean_mmatch(uint8_t const *action, long i, long s, long e) {
 	 */
 	if (rdis0 == 0)
 		return 0;
-	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) <= e; r++) {
+	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < (long)e; r++) {
 		if (action[i + r] == DISCARD)
 			rdis1++;
 		else if (action[i + r] == INVESTIGATE)
@@ -405,8 +405,6 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	struct IVec_xoccurrence occ;
 	bool need_min = !!(flags & XDF_NEED_MINIMAL);
 	int ret = 0;
-	ptrdiff_t dend1 = xe->xdf1.nrec - 1 - xe->delta_end;
-	ptrdiff_t dend2 = xe->xdf2.nrec - 1 - xe->delta_end;
 
 	IVEC_INIT(occ);
 	ivec_zero(&occ, xe->mph_size);
@@ -472,7 +470,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	xe->xdf1.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
 		if (action1.ptr[i] == INVESTIGATE) {
-			if (!xdl_clean_mmatch(action1.ptr, i, xe->delta_start, dend1))
+			if (!xdl_clean_mmatch(action1.ptr, i, xe->delta_start, xe->xdf1.nrec - xe->delta_end))
 				action1.ptr[i] = KEEP;
 			else
 				action1.ptr[i] = DISCARD;
@@ -492,7 +490,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	xe->xdf2.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
 		if (action2.ptr[i] == INVESTIGATE) {
-			if (!xdl_clean_mmatch(action2.ptr, i, xe->delta_start, dend2))
+			if (!xdl_clean_mmatch(action2.ptr, i, xe->delta_start, xe->xdf2.nrec - xe->delta_end))
 				action2.ptr[i] = KEEP;
 			else
 				action2.ptr[i] = DISCARD;
