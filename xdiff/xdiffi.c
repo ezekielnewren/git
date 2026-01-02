@@ -402,7 +402,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	long i;
 	size_t nm, mlim;
 	xrecord_t *recs;
-	uint8_t *action1 = NULL, *action2 = NULL;
+	struct IVec_u8 action1, action2;
 	struct IVec_xoccurrence occ;
 	bool need_min = !!(flags & XDF_NEED_MINIMAL);
 	int ret = 0;
@@ -422,18 +422,15 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 		occ.ptr[mph2].file2 += 1;
 	}
 
+	IVEC_INIT(action1);
+	IVEC_INIT(action2);
+
 	/*
 	 * Create temporary arrays that will help us decide if
 	 * changed[i] should remain false, or become true.
 	 */
-	if (!XDL_CALLOC_ARRAY(action1, xe->xdf1.nrec + 1)) {
-		ret = -1;
-		goto cleanup;
-	}
-	if (!XDL_CALLOC_ARRAY(action2, xe->xdf2.nrec + 1)) {
-		ret = -1;
-		goto cleanup;
-	}
+	ivec_zero(&action1, xe->xdf1.nrec + 1);
+	ivec_zero(&action2, xe->xdf2.nrec + 1);
 
 	/*
 	 * Initialize temporary arrays with DISCARD, KEEP, or INVESTIGATE.
@@ -442,14 +439,14 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->delta_start, recs = &xe->xdf1.recs[xe->delta_start]; i <= dend1; i++, recs++) {
 		nm = occ.ptr[recs->minimal_perfect_hash].file2;
-		action1[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
+		action1.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
 	}
 
 	if ((mlim = xdl_bogosqrt((long)xe->xdf2.nrec)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
 	for (i = xe->delta_start, recs = &xe->xdf2.recs[xe->delta_start]; i <= dend2; i++, recs++) {
 		nm = occ.ptr[recs->minimal_perfect_hash].file1;
-		action2[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
+		action2.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
 	}
 
 	/*
@@ -459,8 +456,8 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	xe->xdf1.nreff = 0;
 	for (i = xe->delta_start, recs = &xe->xdf1.recs[xe->delta_start];
 	     i <= dend1; i++, recs++) {
-		if (action1[i] == KEEP ||
-		    (action1[i] == INVESTIGATE && !xdl_clean_mmatch(action1, i, xe->delta_start, dend1))) {
+		if (action1.ptr[i] == KEEP ||
+		    (action1.ptr[i] == INVESTIGATE && !xdl_clean_mmatch(action1.ptr, i, xe->delta_start, dend1))) {
 			xe->xdf1.reference_index[xe->xdf1.nreff++] = i;
 			/* changed[i] remains false, i.e. keep */
 		} else
@@ -471,8 +468,8 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	xe->xdf2.nreff = 0;
 	for (i = xe->delta_start, recs = &xe->xdf2.recs[xe->delta_start];
 	     i <= dend2; i++, recs++) {
-		if (action2[i] == KEEP ||
-		    (action2[i] == INVESTIGATE && !xdl_clean_mmatch(action2, i, xe->delta_start, dend2))) {
+		if (action2.ptr[i] == KEEP ||
+		    (action2.ptr[i] == INVESTIGATE && !xdl_clean_mmatch(action2.ptr, i, xe->delta_start, dend2))) {
 			xe->xdf2.reference_index[xe->xdf2.nreff++] = i;
 			/* changed[i] remains false, i.e. keep */
 		} else
@@ -480,9 +477,8 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 			/* i.e. discard */
 	}
 
-cleanup:
-	xdl_free(action1);
-	xdl_free(action2);
+	ivec_free(&action1);
+	ivec_free(&action2);
 	ivec_free(&occ);
 
 	return ret;
