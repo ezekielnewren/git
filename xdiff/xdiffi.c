@@ -321,8 +321,8 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 }
 
 
-static bool xdl_clean_mmatch(uint8_t const *action, long i, long s, size_t e) {
-	long r, rdis0, rpdis0, rdis1, rpdis1;
+static bool xdl_clean_mmatch(uint8_t const *action, ptrdiff_t i, ptrdiff_t s, size_t e) {
+	ptrdiff_t r, rdis0, rpdis0, rdis1, rpdis1;
 
 	/*
 	 * Limits the window that is examined during the similar-lines
@@ -470,7 +470,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	xe->xdf1.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
 		if (action1.ptr[i] == INVESTIGATE) {
-			if (!xdl_clean_mmatch(action1.ptr, i, xe->delta_start, xe->xdf1.nrec - xe->delta_end))
+			if (!xdl_clean_mmatch(action1.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf1.nrec - xe->delta_end))
 				action1.ptr[i] = KEEP;
 			else
 				action1.ptr[i] = DISCARD;
@@ -490,7 +490,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	xe->xdf2.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
 		if (action2.ptr[i] == INVESTIGATE) {
-			if (!xdl_clean_mmatch(action2.ptr, i, xe->delta_start, xe->xdf2.nrec - xe->delta_end))
+			if (!xdl_clean_mmatch(action2.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf2.nrec - xe->delta_end))
 				action2.ptr[i] = KEEP;
 			else
 				action2.ptr[i] = DISCARD;
