@@ -41,6 +41,7 @@ static size_t get_hash(xdfile_t *xdf, long index)
 #define DISCARD 0
 #define KEEP 1
 #define INVESTIGATE 2
+#define INFINITE UINT64_MAX
 
 typedef struct s_xdpsplit {
 	long i1, i2;
@@ -399,7 +400,7 @@ DEFINE_IVEC_TYPE(struct xoccurrence, xoccurrence);
  * might be potentially discarded if they appear in a run of discardable.
  */
 static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
-	size_t nm, mlim;
+	size_t nm, mlim1, mlim2;
 	struct IVec_u8 action1, action2;
 	struct IVec_xoccurrence occ;
 	bool need_min = !!(flags & XDF_NEED_MINIMAL);
@@ -430,23 +431,28 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	ivec_zero(&action1, xe->xdf1.nrec + 1);
 	ivec_zero(&action2, xe->xdf2.nrec + 1);
 
+	if (need_min) {
+		mlim1 = INFINITE;
+		mlim2 = INFINITE;
+	} else {
+		mlim1 = XDL_MIN(xdl_bogosqrt(xe->xdf1.nrec), XDL_MAX_EQLIMIT);
+		mlim2 = XDL_MIN(xdl_bogosqrt(xe->xdf2.nrec), XDL_MAX_EQLIMIT);
+
+	}
+
 	/*
 	 * Initialize temporary arrays with DISCARD, KEEP, or INVESTIGATE.
 	 */
-	if ((mlim = xdl_bogosqrt((long)xe->xdf1.nrec)) > XDL_MAX_EQLIMIT)
-		mlim = XDL_MAX_EQLIMIT;
 	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
 		size_t mph1 = xe->xdf1.recs[i].minimal_perfect_hash;
 		nm = occ.ptr[mph1].file2;
-		action1.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
+		action1.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim1) ? INVESTIGATE: KEEP;
 	}
 
-	if ((mlim = xdl_bogosqrt((long)xe->xdf2.nrec)) > XDL_MAX_EQLIMIT)
-		mlim = XDL_MAX_EQLIMIT;
 	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
 		size_t mph2 = xe->xdf2.recs[i].minimal_perfect_hash;
 		nm = occ.ptr[mph2].file1;
-		action2.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
+		action2.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim2) ? INVESTIGATE: KEEP;
 	}
 
 	/*
