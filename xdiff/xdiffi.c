@@ -471,24 +471,42 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	 */
 	xe->xdf1.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
-		if (action1.ptr[i] == KEEP ||
-		    (action1.ptr[i] == INVESTIGATE && !xdl_clean_mmatch(action1.ptr, i, xe->delta_start, dend1))) {
+		if (action1.ptr[i] == INVESTIGATE) {
+			if (!xdl_clean_mmatch(action1.ptr, i, xe->delta_start, dend1))
+				action1.ptr[i] = KEEP;
+			else
+				action1.ptr[i] = DISCARD;
+		}
+
+		if (action1.ptr[i] == KEEP) {
 			xe->xdf1.reference_index[xe->xdf1.nreff++] = i;
 			/* changed[i] remains false, i.e. keep */
-		} else
+		} else if (action1.ptr[i] == DISCARD) {
 			xe->xdf1.changed[i] = true;
 			/* i.e. discard */
+		} else {
+			BUG("Illegal state for action1.ptr[i]");
+		}
 	}
 
 	xe->xdf2.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
-		if (action2.ptr[i] == KEEP ||
-		    (action2.ptr[i] == INVESTIGATE && !xdl_clean_mmatch(action2.ptr, i, xe->delta_start, dend2))) {
+		if (action2.ptr[i] == INVESTIGATE) {
+			if (!xdl_clean_mmatch(action2.ptr, i, xe->delta_start, dend2))
+				action2.ptr[i] = KEEP;
+			else
+				action2.ptr[i] = DISCARD;
+		}
+
+		if (action2.ptr[i] == KEEP) {
 			xe->xdf2.reference_index[xe->xdf2.nreff++] = i;
 			/* changed[i] remains false, i.e. keep */
-		} else
+		} else if (action2.ptr[i] == DISCARD) {
 			xe->xdf2.changed[i] = true;
 			/* i.e. discard */
+		} else {
+			BUG("Illegal state for action2.ptr[i]");
+		}
 	}
 
 	ivec_free(&action1);
