@@ -400,7 +400,7 @@ DEFINE_IVEC_TYPE(struct xoccurrence, xoccurrence);
  * might be potentially discarded if they appear in a run of discardable.
  */
 static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
-	size_t nm, mlim1, mlim2;
+	size_t mlim1, mlim2;
 	struct IVec_u8 action1, action2;
 	struct IVec_xoccurrence occ;
 	bool need_min = !!(flags & XDF_NEED_MINIMAL);
@@ -445,14 +445,24 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	 */
 	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
 		size_t mph1 = xe->xdf1.recs[i].minimal_perfect_hash;
-		nm = occ.ptr[mph1].file2;
-		action1.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim1) ? INVESTIGATE: KEEP;
+		size_t matches_in_the_other_file = occ.ptr[mph1].file2;
+		if (matches_in_the_other_file == 0)
+			action1.ptr[i] = DISCARD;
+		else if (matches_in_the_other_file < mlim1)
+			action1.ptr[i] = KEEP;
+		else /* matches_in_the_other_file >= mlim1 */
+			action1.ptr[i] = INVESTIGATE;
 	}
 
 	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
 		size_t mph2 = xe->xdf2.recs[i].minimal_perfect_hash;
-		nm = occ.ptr[mph2].file1;
-		action2.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim2) ? INVESTIGATE: KEEP;
+		size_t matches_in_the_other_file = occ.ptr[mph2].file1;
+		if (matches_in_the_other_file == 0)
+			action2.ptr[i] = DISCARD;
+		else if (matches_in_the_other_file < mlim2)
+			action2.ptr[i] = KEEP;
+		else /* matches_in_the_other_file >= mlim2 */
+			action2.ptr[i] = INVESTIGATE;
 	}
 
 	/*
