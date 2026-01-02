@@ -399,7 +399,6 @@ DEFINE_IVEC_TYPE(struct xoccurrence, xoccurrence);
  * might be potentially discarded if they appear in a run of discardable.
  */
 static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
-	long i;
 	size_t nm, mlim;
 	struct IVec_u8 action1, action2;
 	struct IVec_xoccurrence occ;
@@ -436,7 +435,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	 */
 	if ((mlim = xdl_bogosqrt((long)xe->xdf1.nrec)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xe->delta_start; i <= dend1; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
 		size_t mph1 = xe->xdf1.recs[i].minimal_perfect_hash;
 		nm = occ.ptr[mph1].file2;
 		action1.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
@@ -444,7 +443,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 
 	if ((mlim = xdl_bogosqrt((long)xe->xdf2.nrec)) > XDL_MAX_EQLIMIT)
 		mlim = XDL_MAX_EQLIMIT;
-	for (i = xe->delta_start; i <= dend2; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
 		size_t mph2 = xe->xdf2.recs[i].minimal_perfect_hash;
 		nm = occ.ptr[mph2].file1;
 		action2.ptr[i] = (nm == 0) ? DISCARD: (nm >= mlim && !need_min) ? INVESTIGATE: KEEP;
@@ -455,7 +454,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	 * false, or become true.
 	 */
 	xe->xdf1.nreff = 0;
-	for (i = xe->delta_start; i <= dend1; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
 		if (action1.ptr[i] == KEEP ||
 		    (action1.ptr[i] == INVESTIGATE && !xdl_clean_mmatch(action1.ptr, i, xe->delta_start, dend1))) {
 			xe->xdf1.reference_index[xe->xdf1.nreff++] = i;
@@ -466,7 +465,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	}
 
 	xe->xdf2.nreff = 0;
-	for (i = xe->delta_start; i <= dend2; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
 		if (action2.ptr[i] == KEEP ||
 		    (action2.ptr[i] == INVESTIGATE && !xdl_clean_mmatch(action2.ptr, i, xe->delta_start, dend2))) {
 			xe->xdf2.reference_index[xe->xdf2.nreff++] = i;
