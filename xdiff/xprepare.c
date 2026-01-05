@@ -116,7 +116,7 @@ static int xdl_classify_record(xdlclassifier_t *cf, xrecord_t *rec) {
 static void xdl_free_ctx(xdfile_t *xdf)
 {
 	xdl_free(xdf->reference_index);
-	xdl_free(xdf->changed - 1);
+	ivec_free(&xdf->changed);
 	xdl_free(xdf->recs);
 }
 
@@ -129,7 +129,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 	long narec = 8;
 
 	xdf->reference_index = NULL;
-	xdf->changed = NULL;
+	IVEC_INIT(xdf->changed);
 	xdf->recs = NULL;
 
 	if (!XDL_ALLOC_ARRAY(xdf->recs, narec))
@@ -149,8 +149,7 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 		}
 	}
 
-	if (!XDL_CALLOC_ARRAY(xdf->changed, xdf->nrec + 2))
-		goto abort;
+	ivec_zero(&xdf->changed, xdf->nrec);
 
 	if ((XDF_DIFF_ALG(flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(flags) != XDF_HISTOGRAM_DIFF)) {
@@ -158,7 +157,6 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 			goto abort;
 	}
 
-	xdf->changed += 1;
 	xdf->nreff = 0;
 
 	return 0;

@@ -23,7 +23,7 @@
 #if !defined(XTYPES_H)
 #define XTYPES_H
 
-
+#include "compat/ivec.h"
 
 typedef struct s_chanode {
 	struct s_chanode *next;
@@ -48,7 +48,7 @@ typedef struct s_xrecord {
 typedef struct s_xdfile {
 	xrecord_t *recs;
 	size_t nrec;
-	bool *changed;
+	struct IVec_bool changed;
 	size_t *reference_index;
 	size_t nreff;
 } xdfile_t;

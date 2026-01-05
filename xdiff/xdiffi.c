@@ -288,10 +288,10 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 	 */
 	if (off1 == lim1) {
 		for (; off2 < lim2; off2++)
-			xdf2->changed[xdf2->reference_index[off2]] = true;
+			xdf2->changed.ptr[xdf2->reference_index[off2]] = true;
 	} else if (off2 == lim2) {
 		for (; off1 < lim1; off1++)
-			xdf1->changed[xdf1->reference_index[off1]] = true;
+			xdf1->changed.ptr[xdf1->reference_index[off1]] = true;
 	} else {
 		xdpsplit_t spl;
 		spl.i1 = spl.i2 = 0;
@@ -362,7 +362,7 @@ static bool xdl_clean_mmatch(uint8_t const *action, ptrdiff_t i, ptrdiff_t s, si
 	 */
 	if (rdis0 == 0)
 		return 0;
-	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < (long)e; r++) {
+	for (r = 1, rdis1 = 0, rpdis1 = 1; (i + r) < (ptrdiff_t) e; r++) {
 		if (action[i + r] == DISCARD)
 			rdis1++;
 		else if (action[i + r] == INVESTIGATE)
@@ -480,7 +480,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 			xe->xdf1.reference_index[xe->xdf1.nreff++] = i;
 			/* changed[i] remains false, i.e. keep */
 		} else if (action1.ptr[i] == DISCARD) {
-			xe->xdf1.changed[i] = true;
+			xe->xdf1.changed.ptr[i] = true;
 			/* i.e. discard */
 		} else {
 			BUG("Illegal state for action1.ptr[i]");
@@ -500,7 +500,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 			xe->xdf2.reference_index[xe->xdf2.nreff++] = i;
 			/* changed[i] remains false, i.e. keep */
 		} else if (action2.ptr[i] == DISCARD) {
-			xe->xdf2.changed[i] = true;
+			xe->xdf2.changed.ptr[i] = true;
 			/* i.e. discard */
 		} else {
 			BUG("Illegal state for action2.ptr[i]");
@@ -924,7 +924,7 @@ struct xdlgroup {
 static void group_init(xdfile_t *xdf, struct xdlgroup *g)
 {
 	g->start = g->end = 0;
-	while (xdf->changed[g->end])
+	while (g->end < (long)xdf->changed.length && xdf->changed.ptr[g->end])
 		g->end++;
 }
 
@@ -938,7 +938,7 @@ static inline int group_next(xdfile_t *xdf, struct xdlgroup *g)
 		return -1;
 
 	g->start = g->end + 1;
-	for (g->end = g->start; xdf->changed[g->end]; g->end++)
+	for (g->end = g->start; g->end < (long)xdf->changed.length && xdf->changed.ptr[g->end]; g->end++)
 		;
 
 	return 0;
@@ -954,7 +954,7 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
 		return -1;
 
 	g->end = g->start - 1;
-	for (g->start = g->end; xdf->changed[g->start - 1]; g->start--)
+	for (g->start = g->end; g->start > 0 && xdf->changed.ptr[g->start - 1]; g->start--)
 		;
 
 	return 0;
@@ -969,10 +969,10 @@ static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
 {
 	if (g->end < (long)xdf->nrec &&
 	    recs_match(&xdf->recs[g->start], &xdf->recs[g->end])) {
-		xdf->changed[g->start++] = false;
-		xdf->changed[g->end++] = true;
+		xdf->changed.ptr[g->start++] = false;
+		xdf->changed.ptr[g->end++] = true;
 
-		while (xdf->changed[g->end])
+		while (g->end < (long)xdf->changed.length && xdf->changed.ptr[g->end])
 			g->end++;
 
 		return 0;
@@ -990,10 +990,10 @@ static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g)
 {
 	if (g->start > 0 &&
 	    recs_match(&xdf->recs[g->start - 1], &xdf->recs[g->end - 1])) {
-		xdf->changed[--g->start] = true;
-		xdf->changed[--g->end] = false;
+		xdf->changed.ptr[--g->start] = true;
+		xdf->changed.ptr[--g->end] = false;
 
-		while (xdf->changed[g->start - 1])
+		while (g->start > 0 && xdf->changed.ptr[g->start - 1])
 			g->start--;
 
 		return 0;
@@ -1148,7 +1148,7 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
 	xdchange_t *cscr = NULL, *xch;
-	bool *changed1 = xe->xdf1.changed, *changed2 = xe->xdf2.changed;
+	bool *changed1 = xe->xdf1.changed.ptr, *changed2 = xe->xdf2.changed.ptr;
 	long i1, i2, l1, l2;
 
 	/*
