@@ -50,7 +50,6 @@ DEFINE_IVEC_TYPE(xrecord_t, xrecord);
 typedef struct s_xdfile {
 	struct IVec_xrecord record;
 	xrecord_t *recs;
-	size_t nrec;
 	struct IVec_bool changed;
 	size_t *reference_index;
 	size_t nreff;

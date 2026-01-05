@@ -141,12 +141,11 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 	}
 
 	xdf->recs = xdf->record.ptr;
-	xdf->nrec = xdf->record.length;
-	ivec_zero(&xdf->changed, xdf->nrec);
+	ivec_zero(&xdf->changed, xdf->record.length);
 
 	if ((XDF_DIFF_ALG(flags) != XDF_PATIENCE_DIFF) &&
 	    (XDF_DIFF_ALG(flags) != XDF_HISTOGRAM_DIFF)) {
-		if (!XDL_ALLOC_ARRAY(xdf->reference_index, xdf->nrec + 1))
+		if (!XDL_ALLOC_ARRAY(xdf->reference_index, xdf->record.length + 1))
 			goto abort;
 	}
 
@@ -172,7 +171,7 @@ void xdl_free_env(xdfenv_t *xe) {
  */
 static void xdl_trim_ends(xdfenv_t *xe)
 {
-	size_t lim = XDL_MIN(xe->xdf1.nrec, xe->xdf2.nrec);
+	size_t lim = XDL_MIN(xe->xdf1.record.length, xe->xdf2.record.length);
 
 	for (size_t i = 0; i < lim; i++) {
 		size_t mph1 = xe->xdf1.recs[i].minimal_perfect_hash;
@@ -185,8 +184,8 @@ static void xdl_trim_ends(xdfenv_t *xe)
 	}
 
 	for (size_t i = 0; i < lim; i++) {
-		size_t mph1 = xe->xdf1.recs[xe->xdf1.nrec - 1 - i].minimal_perfect_hash;
-		size_t mph2 = xe->xdf2.recs[xe->xdf2.nrec - 1 - i].minimal_perfect_hash;
+		size_t mph1 = xe->xdf1.recs[xe->xdf1.record.length - 1 - i].minimal_perfect_hash;
+		size_t mph2 = xe->xdf2.recs[xe->xdf2.record.length - 1 - i].minimal_perfect_hash;
 		if (mph1 != mph2) {
 			xe->delta_end = i;
 			break;
@@ -212,15 +211,15 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		return -1;
 	}
 
-	if (xdl_init_classifier(&cf, xe->xdf1.nrec + xe->xdf2.nrec + 1, xpp->flags) < 0)
+	if (xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length + 1, xpp->flags) < 0)
 		return -1;
 
-	for (size_t i = 0; i < xe->xdf1.nrec; i++) {
+	for (size_t i = 0; i < xe->xdf1.record.length; i++) {
 		xrecord_t *rec = &xe->xdf1.recs[i];
 		xdl_classify_record(&cf, rec);
 	}
 
-	for (size_t i = 0; i < xe->xdf2.nrec; i++) {
+	for (size_t i = 0; i < xe->xdf2.record.length; i++) {
 		xrecord_t *rec = &xe->xdf2.recs[i];
 		xdl_classify_record(&cf, rec);
 	}

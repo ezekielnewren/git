@@ -409,12 +409,12 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	IVEC_INIT(occ);
 	ivec_zero(&occ, xe->mph_size);
 
-	for (size_t j = 0; j < xe->xdf1.nrec; j++) {
+	for (size_t j = 0; j < xe->xdf1.record.length; j++) {
 		size_t mph1 = xe->xdf1.recs[j].minimal_perfect_hash;
 		occ.ptr[mph1].file1 += 1;
 	}
 
-	for (size_t j = 0; j < xe->xdf2.nrec; j++) {
+	for (size_t j = 0; j < xe->xdf2.record.length; j++) {
 		size_t mph2 = xe->xdf2.recs[j].minimal_perfect_hash;
 		occ.ptr[mph2].file2 += 1;
 	}
@@ -426,22 +426,22 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	 * Create temporary arrays that will help us decide if
 	 * changed[i] should remain false, or become true.
 	 */
-	ivec_zero(&action1, xe->xdf1.nrec + 1);
-	ivec_zero(&action2, xe->xdf2.nrec + 1);
+	ivec_zero(&action1, xe->xdf1.record.length + 1);
+	ivec_zero(&action2, xe->xdf2.record.length + 1);
 
 	if (need_min) {
 		mlim1 = INFINITE;
 		mlim2 = INFINITE;
 	} else {
-		mlim1 = XDL_MIN(xdl_bogosqrt(xe->xdf1.nrec), XDL_MAX_EQLIMIT);
-		mlim2 = XDL_MIN(xdl_bogosqrt(xe->xdf2.nrec), XDL_MAX_EQLIMIT);
+		mlim1 = XDL_MIN(xdl_bogosqrt(xe->xdf1.record.length), XDL_MAX_EQLIMIT);
+		mlim2 = XDL_MIN(xdl_bogosqrt(xe->xdf2.record.length), XDL_MAX_EQLIMIT);
 
 	}
 
 	/*
 	 * Initialize temporary arrays with DISCARD, KEEP, or INVESTIGATE.
 	 */
-	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf1.record.length - xe->delta_end; i++) {
 		size_t mph1 = xe->xdf1.recs[i].minimal_perfect_hash;
 		size_t matches_in_the_other_file = occ.ptr[mph1].file2;
 		if (matches_in_the_other_file == 0)
@@ -452,7 +452,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 			action1.ptr[i] = INVESTIGATE;
 	}
 
-	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf2.record.length - xe->delta_end; i++) {
 		size_t mph2 = xe->xdf2.recs[i].minimal_perfect_hash;
 		size_t matches_in_the_other_file = occ.ptr[mph2].file1;
 		if (matches_in_the_other_file == 0)
@@ -468,9 +468,9 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	 * false, or become true.
 	 */
 	xe->xdf1.nreff = 0;
-	for (size_t i = xe->delta_start; i < xe->xdf1.nrec - xe->delta_end; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf1.record.length - xe->delta_end; i++) {
 		if (action1.ptr[i] == INVESTIGATE) {
-			if (!xdl_clean_mmatch(action1.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf1.nrec - xe->delta_end))
+			if (!xdl_clean_mmatch(action1.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf1.record.length - xe->delta_end))
 				action1.ptr[i] = KEEP;
 			else
 				action1.ptr[i] = DISCARD;
@@ -488,9 +488,9 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	}
 
 	xe->xdf2.nreff = 0;
-	for (size_t i = xe->delta_start; i < xe->xdf2.nrec - xe->delta_end; i++) {
+	for (size_t i = xe->delta_start; i < xe->xdf2.record.length - xe->delta_end; i++) {
 		if (action2.ptr[i] == INVESTIGATE) {
-			if (!xdl_clean_mmatch(action2.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf2.nrec - xe->delta_end))
+			if (!xdl_clean_mmatch(action2.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf2.record.length - xe->delta_end))
 				action2.ptr[i] = KEEP;
 			else
 				action2.ptr[i] = DISCARD;
@@ -700,7 +700,7 @@ static void measure_split(const xdfile_t *xdf, long split,
 {
 	long i;
 
-	if (split >= (long)xdf->nrec) {
+	if (split >= (long)xdf->record.length) {
 		m->end_of_file = 1;
 		m->indent = -1;
 	} else {
@@ -723,7 +723,7 @@ static void measure_split(const xdfile_t *xdf, long split,
 
 	m->post_blank = 0;
 	m->post_indent = -1;
-	for (i = split + 1; i < (long)xdf->nrec; i++) {
+	for (i = split + 1; i < (long)xdf->record.length; i++) {
 		m->post_indent = get_indent(&xdf->recs[i]);
 		if (m->post_indent != -1)
 			break;
@@ -934,7 +934,7 @@ static void group_init(xdfile_t *xdf, struct xdlgroup *g)
  */
 static inline int group_next(xdfile_t *xdf, struct xdlgroup *g)
 {
-	if (g->end == (long)xdf->nrec)
+	if (g->end == (long)xdf->record.length)
 		return -1;
 
 	g->start = g->end + 1;
@@ -967,7 +967,7 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
  */
 static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
 {
-	if (g->end < (long)xdf->nrec &&
+	if (g->end < (long)xdf->record.length &&
 	    recs_match(&xdf->recs[g->start], &xdf->recs[g->end])) {
 		xdf->changed.ptr[g->start++] = false;
 		xdf->changed.ptr[g->end++] = true;
@@ -1154,7 +1154,7 @@ int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr) {
 	/*
 	 * Trivial. Collects "groups" of changes and creates an edit script.
 	 */
-	for (i1 = xe->xdf1.nrec, i2 = xe->xdf2.nrec; i1 >= 0 || i2 >= 0; i1--, i2--)
+	for (i1 = xe->xdf1.record.length, i2 = xe->xdf2.record.length; i1 >= 0 || i2 >= 0; i1--, i2--)
 		if (changed1[i1 - 1] || changed2[i2 - 1]) {
 			for (l1 = i1; changed1[i1 - 1]; i1--);
 			for (l2 = i2; changed2[i2 - 1]; i2--);
