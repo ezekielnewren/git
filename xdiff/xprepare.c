@@ -117,38 +117,31 @@ static void xdl_free_ctx(xdfile_t *xdf)
 {
 	xdl_free(xdf->reference_index);
 	ivec_free(&xdf->changed);
-	xdl_free(xdf->recs);
+	ivec_free(&xdf->record);
 }
 
 
 static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
+	xrecord_t rec;
 	long bsize;
-	uint64_t hav;
 	uint8_t const *blk, *cur, *top, *prev;
-	xrecord_t *crec;
-	long narec = 8;
 
 	xdf->reference_index = NULL;
 	IVEC_INIT(xdf->changed);
-	xdf->recs = NULL;
+	IVEC_INIT(xdf->record);
 
-	if (!XDL_ALLOC_ARRAY(xdf->recs, narec))
-		goto abort;
-
-	xdf->nrec = 0;
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
 		for (top = blk + bsize; cur < top; ) {
 			prev = cur;
-			hav = xdl_hash_record(&cur, top, flags);
-			if (XDL_ALLOC_GROW(xdf->recs, (long)xdf->nrec + 1, narec))
-				goto abort;
-			crec = &xdf->recs[xdf->nrec++];
-			crec->ptr = prev;
-			crec->size = cur - prev;
-			crec->line_hash = hav;
+			rec.line_hash = xdl_hash_record(&cur, top, flags);
+			rec.ptr = prev;
+			rec.size = cur - prev;
+			ivec_push(&xdf->record, rec);
 		}
 	}
 
+	xdf->recs = xdf->record.ptr;
+	xdf->nrec = xdf->record.length;
 	ivec_zero(&xdf->changed, xdf->nrec);
 
 	if ((XDF_DIFF_ALG(flags) != XDF_PATIENCE_DIFF) &&
