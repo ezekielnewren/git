@@ -23,9 +23,9 @@
 #include "xinclude.h"
 #include "compat/ivec.h"
 
-static size_t get_hash(xdfile_t *xdf, long index)
+static size_t get_hash(xdfile_t *xdf, struct IVec_usize *reference_index, long index)
 {
-	return xdf->record.ptr[xdf->reference_index[index]].minimal_perfect_hash;
+	return xdf->record.ptr[reference_index->ptr[index]].minimal_perfect_hash;
 }
 
 #define XDL_MAX_COST_MIN 256
@@ -57,8 +57,8 @@ typedef struct s_xdpsplit {
  * using this algorithm, so a little bit of heuristic is needed to cut the
  * search and to return a suboptimal point.
  */
-static long xdl_split(xdfile_t *xdf1, long off1, long lim1,
-		      xdfile_t *xdf2, long off2, long lim2,
+static long xdl_split(xdfile_t *xdf1, long off1, long lim1, struct IVec_usize *ri1,
+		      xdfile_t *xdf2, long off2, long lim2, struct IVec_usize *ri2,
 		      long *kvdf, long *kvdb, int need_min, xdpsplit_t *spl,
 		      xdalgoenv_t *xenv) {
 	long dmin = off1 - lim2, dmax = lim1 - off2;
@@ -102,7 +102,7 @@ static long xdl_split(xdfile_t *xdf1, long off1, long lim1,
 				i1 = kvdf[d + 1];
 			prev1 = i1;
 			i2 = i1 - d;
-			for (; i1 < lim1 && i2 < lim2 && get_hash(xdf1, i1) == get_hash(xdf2, i2); i1++, i2++);
+			for (; i1 < lim1 && i2 < lim2 && get_hash(xdf1, ri1, i1) == get_hash(xdf2, ri2, i2); i1++, i2++);
 			if (i1 - prev1 > xenv->snake_cnt)
 				got_snake = 1;
 			kvdf[d] = i1;
@@ -139,7 +139,7 @@ static long xdl_split(xdfile_t *xdf1, long off1, long lim1,
 				i1 = kvdb[d + 1] - 1;
 			prev1 = i1;
 			i2 = i1 - d;
-			for (; i1 > off1 && i2 > off2 && get_hash(xdf1, i1 - 1) == get_hash(xdf2, i2 - 1); i1--, i2--);
+			for (; i1 > off1 && i2 > off2 && get_hash(xdf1, ri1, i1 - 1) == get_hash(xdf2, ri2, i2 - 1); i1--, i2--);
 			if (prev1 - i1 > xenv->snake_cnt)
 				got_snake = 1;
 			kvdb[d] = i1;
@@ -174,7 +174,7 @@ static long xdl_split(xdfile_t *xdf1, long off1, long lim1,
 				if (v > XDL_K_HEUR * ec && v > best &&
 				    off1 + xenv->snake_cnt <= i1 && i1 < lim1 &&
 				    off2 + xenv->snake_cnt <= i2 && i2 < lim2) {
-					for (k = 1; get_hash(xdf1, i1 - k) == get_hash(xdf2, i2 - k); k++)
+					for (k = 1; get_hash(xdf1, ri1, i1 - k) == get_hash(xdf2, ri2, i2 - k); k++)
 						if (k == xenv->snake_cnt) {
 							best = v;
 							spl->i1 = i1;
@@ -198,7 +198,7 @@ static long xdl_split(xdfile_t *xdf1, long off1, long lim1,
 				if (v > XDL_K_HEUR * ec && v > best &&
 				    off1 < i1 && i1 <= lim1 - xenv->snake_cnt &&
 				    off2 < i2 && i2 <= lim2 - xenv->snake_cnt) {
-					for (k = 0; get_hash(xdf1, i1 + k) == get_hash(xdf2, i2 + k); k++)
+					for (k = 0; get_hash(xdf1, ri1, i1 + k) == get_hash(xdf2, ri2, i2 + k); k++)
 						if (k == xenv->snake_cnt - 1) {
 							best = v;
 							spl->i1 = i1;
@@ -272,15 +272,15 @@ static long xdl_split(xdfile_t *xdf1, long off1, long lim1,
  * sub-boxes by calling the box splitting function. Note that the real job
  * (marking changed lines) is done in the two boundary reaching checks.
  */
-int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
-		 xdfile_t *xdf2, long off2, long lim2,
+int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1, struct IVec_usize *ri1,
+		 xdfile_t *xdf2, long off2, long lim2, struct IVec_usize *ri2,
 		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv) {
 
 	/*
 	 * Shrink the box by walking through each diagonal snake (SW and NE).
 	 */
-	for (; off1 < lim1 && off2 < lim2 && get_hash(xdf1, off1) == get_hash(xdf2, off2); off1++, off2++);
-	for (; off1 < lim1 && off2 < lim2 && get_hash(xdf1, lim1 - 1) == get_hash(xdf2, lim2 - 1); lim1--, lim2--);
+	for (; off1 < lim1 && off2 < lim2 && get_hash(xdf1, ri1, off1) == get_hash(xdf2, ri2, off2); off1++, off2++);
+	for (; off1 < lim1 && off2 < lim2 && get_hash(xdf1, ri1, lim1 - 1) == get_hash(xdf2, ri2, lim2 - 1); lim1--, lim2--);
 
 	/*
 	 * If one dimension is empty, then all records on the other one must
@@ -288,10 +288,10 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 	 */
 	if (off1 == lim1) {
 		for (; off2 < lim2; off2++)
-			xdf2->changed.ptr[xdf2->reference_index[off2]] = true;
+			xdf2->changed.ptr[ri2->ptr[off2]] = true;
 	} else if (off2 == lim2) {
 		for (; off1 < lim1; off1++)
-			xdf1->changed.ptr[xdf1->reference_index[off1]] = true;
+			xdf1->changed.ptr[ri1->ptr[off1]] = true;
 	} else {
 		xdpsplit_t spl;
 		spl.i1 = spl.i2 = 0;
@@ -299,8 +299,8 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 		/*
 		 * Divide ...
 		 */
-		if (xdl_split(xdf1, off1, lim1, xdf2, off2, lim2, kvdf, kvdb,
-			      need_min, &spl, xenv) < 0) {
+		if (xdl_split(xdf1, off1, lim1, ri1, xdf2, off2, lim2, ri2,
+			      kvdf, kvdb, need_min, &spl, xenv) < 0) {
 
 			return -1;
 		}
@@ -308,9 +308,9 @@ int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
 		/*
 		 * ... et Impera.
 		 */
-		if (xdl_recs_cmp(xdf1, off1, spl.i1, xdf2, off2, spl.i2,
+		if (xdl_recs_cmp(xdf1, off1, spl.i1, ri1, xdf2, off2, spl.i2, ri2,
 				 kvdf, kvdb, spl.min_lo, xenv) < 0 ||
-		    xdl_recs_cmp(xdf1, spl.i1, lim1, xdf2, spl.i2, lim2,
+		    xdl_recs_cmp(xdf1, spl.i1, lim1, ri1, xdf2, spl.i2, lim2, ri2,
 				 kvdf, kvdb, spl.min_hi, xenv) < 0) {
 
 			return -1;
@@ -399,7 +399,7 @@ DEFINE_IVEC_TYPE(struct xoccurrence, xoccurrence);
  * matches on the other file. Also, lines that have multiple matches
  * might be potentially discarded if they appear in a run of discardable.
  */
-static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
+static int xdl_cleanup_records(xdfenv_t *xe, struct IVec_usize *reference_index1, struct IVec_usize *reference_index2, uint64_t flags) {
 	size_t mlim1, mlim2;
 	struct IVec_u8 action1, action2;
 	struct IVec_xoccurrence occ;
@@ -467,7 +467,6 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 	 * Use temporary arrays to decide if changed[i] should remain
 	 * false, or become true.
 	 */
-	xe->xdf1.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf1.record.length - xe->delta_end; i++) {
 		if (action1.ptr[i] == INVESTIGATE) {
 			if (!xdl_clean_mmatch(action1.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf1.record.length - xe->delta_end))
@@ -477,7 +476,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 		}
 
 		if (action1.ptr[i] == KEEP) {
-			xe->xdf1.reference_index[xe->xdf1.nreff++] = i;
+			ivec_push_unsafe(reference_index1, i);
 			/* changed[i] remains false, i.e. keep */
 		} else if (action1.ptr[i] == DISCARD) {
 			xe->xdf1.changed.ptr[i] = true;
@@ -487,7 +486,6 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 		}
 	}
 
-	xe->xdf2.nreff = 0;
 	for (size_t i = xe->delta_start; i < xe->xdf2.record.length - xe->delta_end; i++) {
 		if (action2.ptr[i] == INVESTIGATE) {
 			if (!xdl_clean_mmatch(action2.ptr, (ptrdiff_t)i, (ptrdiff_t)xe->delta_start, xe->xdf2.record.length - xe->delta_end))
@@ -497,7 +495,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, uint64_t flags) {
 		}
 
 		if (action2.ptr[i] == KEEP) {
-			xe->xdf2.reference_index[xe->xdf2.nreff++] = i;
+			ivec_push_unsafe(reference_index2, i);
 			/* changed[i] remains false, i.e. keep */
 		} else if (action2.ptr[i] == DISCARD) {
 			xe->xdf2.changed.ptr[i] = true;
@@ -520,9 +518,16 @@ int xdl_do_classic_diff(xdfenv_t *xe, uint64_t flags)
 	long ndiags;
 	long *kvd, *kvdf, *kvdb;
 	xdalgoenv_t xenv;
+	struct IVec_usize reference_index1, reference_index2;
 	int res;
 
-	xdl_cleanup_records(xe, flags);
+	IVEC_INIT(reference_index1);
+	IVEC_INIT(reference_index2);
+
+	ivec_reserve_exact(&reference_index1, xe->xdf1.record.length);
+	ivec_reserve_exact(&reference_index2, xe->xdf2.record.length);
+
+	xdl_cleanup_records(xe, &reference_index1, &reference_index2, flags);
 
 	/*
 	 * Allocate and setup K vectors to be used by the differential
@@ -530,7 +535,7 @@ int xdl_do_classic_diff(xdfenv_t *xe, uint64_t flags)
 	 *
 	 * One is to store the forward path and one to store the backward path.
 	 */
-	ndiags = xe->xdf1.nreff + xe->xdf2.nreff + 3;
+	ndiags = reference_index1.length + reference_index2.length + 3;
 	if (!XDL_ALLOC_ARRAY(kvd, 2 * ndiags + 2)) {
 
 		xdl_free_env(xe);
@@ -538,8 +543,8 @@ int xdl_do_classic_diff(xdfenv_t *xe, uint64_t flags)
 	}
 	kvdf = kvd;
 	kvdb = kvdf + ndiags;
-	kvdf += xe->xdf2.nreff + 1;
-	kvdb += xe->xdf2.nreff + 1;
+	kvdf += reference_index2.length + 1;
+	kvdb += reference_index2.length + 1;
 
 	xenv.mxcost = (long)xdl_bogosqrt(ndiags);
 	if (xenv.mxcost < XDL_MAX_COST_MIN)
@@ -547,7 +552,7 @@ int xdl_do_classic_diff(xdfenv_t *xe, uint64_t flags)
 	xenv.snake_cnt = XDL_SNAKE_CNT;
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
-	res = xdl_recs_cmp(&xe->xdf1, 0, xe->xdf1.nreff, &xe->xdf2, 0, xe->xdf2.nreff,
+	res = xdl_recs_cmp(&xe->xdf1, 0, reference_index1.length, &reference_index1, &xe->xdf2, 0, reference_index2.length, &reference_index2,
 			   kvdf, kvdb, (flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 

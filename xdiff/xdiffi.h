@@ -39,8 +39,8 @@ typedef struct s_xdchange {
 
 
 
-int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1,
-		 xdfile_t *xdf2, long off2, long lim2,
+int xdl_recs_cmp(xdfile_t *xdf1, long off1, long lim1, struct IVec_usize *ri1,
+		 xdfile_t *xdf2, long off2, long lim2, struct IVec_usize *ri2,
 		 long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv);
 int xdl_do_classic_diff(xdfenv_t *xe, uint64_t flags);
 int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
