@@ -27,7 +27,7 @@
 typedef struct s_xdlclass {
 	struct s_xdlclass *next;
 	xrecord_t rec;
-	long idx;
+	size_t idx;
 } xdlclass_t;
 
 DEFINE_IVEC_TYPE(xdlclass_t, xdlclass);
@@ -36,30 +36,27 @@ DEFINE_IVEC_TYPE(xdlclass_t*, xdlclass_ptr);
 typedef struct s_xdlclassifier {
 	struct IVec_xdlclass node;
 	struct IVec_xdlclass_ptr rchash;
-	unsigned int hbits;
-	long hsize;
-	long count;
-	long flags;
+	uint32_t hbits;
+	size_t hsize;
+	size_t count;
+	uint64_t flags;
 } xdlclassifier_t;
 
 
-static int xdl_init_classifier(xdlclassifier_t *cf, long size, long flags) {
+static void xdl_init_classifier(xdlclassifier_t *cf, size_t size, uint64_t flags) {
 	memset(cf, 0, sizeof(xdlclassifier_t));
+	IVEC_INIT(cf->node);
+	IVEC_INIT(cf->rchash);
 
 	cf->flags = flags;
 
-	cf->hbits = xdl_hashbits((unsigned int) size);
+	cf->hbits = xdl_hashbits((uint32_t) size + 1);
 	cf->hsize = 1 << cf->hbits;
-
-	IVEC_INIT(cf->node);
-	IVEC_INIT(cf->rchash);
 
 	ivec_reserve_exact(&cf->node, size);
 	ivec_zero(&cf->rchash, cf->hsize);
 
 	cf->count = 0;
-
-	return 0;
 }
 
 
@@ -77,7 +74,7 @@ static int xdl_classify_record(xdlclassifier_t *cf, xrecord_t *rec) {
 	for (rcrec = cf->rchash.ptr[hi]; rcrec; rcrec = rcrec->next)
 		if (rcrec->rec.line_hash == rec->line_hash &&
 				xdl_recmatch((const char *)rcrec->rec.ptr, (long)rcrec->rec.size,
-					(const char *)rec->ptr, (long)rec->size, cf->flags))
+					(const char *)rec->ptr, (long)rec->size, (long)cf->flags))
 			break;
 
 	if (!rcrec) {
@@ -177,9 +174,7 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		xdl_free_ctx(&xe->xdf1);
 		return -1;
 	}
-
-	if (xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length + 1, xpp->flags) < 0)
-		return -1;
+	xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length, xpp->flags);
 
 	for (size_t i = 0; i < xe->xdf1.record.length; i++) {
 		xrecord_t *rec = &xe->xdf1.record.ptr[i];
