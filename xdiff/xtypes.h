@@ -42,12 +42,12 @@ typedef struct s_xrecord {
 	uint8_t const *ptr;
 	size_t size;
 	uint64_t line_hash;
-	size_t minimal_perfect_hash;
 } xrecord_t;
 
 DEFINE_IVEC_TYPE(xrecord_t, xrecord);
 
 typedef struct s_xdfile {
+	struct IVec_usize minimal_perfect_hash;
 	struct IVec_xrecord record;
 	struct IVec_bool changed;
 } xdfile_t;

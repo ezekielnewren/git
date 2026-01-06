@@ -66,7 +66,7 @@ static void xdl_free_classifier(xdlclassifier_t *cf) {
 }
 
 
-static int xdl_classify_record(xdlclassifier_t *cf, xrecord_t *rec) {
+static size_t xdl_classify_record(xdlclassifier_t *cf, xrecord_t *rec) {
 	size_t hi;
 	xdlclass_t *rcrec;
 
@@ -86,26 +86,26 @@ static int xdl_classify_record(xdlclassifier_t *cf, xrecord_t *rec) {
 		rcrec = cf->rchash.ptr[hi];
 	}
 
-	rec->minimal_perfect_hash = (size_t)rcrec->idx;
-
-	return 0;
+	return rcrec->idx;
 }
 
 
 static void xdl_free_ctx(xdfile_t *xdf)
 {
-	ivec_free(&xdf->changed);
+	ivec_free(&xdf->minimal_perfect_hash);
 	ivec_free(&xdf->record);
+	ivec_free(&xdf->changed);
 }
 
 
-static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
+static void xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 	xrecord_t rec;
 	long bsize;
 	uint8_t const *blk, *cur, *top, *prev;
 
-	IVEC_INIT(xdf->changed);
+	IVEC_INIT(xdf->minimal_perfect_hash);
 	IVEC_INIT(xdf->record);
+	IVEC_INIT(xdf->changed);
 
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
 		for (top = blk + bsize; cur < top; ) {
@@ -117,9 +117,8 @@ static int xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 		}
 	}
 
+	ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
 	ivec_zero(&xdf->changed, xdf->record.length);
-
-	return 0;
 }
 
 
@@ -135,11 +134,11 @@ void xdl_free_env(xdfenv_t *xe) {
  */
 static void xdl_trim_ends(xdfenv_t *xe)
 {
-	size_t lim = XDL_MIN(xe->xdf1.record.length, xe->xdf2.record.length);
+	size_t lim = XDL_MIN(xe->xdf1.minimal_perfect_hash.length, xe->xdf2.minimal_perfect_hash.length);
 
 	for (size_t i = 0; i < lim; i++) {
-		size_t mph1 = xe->xdf1.record.ptr[i].minimal_perfect_hash;
-		size_t mph2 = xe->xdf2.record.ptr[i].minimal_perfect_hash;
+		size_t mph1 = xe->xdf1.minimal_perfect_hash.ptr[i];
+		size_t mph2 = xe->xdf2.minimal_perfect_hash.ptr[i];
 		if (mph1 != mph2) {
 			xe->delta_start = (ssize_t)i;
 			lim -= i;
@@ -148,8 +147,8 @@ static void xdl_trim_ends(xdfenv_t *xe)
 	}
 
 	for (size_t i = 0; i < lim; i++) {
-		size_t mph1 = xe->xdf1.record.ptr[xe->xdf1.record.length - 1 - i].minimal_perfect_hash;
-		size_t mph2 = xe->xdf2.record.ptr[xe->xdf2.record.length - 1 - i].minimal_perfect_hash;
+		size_t mph1 = xe->xdf1.minimal_perfect_hash.ptr[xe->xdf1.minimal_perfect_hash.length - 1 - i];
+		size_t mph2 = xe->xdf2.minimal_perfect_hash.ptr[xe->xdf2.minimal_perfect_hash.length - 1 - i];
 		if (mph1 != mph2) {
 			xe->delta_end = i;
 			break;
@@ -165,25 +164,20 @@ int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
-	if (xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags) < 0) {
-
-		return -1;
-	}
-	if (xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags) < 0) {
-
-		xdl_free_ctx(&xe->xdf1);
-		return -1;
-	}
+	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
+	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
 	xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length, xpp->flags);
 
 	for (size_t i = 0; i < xe->xdf1.record.length; i++) {
 		xrecord_t *rec = &xe->xdf1.record.ptr[i];
-		xdl_classify_record(&cf, rec);
+		size_t mph = xdl_classify_record(&cf, rec);
+		ivec_push_unsafe(&xe->xdf1.minimal_perfect_hash, mph);
 	}
 
 	for (size_t i = 0; i < xe->xdf2.record.length; i++) {
 		xrecord_t *rec = &xe->xdf2.record.ptr[i];
-		xdl_classify_record(&cf, rec);
+		size_t mph = xdl_classify_record(&cf, rec);
+		ivec_push_unsafe(&xe->xdf2.minimal_perfect_hash, mph);
 	}
 
 	xe->mph_size = cf.count;

@@ -25,7 +25,7 @@
 
 static size_t get_hash(xdfile_t *xdf, struct IVec_usize *reference_index, long index)
 {
-	return xdf->record.ptr[reference_index->ptr[index]].minimal_perfect_hash;
+	return xdf->minimal_perfect_hash.ptr[reference_index->ptr[index]];
 }
 
 #define XDL_MAX_COST_MIN 256
@@ -410,12 +410,12 @@ static int xdl_cleanup_records(xdfenv_t *xe, struct IVec_usize *reference_index1
 	ivec_zero(&occ, xe->mph_size);
 
 	for (size_t j = 0; j < xe->xdf1.record.length; j++) {
-		size_t mph1 = xe->xdf1.record.ptr[j].minimal_perfect_hash;
+		size_t mph1 = xe->xdf1.minimal_perfect_hash.ptr[j];
 		occ.ptr[mph1].file1 += 1;
 	}
 
 	for (size_t j = 0; j < xe->xdf2.record.length; j++) {
-		size_t mph2 = xe->xdf2.record.ptr[j].minimal_perfect_hash;
+		size_t mph2 = xe->xdf2.minimal_perfect_hash.ptr[j];
 		occ.ptr[mph2].file2 += 1;
 	}
 
@@ -442,7 +442,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, struct IVec_usize *reference_index1
 	 * Initialize temporary arrays with DISCARD, KEEP, or INVESTIGATE.
 	 */
 	for (size_t i = xe->delta_start; i < xe->xdf1.record.length - xe->delta_end; i++) {
-		size_t mph1 = xe->xdf1.record.ptr[i].minimal_perfect_hash;
+		size_t mph1 = xe->xdf1.minimal_perfect_hash.ptr[i];
 		size_t matches_in_the_other_file = occ.ptr[mph1].file2;
 		if (matches_in_the_other_file == 0)
 			action1.ptr[i] = DISCARD;
@@ -453,7 +453,7 @@ static int xdl_cleanup_records(xdfenv_t *xe, struct IVec_usize *reference_index1
 	}
 
 	for (size_t i = xe->delta_start; i < xe->xdf2.record.length - xe->delta_end; i++) {
-		size_t mph2 = xe->xdf2.record.ptr[i].minimal_perfect_hash;
+		size_t mph2 = xe->xdf2.minimal_perfect_hash.ptr[i];
 		size_t matches_in_the_other_file = occ.ptr[mph2].file1;
 		if (matches_in_the_other_file == 0)
 			action2.ptr[i] = DISCARD;
@@ -604,11 +604,6 @@ static xdchange_t *xdl_add_change(xdchange_t *xscr, long i1, long i2, long chg1,
 	return xch;
 }
 
-
-static int recs_match(xrecord_t *rec1, xrecord_t *rec2)
-{
-	return rec1->minimal_perfect_hash == rec2->minimal_perfect_hash;
-}
 
 /*
  * If a line is indented more than this, get_indent() just returns this value.
@@ -973,7 +968,7 @@ static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
 static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
 {
 	if (g->end < (long)xdf->record.length &&
-	    recs_match(&xdf->record.ptr[g->start], &xdf->record.ptr[g->end])) {
+	    xdf->minimal_perfect_hash.ptr[g->start] == xdf->minimal_perfect_hash.ptr[g->end]) {
 		xdf->changed.ptr[g->start++] = false;
 		xdf->changed.ptr[g->end++] = true;
 
@@ -994,7 +989,7 @@ static int group_slide_down(xdfile_t *xdf, struct xdlgroup *g)
 static int group_slide_up(xdfile_t *xdf, struct xdlgroup *g)
 {
 	if (g->start > 0 &&
-	    recs_match(&xdf->record.ptr[g->start - 1], &xdf->record.ptr[g->end - 1])) {
+	    xdf->minimal_perfect_hash.ptr[g->start - 1] == xdf->minimal_perfect_hash.ptr[g->end - 1]) {
 		xdf->changed.ptr[--g->start] = true;
 		xdf->changed.ptr[--g->end] = false;
 
