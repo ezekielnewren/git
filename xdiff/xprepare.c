@@ -30,13 +30,14 @@ typedef struct s_xdlclass {
 	long idx;
 } xdlclass_t;
 
+DEFINE_IVEC_TYPE(xdlclass_t, xdlclass);
+DEFINE_IVEC_TYPE(xdlclass_t*, xdlclass_ptr);
+
 typedef struct s_xdlclassifier {
+	struct IVec_xdlclass node;
+	struct IVec_xdlclass_ptr rchash;
 	unsigned int hbits;
 	long hsize;
-	xdlclass_t **rchash;
-	chastore_t ncha;
-	xdlclass_t **rcrecs;
-	long alloc;
 	long count;
 	long flags;
 } xdlclassifier_t;
@@ -50,23 +51,11 @@ static int xdl_init_classifier(xdlclassifier_t *cf, long size, long flags) {
 	cf->hbits = xdl_hashbits((unsigned int) size);
 	cf->hsize = 1 << cf->hbits;
 
-	if (xdl_cha_init(&cf->ncha, sizeof(xdlclass_t), size / 4 + 1) < 0) {
+	IVEC_INIT(cf->node);
+	IVEC_INIT(cf->rchash);
 
-		return -1;
-	}
-	if (!XDL_CALLOC_ARRAY(cf->rchash, cf->hsize)) {
-
-		xdl_cha_free(&cf->ncha);
-		return -1;
-	}
-
-	cf->alloc = size;
-	if (!XDL_ALLOC_ARRAY(cf->rcrecs, cf->alloc)) {
-
-		xdl_free(cf->rchash);
-		xdl_cha_free(&cf->ncha);
-		return -1;
-	}
+	ivec_reserve_exact(&cf->node, size);
+	ivec_zero(&cf->rchash, cf->hsize);
 
 	cf->count = 0;
 
@@ -75,10 +64,8 @@ static int xdl_init_classifier(xdlclassifier_t *cf, long size, long flags) {
 
 
 static void xdl_free_classifier(xdlclassifier_t *cf) {
-
-	xdl_free(cf->rcrecs);
-	xdl_free(cf->rchash);
-	xdl_cha_free(&cf->ncha);
+	ivec_free(&cf->node);
+	ivec_free(&cf->rchash);
 }
 
 
@@ -87,24 +74,19 @@ static int xdl_classify_record(xdlclassifier_t *cf, xrecord_t *rec) {
 	xdlclass_t *rcrec;
 
 	hi = XDL_HASHLONG(rec->line_hash, cf->hbits);
-	for (rcrec = cf->rchash[hi]; rcrec; rcrec = rcrec->next)
+	for (rcrec = cf->rchash.ptr[hi]; rcrec; rcrec = rcrec->next)
 		if (rcrec->rec.line_hash == rec->line_hash &&
 				xdl_recmatch((const char *)rcrec->rec.ptr, (long)rcrec->rec.size,
 					(const char *)rec->ptr, (long)rec->size, cf->flags))
 			break;
 
 	if (!rcrec) {
-		if (!(rcrec = xdl_cha_alloc(&cf->ncha))) {
-
-			return -1;
-		}
-		rcrec->idx = cf->count++;
-		if (XDL_ALLOC_GROW(cf->rcrecs, cf->count, cf->alloc))
-				return -1;
-		cf->rcrecs[rcrec->idx] = rcrec;
-		rcrec->rec = *rec;
-		rcrec->next = cf->rchash[hi];
-		cf->rchash[hi] = rcrec;
+		xdlclass_t *node = &cf->node.ptr[cf->node.length++];
+		node->idx = cf->count++;
+		node->rec = *rec;
+		node->next = cf->rchash.ptr[hi];
+		cf->rchash.ptr[hi] = node;
+		rcrec = cf->rchash.ptr[hi];
 	}
 
 	rec->minimal_perfect_hash = (size_t)rcrec->idx;
