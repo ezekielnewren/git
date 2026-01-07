@@ -379,8 +379,8 @@ int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 	return 0;
 }
 
-int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
-		int line1, int count1, int line2, int count2)
+int xdl_fall_back_diff(xdfenv_t *diff_env, uint64_t flags,
+		       size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	/*
 	 * This probably does not work outside Git, since
@@ -399,8 +399,9 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, xpparam_t const *xpp,
 	subfile2.ptr = (char *)diff_env->xdf2.record.ptr[line2 - 1].ptr;
 	subfile2.size = (char *)diff_env->xdf2.record.ptr[line2 + count2 - 2].ptr +
 		diff_env->xdf2.record.ptr[line2 + count2 - 2].size - subfile2.ptr;
-	if (xdl_do_diff(&subfile1, &subfile2, xpp, &env) < 0)
-		return -1;
+
+	xdl_prepare_env(&subfile1, &subfile2, &env, flags);
+	xdl_do_classic_diff(&env, flags);
 
 	memcpy(diff_env->xdf1.changed.ptr + line1 - 1, env.xdf1.changed.ptr, count1);
 	memcpy(diff_env->xdf2.changed.ptr + line2 - 1, env.xdf2.changed.ptr, count2);

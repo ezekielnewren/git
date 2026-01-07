@@ -566,7 +566,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		xdfenv_t *xe) {
 	int res;
 
-	if (xdl_prepare_env(mf1, mf2, xpp, xe) < 0)
+	if (xdl_prepare_env(mf1, mf2, xe, xpp->flags) < 0)
 		return -1;
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_PATIENCE_DIFF) {
@@ -575,7 +575,7 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	}
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
-		res = xdl_do_histogram_diff(xpp, xe);
+		res = xdl_do_histogram_diff(xe, xpp->flags);
 		goto out;
 	}
 

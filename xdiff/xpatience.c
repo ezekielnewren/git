@@ -306,18 +306,6 @@ static int walk_common_sequence(struct hashmap *map, struct entry *first,
 	}
 }
 
-static int fall_back_to_classic_diff(struct hashmap *map,
-		int line1, int count1, int line2, int count2)
-{
-	xpparam_t xpp;
-
-	memset(&xpp, 0, sizeof(xpp));
-	xpp.flags = map->xpp->flags & ~XDF_DIFF_ALGORITHM_MASK;
-
-	return xdl_fall_back_diff(map->env, &xpp,
-				  line1, count1, line2, count2);
-}
-
 /*
  * Recursively find the longest common sequence of unique lines,
  * and if none was found, ask xdl_do_diff() to do the job.
@@ -364,7 +352,7 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 		result = walk_common_sequence(&map, first,
 			line1, count1, line2, count2);
 	else
-		result = fall_back_to_classic_diff(&map,
+		result = xdl_fall_back_diff(env, xpp->flags,
 			line1, count1, line2, count2);
  out:
 	xdl_free(map.entries);

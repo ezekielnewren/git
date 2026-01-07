@@ -25,8 +25,7 @@
 
 
 
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		    xdfenv_t *xe);
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xdfenv_t *xe, uint64_t flags);
 void xdl_free_env(xdfenv_t *xe);
 
 

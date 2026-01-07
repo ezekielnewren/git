@@ -157,16 +157,15 @@ static void xdl_trim_ends(xdfenv_t *xe)
 }
 
 
-int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
-		    xdfenv_t *xe) {
+int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xdfenv_t *xe, uint64_t flags) {
 	xdlclassifier_t cf;
 
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
-	xdl_prepare_ctx(mf1, &xe->xdf1, xpp->flags);
-	xdl_prepare_ctx(mf2, &xe->xdf2, xpp->flags);
-	xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length, xpp->flags);
+	xdl_prepare_ctx(mf1, &xe->xdf1, flags);
+	xdl_prepare_ctx(mf2, &xe->xdf2, flags);
+	xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length, flags);
 
 	for (size_t i = 0; i < xe->xdf1.record.length; i++) {
 		xrecord_t *rec = &xe->xdf1.record.ptr[i];

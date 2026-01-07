@@ -51,6 +51,6 @@ void xdl_free_script(xdchange_t *xscr);
 int xdl_emit_diff(xdfenv_t *xe, xdchange_t *xscr, xdemitcb_t *ecb,
 		  xdemitconf_t const *xecfg);
 int xdl_do_patience_diff(xpparam_t const *xpp, xdfenv_t *env);
-int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env);
+int xdl_do_histogram_diff(xdfenv_t *env, uint64_t flags);
 
 #endif /* #if !defined(XDIFFI_H) */

@@ -214,18 +214,6 @@ static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
 	return b_next;
 }
 
-static int fall_back_to_classic_diff(xpparam_t const *xpp, xdfenv_t *env,
-		size_t line1, size_t count1, size_t line2, size_t count2)
-{
-	xpparam_t xpparam;
-
-	memset(&xpparam, 0, sizeof(xpparam));
-	xpparam.flags = xpp->flags & ~XDF_DIFF_ALGORITHM_MASK;
-
-	return xdl_fall_back_diff(env, &xpparam,
-				  line1, count1, line2, count2);
-}
-
 static inline void free_index(struct histindex *index)
 {
 	xdl_free(index->records);
@@ -234,7 +222,7 @@ static inline void free_index(struct histindex *index)
 	xdl_cha_free(&index->rcha);
 }
 
-static int find_lcs(xpparam_t const *xpp, xdfenv_t *env,
+static int find_lcs(xdfenv_t *env,
 		    struct region *lcs,
 		    size_t line1, size_t count1, size_t line2, size_t count2)
 {
@@ -287,7 +275,7 @@ cleanup:
 	return ret;
 }
 
-static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
+static int histogram_diff(uint64_t flags, xdfenv_t *env,
 	size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	struct region lcs;
@@ -310,11 +298,11 @@ redo:
 	}
 
 	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(xpp, env, &lcs, line1, count1, line2, count2);
+	lcs_found = find_lcs(env, &lcs, line1, count1, line2, count2);
 	if (lcs_found < 0)
 		goto out;
 	else if (lcs_found)
-		result = fall_back_to_classic_diff(xpp, env, line1, count1, line2, count2);
+		result = xdl_fall_back_diff(env, flags, line1, count1, line2, count2);
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
@@ -323,7 +311,7 @@ redo:
 				env->xdf2.changed.ptr[line2++ - 1] = true;
 			result = 0;
 		} else {
-			result = histogram_diff(xpp, env,
+			result = histogram_diff(flags, env,
 						line1, lcs.begin1 - line1,
 						line2, lcs.begin2 - line2);
 			if (result)
@@ -345,12 +333,12 @@ out:
 	return result;
 }
 
-int xdl_do_histogram_diff(xpparam_t const *xpp, xdfenv_t *env)
+int xdl_do_histogram_diff(xdfenv_t *env, uint64_t flags)
 {
 	ptrdiff_t dend1 = env->xdf1.record.length - 1 - env->delta_end;
 	ptrdiff_t dend2 = env->xdf2.record.length - 1 - env->delta_end;
 
-	return histogram_diff(xpp, env,
+	return histogram_diff(flags, env,
 		env->delta_start + 1, dend1 - env->delta_start + 1,
 		env->delta_start + 1, dend2 - env->delta_start + 1);
 }
