@@ -225,6 +225,40 @@ static inline void free_index(struct histindex *index)
 	xdl_cha_free(&index->rcha);
 }
 
+static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, size_t count1)
+{
+	memset(index, 0, sizeof(struct histindex));
+
+	index->env = env;
+
+	index->records = NULL;
+	index->line_map = NULL;
+	/* in case of early xdl_cha_free() */
+	index->rcha.head = NULL;
+
+	index->table_bits = xdl_hashbits(count1);
+	index->records_size = 1 << index->table_bits;
+	if (!XDL_CALLOC_ARRAY(index->records, index->records_size))
+		goto abort;
+
+	index->line_map_size = count1;
+	if (!XDL_CALLOC_ARRAY(index->line_map, index->line_map_size))
+		goto abort;
+
+	if (!XDL_CALLOC_ARRAY(index->next_ptrs, index->line_map_size))
+		goto abort;
+
+	/* lines / 4 + 1 comes from xprepare.c:xdl_prepare_ctx() */
+	if (xdl_cha_init(&index->rcha, sizeof(struct record), count1 / 4 + 1) < 0)
+		goto abort;
+
+	index->ptr_shift = line1;
+
+	return 0;
+abort:
+	return -1;
+}
+
 static int find_lcs(xdfenv_t *env,
 		    struct region *lcs,
 		    size_t line1, size_t count1, size_t line2, size_t count2)
@@ -233,32 +267,8 @@ static int find_lcs(xdfenv_t *env,
 	int ret = -1;
 	struct histindex index;
 
-	memset(&index, 0, sizeof(index));
-
-	index.env = env;
-
-	index.records = NULL;
-	index.line_map = NULL;
-	/* in case of early xdl_cha_free() */
-	index.rcha.head = NULL;
-
-	index.table_bits = xdl_hashbits(count1);
-	index.records_size = 1 << index.table_bits;
-	if (!XDL_CALLOC_ARRAY(index.records, index.records_size))
+	if (histindex_init(&index, env, line1, count1))
 		goto cleanup;
-
-	index.line_map_size = count1;
-	if (!XDL_CALLOC_ARRAY(index.line_map, index.line_map_size))
-		goto cleanup;
-
-	if (!XDL_CALLOC_ARRAY(index.next_ptrs, index.line_map_size))
-		goto cleanup;
-
-	/* lines / 4 + 1 comes from xprepare.c:xdl_prepare_ctx() */
-	if (xdl_cha_init(&index.rcha, sizeof(struct record), count1 / 4 + 1) < 0)
-		goto cleanup;
-
-	index.ptr_shift = line1;
 
 	if (scanA(&index, line1, count1))
 		goto cleanup;
