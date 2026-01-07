@@ -46,6 +46,7 @@
 #define MAX_CHAIN_LENGTH 64
 
 #define LINE_END(n) (line##n + count##n - 1)
+#define ONE_INDEXED 1
 
 struct record {
 	size_t ptr, cnt;
@@ -83,7 +84,7 @@ struct region {
 	((LINE_MAP(index, ptr))->cnt)
 
 #define MPH(env, s, l) \
-	(env->xdf##s.minimal_perfect_hash.ptr[l - 1])
+	(env->xdf##s.minimal_perfect_hash.ptr[l - ONE_INDEXED])
 
 #define CMP(i, s1, l1, s2, l2) \
 	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
@@ -337,10 +338,11 @@ out:
 
 int xdl_do_histogram_diff(xdfenv_t *env, uint64_t flags)
 {
-	ptrdiff_t dend1 = env->xdf1.record.length - 1 - env->delta_end;
-	ptrdiff_t dend2 = env->xdf2.record.length - 1 - env->delta_end;
+	size_t start = ONE_INDEXED + env->delta_start;
+	size_t end1 = ONE_INDEXED + env->xdf1.record.length - env->delta_end;
+	size_t end2 = ONE_INDEXED + env->xdf2.record.length - env->delta_end;
 
 	return histogram_diff(flags, env,
-		env->delta_start + 1, dend1 - env->delta_start + 1,
-		env->delta_start + 1, dend2 - env->delta_start + 1);
+		start, end1 - start,
+		start, end2 - start);
 }
