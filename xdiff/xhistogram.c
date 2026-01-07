@@ -51,30 +51,30 @@
 
 struct histindex {
 	struct record {
-		unsigned int ptr, cnt;
+		size_t ptr, cnt;
 		struct record *next;
 	} **records, /* an occurrence */
 	  **line_map; /* map of line to record chain */
 	chastore_t rcha;
-	unsigned int *next_ptrs;
-	unsigned int table_bits,
-		     records_size,
-		     line_map_size;
+	size_t *next_ptrs;
+	size_t table_bits,
+	       records_size,
+	       line_map_size;
 
-	unsigned int max_chain_length,
-		     key_shift,
-		     ptr_shift;
+	size_t max_chain_length,
+	       key_shift,
+	       ptr_shift;
 
-	unsigned int cnt,
-		     has_common;
+	size_t cnt,
+	       has_common;
 
 	xdfenv_t *env;
 	xpparam_t const *xpp;
 };
 
 struct region {
-	unsigned int begin1, end1;
-	unsigned int begin2, end2;
+	size_t begin1, end1;
+	size_t begin2, end2;
 };
 
 #define LINE_MAP(i, a) (i->line_map[(a) - i->ptr_shift])
@@ -94,13 +94,13 @@ struct region {
 #define TABLE_HASH(index, side, line) \
 	XDL_HASHLONG(MPH(index->env, side, line), index->table_bits)
 
-static int scanA(struct histindex *index, int line1, int count1)
+static int scanA(struct histindex *index, size_t line1, size_t count1)
 {
-	unsigned int ptr, tbl_idx;
-	unsigned int chain_len;
+	size_t ptr, tbl_idx;
+	size_t chain_len;
 	struct record **rec_chain, *rec;
 
-	for (ptr = LINE_END(1); (unsigned int)line1 <= ptr; ptr--) {
+	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
 		tbl_idx = TABLE_HASH(index, 1, ptr);
 		rec_chain = index->records + tbl_idx;
 		rec = *rec_chain;
@@ -147,13 +147,13 @@ continue_scan:
 	return 0;
 }
 
-static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
-	int line1, int count1, int line2, int count2)
+static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
+	size_t line1, size_t count1, size_t line2, size_t count2)
 {
-	unsigned int b_next = b_ptr + 1;
+	size_t b_next = b_ptr + 1;
 	struct record *rec = index->records[TABLE_HASH(index, 2, b_ptr)];
-	unsigned int as, ae, bs, be, np, rc;
-	int should_break;
+	size_t as, ae, bs, be, np, rc;
+	bool should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->cnt > index->cnt) {
@@ -175,14 +175,14 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 			be = bs;
 			rc = rec->cnt;
 
-			while ((unsigned int)line1 < as && (unsigned int)line2 < bs
+			while (line1 < as && line2 < bs
 				&& CMP(index, 1, as - 1, 2, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc)
 					rc = XDL_MIN(rc, CNT(index, as));
 			}
-			while (ae < (unsigned int)LINE_END(1) && be < (unsigned int)LINE_END(2)
+			while (ae < LINE_END(1) && be < LINE_END(2)
 				&& CMP(index, 1, ae + 1, 2, be + 1)) {
 				ae++;
 				be++;
@@ -221,7 +221,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, int b_ptr,
 }
 
 static int fall_back_to_classic_diff(xpparam_t const *xpp, xdfenv_t *env,
-		int line1, int count1, int line2, int count2)
+		size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	xpparam_t xpparam;
 
@@ -242,9 +242,9 @@ static inline void free_index(struct histindex *index)
 
 static int find_lcs(xpparam_t const *xpp, xdfenv_t *env,
 		    struct region *lcs,
-		    int line1, int count1, int line2, int count2)
+		    size_t line1, size_t count1, size_t line2, size_t count2)
 {
-	int b_ptr;
+	size_t b_ptr;
 	int ret = -1;
 	struct histindex index;
 
@@ -296,7 +296,7 @@ cleanup:
 }
 
 static int histogram_diff(xpparam_t const *xpp, xdfenv_t *env,
-	int line1, int count1, int line2, int count2)
+	size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	struct region lcs;
 	int lcs_found;
@@ -307,7 +307,7 @@ redo:
 	if (count1 <= 0 && count2 <= 0)
 		return 0;
 
-	if ((unsigned int)LINE_END(1) >= MAX_PTR)
+	if (LINE_END(1) >= MAX_PTR)
 		return -1;
 
 	if (!count1) {
