@@ -43,11 +43,9 @@
 
 #include "xinclude.h"
 
-#define MAX_PTR	UINT_MAX
-#define MAX_CNT	UINT_MAX
+#define MAX_CHAIN_LENGTH 64
 
 #define LINE_END(n) (line##n + count##n - 1)
-#define LINE_END_PTR(n) (*line##n + *count##n - 1)
 
 struct histindex {
 	struct record {
@@ -61,15 +59,12 @@ struct histindex {
 	       records_size,
 	       line_map_size;
 
-	size_t max_chain_length,
-	       key_shift,
-	       ptr_shift;
+	size_t ptr_shift;
 
-	size_t cnt,
-	       has_common;
+	size_t cnt;
+	bool has_common;
 
 	xdfenv_t *env;
-	xpparam_t const *xpp;
 };
 
 struct region {
@@ -115,8 +110,7 @@ static int scanA(struct histindex *index, size_t line1, size_t count1)
 				 */
 				NEXT_PTR(index, ptr) = rec->ptr;
 				rec->ptr = ptr;
-				/* cap rec->cnt at MAX_CNT */
-				rec->cnt = XDL_MIN(MAX_CNT, rec->cnt + 1);
+				rec->cnt += 1;
 				LINE_MAP(index, ptr) = rec;
 				goto continue_scan;
 			}
@@ -125,7 +119,7 @@ static int scanA(struct histindex *index, size_t line1, size_t count1)
 			chain_len++;
 		}
 
-		if (chain_len == index->max_chain_length)
+		if (chain_len == MAX_CHAIN_LENGTH)
 			return -1;
 
 		/*
@@ -251,7 +245,6 @@ static int find_lcs(xpparam_t const *xpp, xdfenv_t *env,
 	memset(&index, 0, sizeof(index));
 
 	index.env = env;
-	index.xpp = xpp;
 
 	index.records = NULL;
 	index.line_map = NULL;
@@ -275,17 +268,16 @@ static int find_lcs(xpparam_t const *xpp, xdfenv_t *env,
 		goto cleanup;
 
 	index.ptr_shift = line1;
-	index.max_chain_length = 64;
 
 	if (scanA(&index, line1, count1))
 		goto cleanup;
 
-	index.cnt = index.max_chain_length + 1;
+	index.cnt = MAX_CHAIN_LENGTH + 1;
 
 	for (b_ptr = line2; b_ptr <= LINE_END(2); )
 		b_ptr = try_lcs(&index, lcs, b_ptr, line1, count1, line2, count2);
 
-	if (index.has_common && index.max_chain_length < index.cnt)
+	if (index.has_common && MAX_CHAIN_LENGTH < index.cnt)
 		ret = 1;
 	else
 		ret = 0;
@@ -306,9 +298,6 @@ redo:
 
 	if (count1 <= 0 && count2 <= 0)
 		return 0;
-
-	if (LINE_END(1) >= MAX_PTR)
-		return -1;
 
 	if (!count1) {
 		while(count2--)
