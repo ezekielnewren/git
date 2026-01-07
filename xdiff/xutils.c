@@ -21,7 +21,7 @@
  */
 
 #include "xinclude.h"
-
+#include "xxh3.h"
 
 uint64_t xdl_bogosqrt(uint64_t n) {
 	uint64_t i;
@@ -274,68 +274,17 @@ uint64_t xdl_hash_record_with_whitespace(uint8_t const **data,
 	return ha;
 }
 
-/*
- * Compiler reassociation barrier: pretend to modify X and Y to disallow
- * changing evaluation order with respect to following uses of X and Y.
- */
-#ifdef __GNUC__
-#define REASSOC_FENCE(x, y) __asm__("" : "+r"(x), "+r"(y))
-#else
-#define REASSOC_FENCE(x, y)
-#endif
+uint64_t xdl_hash_record_verbatim(uint8_t const **data, uint8_t const *top)
+{
+	uint8_t const *start = *data;
+	size_t length = top - start;
+	uint8_t const *ptr = memchr(start, '\n', length);
 
-uint64_t xdl_hash_record_verbatim(uint8_t const **data, uint8_t const *top) {
-	uint64_t ha = 5381, c0, c1;
-	uint8_t const *ptr = *data;
-#if 0
-	/*
-	 * The baseline form of the optimized loop below. This is the djb2
-	 * hash (the above function uses a variant with XOR instead of ADD).
-	 */
-	for (; ptr < top && *ptr != '\n'; ptr++) {
-		ha += (ha << 5);
-		ha += (uint64_t) *ptr;
-	}
-	*data = ptr < top ? ptr + 1: ptr;
-#else
-	/* Process two characters per iteration. */
-	if (top - ptr >= 2) do {
-		if ((c0 = ptr[0]) == '\n') {
-			*data = ptr + 1;
-			return ha;
-		}
-		if ((c1 = ptr[1]) == '\n') {
-			*data = ptr + 2;
-			c0 += ha;
-			REASSOC_FENCE(c0, ha);
-			ha = ha * 32 + c0;
-			return ha;
-		}
-		/*
-		 * Combine characters C0 and C1 into the hash HA. We have
-		 * HA = (HA * 33 + C0) * 33 + C1, and we want to ensure
-		 * that dependency chain over HA is just one multiplication
-		 * and one addition, i.e. we want to evaluate this as
-		 * HA = HA * 33 * 33 + (C0 * 33 + C1), and likewise prefer
-		 * (C0 * 32 + (C0 + C1)) for the expression in parenthesis.
-		 */
-		ha *= 33 * 33;
-		c1 += c0;
-		REASSOC_FENCE(c1, c0);
-		c1 += c0 * 32;
-		REASSOC_FENCE(c1, ha);
-		ha += c1;
+	if (ptr)
+		length = ptr - start + 1;
 
-		ptr += 2;
-	} while (ptr < top - 1);
-	*data = top;
-	if (ptr < top && (c0 = ptr[0]) != '\n') {
-		c0 += ha;
-		REASSOC_FENCE(c0, ha);
-		ha = ha * 32 + c0;
-	}
-#endif
-	return ha;
+	*data = start + length;
+	return XXH3_64bits(start, length);
 }
 
 unsigned int xdl_hashbits(unsigned int size) {
