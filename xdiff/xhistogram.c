@@ -47,12 +47,14 @@
 
 #define LINE_END(n) (line##n + count##n - 1)
 
+struct record {
+	size_t ptr, cnt;
+	struct record *next;
+};
+
 struct histindex {
-	struct record {
-		size_t ptr, cnt;
-		struct record *next;
-	} **records, /* an occurrence */
-	  **line_map; /* map of line to record chain */
+	struct record **records;  /* an occurrence */
+	struct record **line_map; /* map of line to record chain */
 	chastore_t rcha;
 	size_t *next_ptrs;
 	size_t table_bits,
