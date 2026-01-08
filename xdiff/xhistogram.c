@@ -77,26 +77,28 @@ struct region {
 #define NEXT_PTR(index, line_number) \
 	(index->next_ptr.ptr[(line_number) - index->ptr_shift])
 
-#define MPH(env, s, l) \
-	(env->xdf##s.minimal_perfect_hash.ptr[l - ONE_INDEXED])
+#define MPH(s, l) \
+	(mph##s->ptr[l - ONE_INDEXED])
 
-#define TABLE_HASH(env, side, line, mask) \
-	(MPH(env, side, line)&mask)
+#define TABLE_HASH(side, line, mask) \
+	(MPH(side, line)&mask)
 
-static int scanA(struct histindex *index, xdfenv_t *xe, size_t line1, size_t count1)
-{
+static int scanA(struct histindex *index, xdfenv_t *xe,
+	struct IVec_usize *mph1,
+	size_t line1, size_t count1
+) {
 	size_t ptr, tbl_idx;
 	size_t chain_len;
 	struct record **rec_chain, *rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(xe, 1, ptr, index->mask);
+		tbl_idx = TABLE_HASH(1, ptr, index->mask);
 		rec_chain = &index->record.ptr[tbl_idx];
 		rec = *rec_chain;
 
 		chain_len = 0;
 		while (rec) {
-			if (MPH(xe, 1, rec->ptr) == MPH(xe, 1, ptr)) {
+			if (MPH(1, rec->ptr) == MPH(1, ptr)) {
 				/*
 				 * ptr is identical to another element. Insert
 				 * it onto the front of the existing element
@@ -136,23 +138,23 @@ continue_scan:
 	return 0;
 }
 
-static int try_lcs(struct histindex *index, xdfenv_t *xe, struct region *lcs, size_t b_ptr,
+static int try_lcs(struct histindex *index, struct IVec_usize *mph1, struct IVec_usize *mph2, struct region *lcs, size_t b_ptr,
 	size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	size_t b_next = b_ptr + 1;
-	struct record *rec = index->record.ptr[TABLE_HASH(xe, 2, b_ptr, index->mask)];
+	struct record *rec = index->record.ptr[TABLE_HASH(2, b_ptr, index->mask)];
 	size_t as, ae, bs, be, np, rc;
 	bool should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->count > index->count) {
 			if (!index->has_common)
-				index->has_common = MPH(xe, 1, rec->ptr) == MPH(xe, 2, b_ptr);
+				index->has_common = MPH(1, rec->ptr) == MPH(2, b_ptr);
 			continue;
 		}
 
 		as = rec->ptr;
-		if (MPH(xe, 1, as) != MPH(xe, 2, b_ptr))
+		if (MPH(1, as) != MPH(2, b_ptr))
 			continue;
 
 		index->has_common = 1;
@@ -165,14 +167,14 @@ static int try_lcs(struct histindex *index, xdfenv_t *xe, struct region *lcs, si
 			rc = rec->count;
 
 			while (line1 < as && line2 < bs
-				&& MPH(xe, 1, as - 1) == MPH(xe, 2, bs - 1)) {
+				&& MPH(1, as - 1) == MPH(2, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc)
 					rc = XDL_MIN(rc, LINE_MAP(index, as)->count);
 			}
 			while (ae < LINE_END(1) && be < LINE_END(2)
-				&& MPH(xe, 1, ae + 1) == MPH(xe, 2, be + 1)) {
+				&& MPH(1, ae + 1) == MPH(2, be + 1)) {
 				ae++;
 				be++;
 				if (1 < rc)
@@ -236,8 +238,8 @@ static int histindex_init(struct histindex *index, size_t line1, size_t count1)
 	return 0;
 }
 
-static int find_lcs(xdfenv_t *env,
-		    struct region *lcs,
+static int find_lcs(xdfenv_t *env, struct region *lcs,
+		    struct IVec_usize *mph1, struct IVec_usize *mph2,
 		    size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	size_t b_ptr;
@@ -246,13 +248,13 @@ static int find_lcs(xdfenv_t *env,
 
 	histindex_init(&index, line1, count1);
 
-	if (scanA(&index, env, line1, count1))
+	if (scanA(&index, env, mph1, line1, count1))
 		goto cleanup;
 
 	index.count = MAX_CHAIN_LENGTH + 1;
 
 	for (b_ptr = line2; b_ptr <= LINE_END(2); )
-		b_ptr = try_lcs(&index, env, lcs, b_ptr, line1, count1, line2, count2);
+		b_ptr = try_lcs(&index, mph1, mph2, lcs, b_ptr, line1, count1, line2, count2);
 
 	if (index.has_common && MAX_CHAIN_LENGTH < index.count)
 		ret = 1;
@@ -265,6 +267,7 @@ cleanup:
 }
 
 static int histogram_diff(uint64_t flags, xdfenv_t *env,
+	struct IVec_usize *mph1, struct IVec_usize *mph2,
 	size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	struct region lcs;
@@ -287,7 +290,7 @@ redo:
 	}
 
 	memset(&lcs, 0, sizeof(lcs));
-	lcs_found = find_lcs(env, &lcs, line1, count1, line2, count2);
+	lcs_found = find_lcs(env, &lcs, mph1, mph2, line1, count1, line2, count2);
 	if (lcs_found < 0)
 		goto out;
 	else if (lcs_found)
@@ -300,7 +303,7 @@ redo:
 				env->xdf2.changed.ptr[line2++ - 1] = true;
 			result = 0;
 		} else {
-			result = histogram_diff(flags, env,
+			result = histogram_diff(flags, env, mph1, mph2,
 						line1, lcs.begin1 - line1,
 						line2, lcs.begin2 - line2);
 			if (result)
@@ -322,13 +325,13 @@ out:
 	return result;
 }
 
-int xdl_do_histogram_diff(xdfenv_t *env, uint64_t flags)
+int xdl_do_histogram_diff(xdfenv_t *env, struct IVec_usize *mph1, struct IVec_usize *mph2, uint64_t flags)
 {
 	size_t start = ONE_INDEXED + env->delta_start;
 	size_t end1 = ONE_INDEXED + env->xdf1.record.length - env->delta_end;
 	size_t end2 = ONE_INDEXED + env->xdf2.record.length - env->delta_end;
 
-	return histogram_diff(flags, env,
+	return histogram_diff(flags, env, mph1, mph2,
 		start, end1 - start,
 		start, end2 - start);
 }

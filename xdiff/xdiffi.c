@@ -575,7 +575,10 @@ int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	}
 
 	if (XDF_DIFF_ALG(xpp->flags) == XDF_HISTOGRAM_DIFF) {
-		res = xdl_do_histogram_diff(xe, xpp->flags);
+		res = xdl_do_histogram_diff(xe,
+			&xe->xdf1.minimal_perfect_hash,
+			&xe->xdf2.minimal_perfect_hash,
+			xpp->flags);
 		goto out;
 	}
 
