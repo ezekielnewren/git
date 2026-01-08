@@ -77,9 +77,6 @@ struct region {
 #define NEXT_PTR(index, line_number) \
 	(index->next_ptr.ptr[(line_number) - index->ptr_shift])
 
-#define CNT(index, ptr) \
-	((LINE_MAP(index, ptr))->count)
-
 #define MPH(env, s, l) \
 	(env->xdf##s.minimal_perfect_hash.ptr[l - ONE_INDEXED])
 
@@ -172,14 +169,14 @@ static int try_lcs(struct histindex *index, xdfenv_t *xe, struct region *lcs, si
 				as--;
 				bs--;
 				if (1 < rc)
-					rc = XDL_MIN(rc, CNT(index, as));
+					rc = XDL_MIN(rc, LINE_MAP(index, as)->count);
 			}
 			while (ae < LINE_END(1) && be < LINE_END(2)
 				&& MPH(xe, 1, ae + 1) == MPH(xe, 2, be + 1)) {
 				ae++;
 				be++;
 				if (1 < rc)
-					rc = XDL_MIN(rc, CNT(index, ae));
+					rc = XDL_MIN(rc, LINE_MAP(index, ae)->count);
 			}
 
 			if (b_next <= be)
