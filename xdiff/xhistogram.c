@@ -53,10 +53,12 @@ struct record {
 	struct record *next;
 };
 
+DEFINE_IVEC_TYPE(struct record, record);
+
 struct histindex {
 	struct record **records;  /* an occurrence */
 	struct record **line_map; /* map of line to record chain */
-	chastore_t rcha;
+	struct IVec_record record_storage;
 	size_t *next_ptrs;
 	size_t table_bits,
 	       records_size,
@@ -129,8 +131,9 @@ static int scanA(struct histindex *index, size_t line1, size_t count1)
 		 * This is the first time we have ever seen this particular
 		 * element in the sequence. Construct a new chain for it.
 		 */
-		if (!(rec = xdl_cha_alloc(&index->rcha)))
-			return -1;
+		if (index->record_storage.capacity == 0)
+			ivec_reserve_exact(&index->record_storage, index->env->mph_size);
+		rec = &index->record_storage.ptr[index->record_storage.length++];
 		rec->ptr = ptr;
 		rec->cnt = 1;
 		rec->next = *rec_chain;
@@ -221,20 +224,19 @@ static inline void free_index(struct histindex *index)
 {
 	xdl_free(index->records);
 	xdl_free(index->line_map);
+	ivec_free(&index->record_storage);
 	xdl_free(index->next_ptrs);
-	xdl_cha_free(&index->rcha);
 }
 
 static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, size_t count1)
 {
 	memset(index, 0, sizeof(struct histindex));
+	IVEC_INIT(index->record_storage);
 
 	index->env = env;
 
 	index->records = NULL;
 	index->line_map = NULL;
-	/* in case of early xdl_cha_free() */
-	index->rcha.head = NULL;
 
 	index->table_bits = xdl_hashbits(count1);
 	index->records_size = 1 << index->table_bits;
@@ -246,10 +248,6 @@ static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, 
 		goto abort;
 
 	if (!XDL_CALLOC_ARRAY(index->next_ptrs, index->line_map_size))
-		goto abort;
-
-	/* lines / 4 + 1 comes from xprepare.c:xdl_prepare_ctx() */
-	if (xdl_cha_init(&index->rcha, sizeof(struct record), count1 / 4 + 1) < 0)
 		goto abort;
 
 	index->ptr_shift = line1;
