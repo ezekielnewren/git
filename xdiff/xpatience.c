@@ -46,7 +46,7 @@
  * second file.
  */
 struct hashmap {
-	int nr, alloc;
+	size_t nr, alloc;
 	struct entry {
 		size_t minimal_perfect_hash;
 		/*
@@ -54,7 +54,7 @@ struct hashmap {
 		 * line2 is NON_UNIQUE if the line is not unique
 		 * in either the first or the second file.
 		 */
-		unsigned long line1, line2;
+		size_t line1, line2;
 		/*
 		 * "next" & "previous" are used for the longest common
 		 * sequence;
@@ -66,18 +66,17 @@ struct hashmap {
 		 * If 1, this entry can serve as an anchor. See
 		 * Documentation/diff-options.adoc for more information.
 		 */
-		unsigned anchor : 1;
+		bool anchor : true;
 	} *entries, *first, *last;
 	/* were common records found? */
-	unsigned long has_matches;
+	bool has_matches;
 	xdfenv_t *env;
 	xpparam_t const *xpp;
 };
 
 static int is_anchor(xpparam_t const *xpp, const char *line)
 {
-	size_t i;
-	for (i = 0; i < xpp->anchors_nr; i++) {
+	for (size_t i = 0; i < xpp->anchors_nr; i++) {
 		if (!strncmp(line, xpp->anchors[i], strlen(xpp->anchors[i])))
 			return 1;
 	}
@@ -85,8 +84,8 @@ static int is_anchor(xpparam_t const *xpp, const char *line)
 }
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
-static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
-			  int pass)
+static void insert_record(xpparam_t const *xpp, size_t line, struct hashmap *map,
+			  size_t pass)
 {
 	size_t *mph_vec = pass == 1 ?
 		map->env->xdf1.minimal_perfect_hash.ptr : map->env->xdf2.minimal_perfect_hash.ptr;
@@ -101,7 +100,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 	 * So we multiply ha by 2 in the hope that the hashing was
 	 * "unique enough".
 	 */
-	int index = (int)((mph << 1) % map->alloc);
+	size_t index = (mph << 1) % map->alloc;
 
 	while (map->entries[index].line1) {
 		if (map->entries[index].minimal_perfect_hash != mph) {
@@ -110,7 +109,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
 			continue;
 		}
 		if (pass == 2)
-			map->has_matches = 1;
+			map->has_matches = true;
 		if (pass == 1 || map->entries[index].line2)
 			map->entries[index].line2 = NON_UNIQUE;
 		else
@@ -141,7 +140,7 @@ static void insert_record(xpparam_t const *xpp, int line, struct hashmap *map,
  */
 static int fill_hashmap(xpparam_t const *xpp, xdfenv_t *env,
 		struct hashmap *result,
-		int line1, int count1, int line2, int count2)
+		size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	result->xpp = xpp;
 	result->env = env;
@@ -166,13 +165,13 @@ static int fill_hashmap(xpparam_t const *xpp, xdfenv_t *env,
  * Find the longest sequence with a smaller last element (meaning a smaller
  * line2, as we construct the sequence with entries ordered by line1).
  */
-static int binary_search(struct entry **sequence, int longest,
+static ptrdiff_t binary_search(struct entry **sequence, ptrdiff_t longest,
 		struct entry *entry)
 {
-	int left = -1, right = longest;
+	ptrdiff_t left = -1, right = longest;
 
 	while (left + 1 < right) {
-		int middle = left + (right - left) / 2;
+		ptrdiff_t middle = left + (right - left) / 2;
 		/* by construction, no two entries can be equal */
 		if (sequence[middle]->line2 > entry->line2)
 			right = middle;
@@ -195,7 +194,7 @@ static int binary_search(struct entry **sequence, int longest,
 static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 {
 	struct entry **sequence;
-	int longest = 0, i;
+	ptrdiff_t longest = 0, i;
 	struct entry *entry;
 
 	/*
@@ -203,7 +202,7 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	 * Therefore, overriding entries before this has no effect, so
 	 * do not do that either.
 	 */
-	int anchor_i = -1;
+	ptrdiff_t anchor_i = -1;
 
 	if (!XDL_ALLOC_ARRAY(sequence, map->nr))
 		return -1;
@@ -247,7 +246,7 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	return 0;
 }
 
-static int match(struct hashmap *map, int line1, int line2)
+static int match(struct hashmap *map, size_t line1, size_t line2)
 {
 	size_t mph1 = map->env->xdf1.minimal_perfect_hash.ptr[line1 - 1];
 	size_t mph2 = map->env->xdf2.minimal_perfect_hash.ptr[line2 - 1];
@@ -255,13 +254,13 @@ static int match(struct hashmap *map, int line1, int line2)
 }
 
 static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
-		int line1, int count1, int line2, int count2);
+		size_t line1, size_t count1, size_t line2, size_t count2);
 
 static int walk_common_sequence(struct hashmap *map, struct entry *first,
-		int line1, int count1, int line2, int count2)
+		size_t line1, size_t count1, size_t line2, size_t count2)
 {
-	int end1 = line1 + count1, end2 = line2 + count2;
-	int next1, next2;
+	size_t end1 = line1 + count1, end2 = line2 + count2;
+	size_t next1, next2;
 
 	for (;;) {
 		/* Try to grow the line ranges of common lines */
@@ -313,7 +312,7 @@ static int walk_common_sequence(struct hashmap *map, struct entry *first,
  * This function assumes that env was prepared with xdl_prepare_env().
  */
 static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
-		int line1, int count1, int line2, int count2)
+		size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	struct hashmap map;
 	struct entry *first;
