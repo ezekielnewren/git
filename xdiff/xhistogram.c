@@ -57,15 +57,12 @@ DEFINE_IVEC_TYPE(struct record, record);
 DEFINE_IVEC_TYPE(struct record*, record_ptr);
 
 struct histindex {
-	struct IVec_record_ptr record; /* an occurrence */
-	struct record **line_map;      /* map of line to record chain */
+	struct IVec_record_ptr record;   /* an occurrence */
+	struct IVec_record_ptr line_map; /* map of line to record chain */
 	struct IVec_record record_storage;
 	size_t *next_ptrs;
-	size_t table_bits,
-	       line_map_size;
-
+	size_t table_bits;
 	size_t ptr_shift;
-
 	size_t cnt;
 	bool has_common;
 
@@ -77,7 +74,7 @@ struct region {
 	size_t begin2, end2;
 };
 
-#define LINE_MAP(i, a) (i->line_map[(a) - i->ptr_shift])
+#define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
 
 #define NEXT_PTR(index, ptr) \
 	(index->next_ptrs[(ptr) - index->ptr_shift])
@@ -223,7 +220,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
 static inline void free_index(struct histindex *index)
 {
 	ivec_free(&index->record);
-	xdl_free(index->line_map);
+	ivec_free(&index->line_map);
 	ivec_free(&index->record_storage);
 	xdl_free(index->next_ptrs);
 }
@@ -232,20 +229,17 @@ static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, 
 {
 	memset(index, 0, sizeof(struct histindex));
 	IVEC_INIT(index->record);
+	IVEC_INIT(index->line_map);
 	IVEC_INIT(index->record_storage);
 
 	index->env = env;
 
-	index->line_map = NULL;
-
 	index->table_bits = xdl_hashbits(count1);
 	ivec_zero(&index->record, 1 << index->table_bits);
 
-	index->line_map_size = count1;
-	if (!XDL_CALLOC_ARRAY(index->line_map, index->line_map_size))
-		goto abort;
+	ivec_zero(&index->line_map, count1);
 
-	if (!XDL_CALLOC_ARRAY(index->next_ptrs, index->line_map_size))
+	if (!XDL_CALLOC_ARRAY(index->next_ptrs, count1))
 		goto abort;
 
 	index->ptr_shift = line1;
