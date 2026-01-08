@@ -60,7 +60,7 @@ struct histindex {
 	struct IVec_record_ptr record;   /* an occurrence */
 	struct IVec_record_ptr line_map; /* map of line to record chain */
 	struct IVec_record record_storage;
-	size_t *next_ptrs;
+	struct IVec_usize next_ptr;
 	size_t table_bits;
 	size_t ptr_shift;
 	size_t cnt;
@@ -76,8 +76,8 @@ struct region {
 
 #define LINE_MAP(i, a) (i->line_map.ptr[(a) - i->ptr_shift])
 
-#define NEXT_PTR(index, ptr) \
-	(index->next_ptrs[(ptr) - index->ptr_shift])
+#define NEXT_PTR(index, line_number) \
+	(index->next_ptr.ptr[(line_number) - index->ptr_shift])
 
 #define CNT(index, ptr) \
 	((LINE_MAP(index, ptr))->cnt)
@@ -222,7 +222,7 @@ static inline void free_index(struct histindex *index)
 	ivec_free(&index->record);
 	ivec_free(&index->line_map);
 	ivec_free(&index->record_storage);
-	xdl_free(index->next_ptrs);
+	ivec_free(&index->next_ptr);
 }
 
 static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, size_t count1)
@@ -231,6 +231,7 @@ static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, 
 	IVEC_INIT(index->record);
 	IVEC_INIT(index->line_map);
 	IVEC_INIT(index->record_storage);
+	IVEC_INIT(index->next_ptr);
 
 	index->env = env;
 
@@ -238,15 +239,11 @@ static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, 
 	ivec_zero(&index->record, 1 << index->table_bits);
 
 	ivec_zero(&index->line_map, count1);
-
-	if (!XDL_CALLOC_ARRAY(index->next_ptrs, count1))
-		goto abort;
+	ivec_zero(&index->next_ptr, count1);
 
 	index->ptr_shift = line1;
 
 	return 0;
-abort:
-	return -1;
 }
 
 static int find_lcs(xdfenv_t *env,
@@ -257,8 +254,7 @@ static int find_lcs(xdfenv_t *env,
 	int ret = -1;
 	struct histindex index;
 
-	if (histindex_init(&index, env, line1, count1))
-		goto cleanup;
+	histindex_init(&index, env, line1, count1);
 
 	if (scanA(&index, line1, count1))
 		goto cleanup;
