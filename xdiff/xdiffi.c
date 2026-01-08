@@ -274,6 +274,7 @@ static long xdl_split(struct IVec_usize *mph1, long off1, long lim1, struct IVec
  */
 int xdl_recs_cmp(struct IVec_usize *mph1, long off1, long lim1, struct IVec_usize *ri1,
 		 struct IVec_usize *mph2, long off2, long lim2, struct IVec_usize *ri2,
+		 struct IVec_bool *changed1, struct IVec_bool *changed2,
 		 xdfenv_t *xe, long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv) {
 
 	/*
@@ -288,10 +289,10 @@ int xdl_recs_cmp(struct IVec_usize *mph1, long off1, long lim1, struct IVec_usiz
 	 */
 	if (off1 == lim1) {
 		for (; off2 < lim2; off2++)
-			xe->xdf2.changed.ptr[ri2->ptr[off2]] = true;
+			changed2->ptr[ri2->ptr[off2]] = true;
 	} else if (off2 == lim2) {
 		for (; off1 < lim1; off1++)
-			xe->xdf1.changed.ptr[ri1->ptr[off1]] = true;
+			changed1->ptr[ri1->ptr[off1]] = true;
 	} else {
 		xdpsplit_t spl;
 		spl.i1 = spl.i2 = 0;
@@ -309,9 +310,9 @@ int xdl_recs_cmp(struct IVec_usize *mph1, long off1, long lim1, struct IVec_usiz
 		 * ... et Impera.
 		 */
 		if (xdl_recs_cmp(mph1, off1, spl.i1, ri1, mph2, off2, spl.i2, ri2,
-				 xe, kvdf, kvdb, spl.min_lo, xenv) < 0 ||
+				 changed1, changed2, xe, kvdf, kvdb, spl.min_lo, xenv) < 0 ||
 		    xdl_recs_cmp(mph1, spl.i1, lim1, ri1, mph2, spl.i2, lim2, ri2,
-				 xe, kvdf, kvdb, spl.min_hi, xenv) < 0) {
+				 changed1, changed2, xe, kvdf, kvdb, spl.min_hi, xenv) < 0) {
 
 			return -1;
 		}
@@ -401,6 +402,7 @@ DEFINE_IVEC_TYPE(struct xoccurrence, xoccurrence);
  */
 static int xdl_cleanup_records(xdfenv_t *xe,
 	struct IVec_usize *mph1_, struct IVec_usize *mph2_,
+	struct IVec_bool *changed1, struct IVec_bool *changed2,
 	struct IVec_usize *reference_index1, struct IVec_usize *reference_index2,
 	uint64_t flags) {
 	size_t mlim1, mlim2;
@@ -482,7 +484,7 @@ static int xdl_cleanup_records(xdfenv_t *xe,
 			ivec_push_unsafe(reference_index1, i);
 			/* changed[i] remains false, i.e. keep */
 		} else if (action1.ptr[i] == DISCARD) {
-			xe->xdf1.changed.ptr[i] = true;
+			changed1->ptr[i] = true;
 			/* i.e. discard */
 		} else {
 			BUG("Illegal state for action1.ptr[i]");
@@ -501,7 +503,7 @@ static int xdl_cleanup_records(xdfenv_t *xe,
 			ivec_push_unsafe(reference_index2, i);
 			/* changed[i] remains false, i.e. keep */
 		} else if (action2.ptr[i] == DISCARD) {
-			xe->xdf2.changed.ptr[i] = true;
+			changed2->ptr[i] = true;
 			/* i.e. discard */
 		} else {
 			BUG("Illegal state for action2.ptr[i]");
@@ -530,7 +532,7 @@ int xdl_do_classic_diff(xdfenv_t *xe, struct IVec_usize *mph1, struct IVec_usize
 	ivec_reserve_exact(&reference_index1, mph1->length);
 	ivec_reserve_exact(&reference_index2, mph2->length);
 
-	xdl_cleanup_records(xe, mph1, mph2, &reference_index1, &reference_index2, flags);
+	xdl_cleanup_records(xe, mph1, mph2, &xe->xdf1.changed, &xe->xdf2.changed, &reference_index1, &reference_index2, flags);
 
 	/*
 	 * Allocate and setup K vectors to be used by the differential
@@ -556,7 +558,7 @@ int xdl_do_classic_diff(xdfenv_t *xe, struct IVec_usize *mph1, struct IVec_usize
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 	res = xdl_recs_cmp(mph1, 0, reference_index1.length, &reference_index1, mph2, 0, reference_index2.length, &reference_index2,
-			   xe, kvdf, kvdb, (flags & XDF_NEED_MINIMAL) != 0,
+			   &xe->xdf1.changed, &xe->xdf2.changed, xe, kvdf, kvdb, (flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 
 	xdl_free(kvd);
@@ -959,13 +961,13 @@ static inline int group_next(struct IVec_bool *changed, struct xdlgroup *g)
  * Move g to describe the previous (possibly empty) group in xdf and return 0.
  * If g is already at the beginning of the file, do nothing and return -1.
  */
-static inline int group_previous(xdfile_t *xdf, struct xdlgroup *g)
+static inline int group_previous(struct IVec_bool *changed, struct xdlgroup *g)
 {
 	if (g->start == 0)
 		return -1;
 
 	g->end = g->start - 1;
-	for (g->start = g->end; g->start > 0 && xdf->changed.ptr[g->start - 1]; g->start--)
+	for (g->start = g->end; g->start > 0 && changed->ptr[g->start - 1]; g->start--)
 		;
 
 	return 0;
@@ -1051,7 +1053,7 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 			/* Shift the group backward as much as possible: */
 			while (!group_slide_up(&xdf->minimal_perfect_hash, &xdf->changed, &g))
-				if (group_previous(xdfo, &go))
+				if (group_previous(&xdfo->changed, &go))
 					BUG("group sync broken sliding up");
 
 			/*
@@ -1094,7 +1096,7 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			while (go.end == go.start) {
 				if (group_slide_up(&xdf->minimal_perfect_hash, &xdf->changed, &g))
 					BUG("match disappeared");
-				if (group_previous(xdfo, &go))
+				if (group_previous(&xdfo->changed, &go))
 					BUG("group sync broken sliding to match");
 			}
 		} else if (flags & XDF_INDENT_HEURISTIC) {
@@ -1137,7 +1139,7 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			while (g.end > best_shift) {
 				if (group_slide_up(&xdf->minimal_perfect_hash, &xdf->changed, &g))
 					BUG("best shift unreached");
-				if (group_previous(xdfo, &go))
+				if (group_previous(&xdfo->changed, &go))
 					BUG("group sync broken sliding to blank line");
 			}
 		}

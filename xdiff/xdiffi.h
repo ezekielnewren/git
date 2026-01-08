@@ -41,6 +41,7 @@ typedef struct s_xdchange {
 
 int xdl_recs_cmp(struct IVec_usize *mph1, long off1, long lim1, struct IVec_usize *ri1,
 		 struct IVec_usize *mph2, long off2, long lim2, struct IVec_usize *ri2,
+		 struct IVec_bool *changed1, struct IVec_bool *changed2,
 		 xdfenv_t *xe, long *kvdf, long *kvdb, int need_min, xdalgoenv_t *xenv);
 int xdl_do_classic_diff(xdfenv_t *xe, struct IVec_usize *mph1, struct IVec_usize *mph2, uint64_t flags);
 int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
