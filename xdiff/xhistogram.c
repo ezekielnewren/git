@@ -281,11 +281,11 @@ redo:
 
 	if (!count1) {
 		while(count2--)
-			env->xdf2.changed.ptr[line2++ - 1] = true;
+			env->changed2.ptr[line2++ - 1] = true;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			env->xdf1.changed.ptr[line1++ - 1] = true;
+			env->changed1.ptr[line1++ - 1] = true;
 		return 0;
 	}
 
@@ -298,9 +298,9 @@ redo:
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
-				env->xdf1.changed.ptr[line1++ - 1] = true;
+				env->changed1.ptr[line1++ - 1] = true;
 			while (count2--)
-				env->xdf2.changed.ptr[line2++ - 1] = true;
+				env->changed2.ptr[line2++ - 1] = true;
 			result = 0;
 		} else {
 			result = histogram_diff(flags, env, mph1, mph2,

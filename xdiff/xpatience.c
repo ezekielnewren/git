@@ -320,11 +320,11 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 	/* trivial case: one side is empty */
 	if (!count1) {
 		while(count2--)
-			env->xdf2.changed.ptr[line2++ - 1] = true;
+			env->changed2.ptr[line2++ - 1] = true;
 		return 0;
 	} else if (!count2) {
 		while(count1--)
-			env->xdf1.changed.ptr[line1++ - 1] = true;
+			env->changed1.ptr[line1++ - 1] = true;
 		return 0;
 	}
 
@@ -336,9 +336,9 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 	/* are there any matching lines at all? */
 	if (!map.has_matches) {
 		while(count1--)
-			env->xdf1.changed.ptr[line1++ - 1] = true;
+			env->changed1.ptr[line1++ - 1] = true;
 		while(count2--)
-			env->xdf2.changed.ptr[line2++ - 1] = true;
+			env->changed2.ptr[line2++ - 1] = true;
 		xdl_free(map.entries);
 		return 0;
 	}

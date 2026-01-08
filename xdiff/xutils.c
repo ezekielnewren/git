@@ -404,8 +404,8 @@ int xdl_fall_back_diff(xdfenv_t *diff_env, uint64_t flags,
 	xdl_prepare_env(&subfile1, &subfile2, &env, flags);
 	xdl_do_classic_diff(&env, mph1, mph2, flags);
 
-	memcpy(diff_env->xdf1.changed.ptr + line1 - 1, env.xdf1.changed.ptr, count1);
-	memcpy(diff_env->xdf2.changed.ptr + line2 - 1, env.xdf2.changed.ptr, count2);
+	memcpy(diff_env->changed1.ptr + line1 - 1, env.changed1.ptr, count1);
+	memcpy(diff_env->changed2.ptr + line2 - 1, env.changed2.ptr, count2);
 
 	xdl_free_env(&env);
 

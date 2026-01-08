@@ -389,9 +389,9 @@ static int xdl_refine_conflicts(xdfenv_t *xe1, xdfenv_t *xe2, xdmerge_t *m,
 			+ xe2->xdf2.record.ptr[m->i2 + m->chg2 - 1].size - t2.ptr;
 		if (xdl_do_diff(&t1, &t2, xpp, &xe) < 0)
 			return -1;
-		if (xdl_change_compact(&xe.xdf1, &xe.xdf1.changed, &xe.xdf2.changed, xpp->flags) < 0 ||
-		    xdl_change_compact(&xe.xdf2, &xe.xdf2.changed, &xe.xdf1.changed, xpp->flags) < 0 ||
-		    xdl_build_script(&xe.xdf1.changed, &xe.xdf2.changed, &xscr) < 0) {
+		if (xdl_change_compact(&xe.xdf1, &xe.changed1, &xe.changed2, xpp->flags) < 0 ||
+		    xdl_change_compact(&xe.xdf2, &xe.changed2, &xe.changed1, xpp->flags) < 0 ||
+		    xdl_build_script(&xe.changed1, &xe.changed2, &xscr) < 0) {
 			xdl_free_env(&xe);
 			return -1;
 		}
@@ -698,14 +698,14 @@ int xdl_merge(mmfile_t *orig, mmfile_t *mf1, mmfile_t *mf2,
 	if (xdl_do_diff(orig, mf2, xpp, &xe2) < 0)
 		goto free_xe1; /* avoid double free of xe2 */
 
-	if (xdl_change_compact(&xe1.xdf1, &xe1.xdf1.changed, &xe1.xdf2.changed, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe1.xdf2, &xe1.xdf2.changed, &xe1.xdf1.changed, xpp->flags) < 0 ||
-	    xdl_build_script(&xe1.xdf1.changed, &xe1.xdf2.changed, &xscr1) < 0)
+	if (xdl_change_compact(&xe1.xdf1, &xe1.changed1, &xe1.changed2, xpp->flags) < 0 ||
+	    xdl_change_compact(&xe1.xdf2, &xe1.changed2, &xe1.changed1, xpp->flags) < 0 ||
+	    xdl_build_script(&xe1.changed1, &xe1.changed2, &xscr1) < 0)
 		goto out;
 
-	if (xdl_change_compact(&xe2.xdf1, &xe2.xdf1.changed, &xe2.xdf2.changed, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe2.xdf2, &xe2.xdf2.changed, &xe2.xdf1.changed, xpp->flags) < 0 ||
-	    xdl_build_script(&xe2.xdf1.changed, &xe2.xdf2.changed, &xscr2) < 0)
+	if (xdl_change_compact(&xe2.xdf1, &xe2.changed1, &xe2.changed2, xpp->flags) < 0 ||
+	    xdl_change_compact(&xe2.xdf2, &xe2.changed2, &xe2.changed1, xpp->flags) < 0 ||
+	    xdl_build_script(&xe2.changed1, &xe2.changed2, &xscr2) < 0)
 		goto out;
 
 	if (!xscr1) {

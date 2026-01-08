@@ -49,11 +49,11 @@ DEFINE_IVEC_TYPE(xrecord_t, xrecord);
 typedef struct s_xdfile {
 	struct IVec_usize minimal_perfect_hash;
 	struct IVec_xrecord record;
-	struct IVec_bool changed;
 } xdfile_t;
 
 typedef struct s_xdfenv {
 	xdfile_t xdf1, xdf2;
+	struct IVec_bool changed1, changed2;
 	size_t delta_start, delta_end;
 	size_t mph_size;
 } xdfenv_t;

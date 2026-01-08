@@ -532,7 +532,7 @@ int xdl_do_classic_diff(xdfenv_t *xe, struct IVec_usize *mph1, struct IVec_usize
 	ivec_reserve_exact(&reference_index1, mph1->length);
 	ivec_reserve_exact(&reference_index2, mph2->length);
 
-	xdl_cleanup_records(xe, mph1, mph2, &xe->xdf1.changed, &xe->xdf2.changed, &reference_index1, &reference_index2, flags);
+	xdl_cleanup_records(xe, mph1, mph2, &xe->changed1, &xe->changed2, &reference_index1, &reference_index2, flags);
 
 	/*
 	 * Allocate and setup K vectors to be used by the differential
@@ -558,7 +558,7 @@ int xdl_do_classic_diff(xdfenv_t *xe, struct IVec_usize *mph1, struct IVec_usize
 	xenv.heur_min = XDL_HEUR_MIN_COST;
 
 	res = xdl_recs_cmp(mph1, 0, reference_index1.length, &reference_index1, mph2, 0, reference_index2.length, &reference_index2,
-			   &xe->xdf1.changed, &xe->xdf2.changed, xe, kvdf, kvdb, (flags & XDF_NEED_MINIMAL) != 0,
+			   &xe->changed1, &xe->changed2, xe, kvdf, kvdb, (flags & XDF_NEED_MINIMAL) != 0,
 			   &xenv);
 
 	xdl_free(kvd);
@@ -1282,9 +1282,9 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 		return -1;
 	}
-	if (xdl_change_compact(&xe.xdf1, &xe.xdf1.changed, &xe.xdf2.changed, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe.xdf2, &xe.xdf2.changed, &xe.xdf1.changed, xpp->flags) < 0 ||
-	    xdl_build_script(&xe.xdf1.changed, &xe.xdf2.changed, &xscr) < 0) {
+	if (xdl_change_compact(&xe.xdf1, &xe.changed1, &xe.changed2, xpp->flags) < 0 ||
+	    xdl_change_compact(&xe.xdf2, &xe.changed2, &xe.changed1, xpp->flags) < 0 ||
+	    xdl_build_script(&xe.changed1, &xe.changed2, &xscr) < 0) {
 
 		xdl_free_env(&xe);
 		return -1;

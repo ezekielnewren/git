@@ -94,7 +94,6 @@ static void xdl_free_ctx(xdfile_t *xdf)
 {
 	ivec_free(&xdf->minimal_perfect_hash);
 	ivec_free(&xdf->record);
-	ivec_free(&xdf->changed);
 }
 
 
@@ -105,7 +104,6 @@ static void xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 
 	IVEC_INIT(xdf->minimal_perfect_hash);
 	IVEC_INIT(xdf->record);
-	IVEC_INIT(xdf->changed);
 
 	if ((cur = blk = xdl_mmfile_first(mf, &bsize))) {
 		for (top = blk + bsize; cur < top; ) {
@@ -118,7 +116,6 @@ static void xdl_prepare_ctx(mmfile_t *mf, xdfile_t *xdf, uint64_t flags) {
 	}
 
 	ivec_reserve_exact(&xdf->minimal_perfect_hash, xdf->record.length);
-	ivec_zero(&xdf->changed, xdf->record.length);
 }
 
 
@@ -160,12 +157,17 @@ static void xdl_trim_ends(xdfenv_t *xe)
 int xdl_prepare_env(mmfile_t *mf1, mmfile_t *mf2, xdfenv_t *xe, uint64_t flags) {
 	xdlclassifier_t cf;
 
+	IVEC_INIT(xe->changed1);
+	IVEC_INIT(xe->changed2);
 	xe->delta_start = 0;
 	xe->delta_end = 0;
 
 	xdl_prepare_ctx(mf1, &xe->xdf1, flags);
 	xdl_prepare_ctx(mf2, &xe->xdf2, flags);
 	xdl_init_classifier(&cf, xe->xdf1.record.length + xe->xdf2.record.length, flags);
+
+	ivec_zero(&xe->changed1, xe->xdf1.record.length);
+	ivec_zero(&xe->changed2, xe->xdf2.record.length);
 
 	for (size_t i = 0; i < xe->xdf1.record.length; i++) {
 		xrecord_t *rec = &xe->xdf1.record.ptr[i];
