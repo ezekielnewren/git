@@ -61,7 +61,7 @@ struct histindex {
 	struct IVec_record_ptr line_map; /* map of line to record chain */
 	struct IVec_record record_storage;
 	struct IVec_usize next_ptr;
-	size_t table_bits;
+	size_t mask;
 	size_t ptr_shift;
 	size_t count;
 	bool has_common;
@@ -80,8 +80,8 @@ struct region {
 #define MPH(env, s, l) \
 	(env->xdf##s.minimal_perfect_hash.ptr[l - ONE_INDEXED])
 
-#define TABLE_HASH(env, side, line, bits) \
-	XDL_HASHLONG(MPH(env, side, line), bits)
+#define TABLE_HASH(env, side, line, mask) \
+	(MPH(env, side, line)&mask)
 
 static int scanA(struct histindex *index, xdfenv_t *xe, size_t line1, size_t count1)
 {
@@ -90,7 +90,7 @@ static int scanA(struct histindex *index, xdfenv_t *xe, size_t line1, size_t cou
 	struct record **rec_chain, *rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(xe, 1, ptr, index->table_bits);
+		tbl_idx = TABLE_HASH(xe, 1, ptr, index->mask);
 		rec_chain = &index->record.ptr[tbl_idx];
 		rec = *rec_chain;
 
@@ -140,7 +140,7 @@ static int try_lcs(struct histindex *index, xdfenv_t *xe, struct region *lcs, si
 	size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	size_t b_next = b_ptr + 1;
-	struct record *rec = index->record.ptr[TABLE_HASH(xe, 2, b_ptr, index->table_bits)];
+	struct record *rec = index->record.ptr[TABLE_HASH(xe, 2, b_ptr, index->mask)];
 	size_t as, ae, bs, be, np, rc;
 	bool should_break;
 
@@ -225,8 +225,8 @@ static int histindex_init(struct histindex *index, size_t line1, size_t count1)
 	IVEC_INIT(index->record_storage);
 	IVEC_INIT(index->next_ptr);
 
-	index->table_bits = xdl_hashbits(count1);
-	ivec_zero(&index->record, 1 << index->table_bits);
+	ivec_zero(&index->record, 1 << xdl_hashbits(count1));
+	index->mask = index->record.length - 1;
 
 	ivec_zero(&index->line_map, count1);
 	ivec_zero(&index->next_ptr, count1);
