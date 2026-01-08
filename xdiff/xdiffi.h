@@ -50,7 +50,7 @@ int xdl_build_script(xdfenv_t *xe, xdchange_t **xscr);
 void xdl_free_script(xdchange_t *xscr);
 int xdl_emit_diff(xdfenv_t *xe, xdchange_t *xscr, xdemitcb_t *ecb,
 		  xdemitconf_t const *xecfg);
-int xdl_do_patience_diff(xpparam_t const *xpp, xdfenv_t *env);
+int xdl_do_patience_diff(xpparam_t const *xpp, xdfenv_t *env, struct IVec_usize *mph1, struct IVec_usize *mph2);
 int xdl_do_histogram_diff(xdfenv_t *env, struct IVec_usize *mph1, struct IVec_usize *mph2, uint64_t flags);
 
 #endif /* #if !defined(XDIFFI_H) */

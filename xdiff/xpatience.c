@@ -40,6 +40,9 @@
  */
 
 #define NON_UNIQUE ULONG_MAX
+#define ONE_INDEXED 1
+#define MPH(s, l) \
+	(mph##s->ptr[l - ONE_INDEXED])
 
 /*
  * This is a hash mapping from line hash to line numbers in the first and
@@ -85,10 +88,9 @@ static int is_anchor(xpparam_t const *xpp, const char *line)
 
 /* The argument "pass" is 1 for the first file, 2 for the second. */
 static void insert_record(xpparam_t const *xpp, size_t line, struct hashmap *map,
-			  size_t pass)
+			  struct IVec_usize *mph1, struct IVec_usize *mph2, size_t pass)
 {
-	size_t *mph_vec = pass == 1 ?
-		map->env->xdf1.minimal_perfect_hash.ptr : map->env->xdf2.minimal_perfect_hash.ptr;
+	size_t *mph_vec = pass == 1 ? mph1->ptr : mph2->ptr;
 	size_t mph = mph_vec[line - 1];
 	/*
 	 * After xdl_prepare_env() (or more precisely, due to
@@ -140,6 +142,7 @@ static void insert_record(xpparam_t const *xpp, size_t line, struct hashmap *map
  */
 static int fill_hashmap(xpparam_t const *xpp, xdfenv_t *env,
 		struct hashmap *result,
+		struct IVec_usize *mph1, struct IVec_usize *mph2,
 		size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	result->xpp = xpp;
@@ -152,11 +155,11 @@ static int fill_hashmap(xpparam_t const *xpp, xdfenv_t *env,
 
 	/* First, fill with entries from the first file */
 	while (count1--)
-		insert_record(xpp, line1++, result, 1);
+		insert_record(xpp, line1++, result, mph1, mph2, 1);
 
 	/* Then search for matches in the second file */
 	while (count2--)
-		insert_record(xpp, line2++, result, 2);
+		insert_record(xpp, line2++, result, mph1, mph2, 2);
 
 	return 0;
 }
@@ -246,18 +249,13 @@ static int find_longest_common_sequence(struct hashmap *map, struct entry **res)
 	return 0;
 }
 
-static int match(struct hashmap *map, size_t line1, size_t line2)
-{
-	size_t mph1 = map->env->xdf1.minimal_perfect_hash.ptr[line1 - 1];
-	size_t mph2 = map->env->xdf2.minimal_perfect_hash.ptr[line2 - 1];
-	return mph1 == mph2;
-}
-
 static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
-		size_t line1, size_t count1, size_t line2, size_t count2);
+			 struct IVec_usize *mph1, struct IVec_usize *mph2,
+			 size_t line1, size_t count1, size_t line2, size_t count2);
 
 static int walk_common_sequence(struct hashmap *map, struct entry *first,
-		size_t line1, size_t count1, size_t line2, size_t count2)
+				struct IVec_usize *mph1, struct IVec_usize *mph2,
+				size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	size_t end1 = line1 + count1, end2 = line2 + count2;
 	size_t next1, next2;
@@ -268,7 +266,7 @@ static int walk_common_sequence(struct hashmap *map, struct entry *first,
 			next1 = first->line1;
 			next2 = first->line2;
 			while (next1 > line1 && next2 > line2 &&
-					match(map, next1 - 1, next2 - 1)) {
+					MPH(1, next1 - 1) == MPH(2, next2 - 1)) {
 				next1--;
 				next2--;
 			}
@@ -277,14 +275,14 @@ static int walk_common_sequence(struct hashmap *map, struct entry *first,
 			next2 = end2;
 		}
 		while (line1 < next1 && line2 < next2 &&
-				match(map, line1, line2)) {
+				MPH(1, line1) == MPH(2, line2)) {
 			line1++;
 			line2++;
 		}
 
 		/* Recurse */
 		if (next1 > line1 || next2 > line2) {
-			if (patience_diff(map->xpp, map->env,
+			if (patience_diff(map->xpp, map->env, mph1, mph2,
 					line1, next1 - line1,
 					line2, next2 - line2))
 				return -1;
@@ -312,7 +310,8 @@ static int walk_common_sequence(struct hashmap *map, struct entry *first,
  * This function assumes that env was prepared with xdl_prepare_env().
  */
 static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
-		size_t line1, size_t count1, size_t line2, size_t count2)
+			 struct IVec_usize *mph1, struct IVec_usize *mph2,
+			 size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	struct hashmap map;
 	struct entry *first;
@@ -330,7 +329,7 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 	}
 
 	memset(&map, 0, sizeof(map));
-	if (fill_hashmap(xpp, env, &map,
+	if (fill_hashmap(xpp, env, &map, mph1, mph2,
 			line1, count1, line2, count2))
 		return -1;
 
@@ -348,7 +347,7 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 	if (result)
 		goto out;
 	if (first)
-		result = walk_common_sequence(&map, first,
+		result = walk_common_sequence(&map, first, mph1, mph2,
 			line1, count1, line2, count2);
 	else
 		result = xdl_fall_back_diff(env, xpp->flags,
@@ -358,12 +357,12 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 	return result;
 }
 
-int xdl_do_patience_diff(xpparam_t const *xpp, xdfenv_t *env)
+int xdl_do_patience_diff(xpparam_t const *xpp, xdfenv_t *env, struct IVec_usize *mph1, struct IVec_usize *mph2)
 {
-	ptrdiff_t dend1 = env->xdf1.record.length - 1 - env->delta_end;
-	ptrdiff_t dend2 = env->xdf2.record.length - 1 - env->delta_end;
+	ptrdiff_t dend1 = mph1->length - 1 - env->delta_end;
+	ptrdiff_t dend2 = mph2->length - 1 - env->delta_end;
 
-	return patience_diff(xpp, env,
+	return patience_diff(xpp, env, mph1, mph2,
 		env->delta_start + 1, dend1 - env->delta_start + 1,
 		env->delta_start + 1, dend2 - env->delta_start + 1);
 }
