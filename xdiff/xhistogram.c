@@ -65,8 +65,6 @@ struct histindex {
 	size_t ptr_shift;
 	size_t count;
 	bool has_common;
-
-	xdfenv_t *env;
 };
 
 struct region {
@@ -85,26 +83,23 @@ struct region {
 #define MPH(env, s, l) \
 	(env->xdf##s.minimal_perfect_hash.ptr[l - ONE_INDEXED])
 
-#define CMP(i, s1, l1, s2, l2) \
-	(MPH(i->env, s1, l1) == MPH(i->env, s2, l2))
+#define TABLE_HASH(env, side, line, bits) \
+	XDL_HASHLONG(MPH(env, side, line), bits)
 
-#define TABLE_HASH(index, side, line) \
-	XDL_HASHLONG(MPH(index->env, side, line), index->table_bits)
-
-static int scanA(struct histindex *index, size_t line1, size_t count1)
+static int scanA(struct histindex *index, xdfenv_t *xe, size_t line1, size_t count1)
 {
 	size_t ptr, tbl_idx;
 	size_t chain_len;
 	struct record **rec_chain, *rec;
 
 	for (ptr = LINE_END(1); line1 <= ptr; ptr--) {
-		tbl_idx = TABLE_HASH(index, 1, ptr);
+		tbl_idx = TABLE_HASH(xe, 1, ptr, index->table_bits);
 		rec_chain = &index->record.ptr[tbl_idx];
 		rec = *rec_chain;
 
 		chain_len = 0;
 		while (rec) {
-			if (CMP(index, 1, rec->ptr, 1, ptr)) {
+			if (MPH(xe, 1, rec->ptr) == MPH(xe, 1, ptr)) {
 				/*
 				 * ptr is identical to another element. Insert
 				 * it onto the front of the existing element
@@ -129,7 +124,7 @@ static int scanA(struct histindex *index, size_t line1, size_t count1)
 		 * element in the sequence. Construct a new chain for it.
 		 */
 		if (index->record_storage.capacity == 0)
-			ivec_reserve_exact(&index->record_storage, index->env->mph_size);
+			ivec_reserve_exact(&index->record_storage, xe->mph_size);
 		rec = &index->record_storage.ptr[index->record_storage.length++];
 		rec->ptr = ptr;
 		rec->count = 1;
@@ -144,23 +139,23 @@ continue_scan:
 	return 0;
 }
 
-static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
+static int try_lcs(struct histindex *index, xdfenv_t *xe, struct region *lcs, size_t b_ptr,
 	size_t line1, size_t count1, size_t line2, size_t count2)
 {
 	size_t b_next = b_ptr + 1;
-	struct record *rec = index->record.ptr[TABLE_HASH(index, 2, b_ptr)];
+	struct record *rec = index->record.ptr[TABLE_HASH(xe, 2, b_ptr, index->table_bits)];
 	size_t as, ae, bs, be, np, rc;
 	bool should_break;
 
 	for (; rec; rec = rec->next) {
 		if (rec->count > index->count) {
 			if (!index->has_common)
-				index->has_common = CMP(index, 1, rec->ptr, 2, b_ptr);
+				index->has_common = MPH(xe, 1, rec->ptr) == MPH(xe, 2, b_ptr);
 			continue;
 		}
 
 		as = rec->ptr;
-		if (!CMP(index, 1, as, 2, b_ptr))
+		if (MPH(xe, 1, as) != MPH(xe, 2, b_ptr))
 			continue;
 
 		index->has_common = 1;
@@ -173,14 +168,14 @@ static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
 			rc = rec->count;
 
 			while (line1 < as && line2 < bs
-				&& CMP(index, 1, as - 1, 2, bs - 1)) {
+				&& MPH(xe, 1, as - 1) == MPH(xe, 2, bs - 1)) {
 				as--;
 				bs--;
 				if (1 < rc)
 					rc = XDL_MIN(rc, CNT(index, as));
 			}
 			while (ae < LINE_END(1) && be < LINE_END(2)
-				&& CMP(index, 1, ae + 1, 2, be + 1)) {
+				&& MPH(xe, 1, ae + 1) == MPH(xe, 2, be + 1)) {
 				ae++;
 				be++;
 				if (1 < rc)
@@ -225,15 +220,13 @@ static inline void free_index(struct histindex *index)
 	ivec_free(&index->next_ptr);
 }
 
-static int histindex_init(struct histindex *index, xdfenv_t *env, size_t line1, size_t count1)
+static int histindex_init(struct histindex *index, size_t line1, size_t count1)
 {
 	memset(index, 0, sizeof(struct histindex));
 	IVEC_INIT(index->record);
 	IVEC_INIT(index->line_map);
 	IVEC_INIT(index->record_storage);
 	IVEC_INIT(index->next_ptr);
-
-	index->env = env;
 
 	index->table_bits = xdl_hashbits(count1);
 	ivec_zero(&index->record, 1 << index->table_bits);
@@ -254,15 +247,15 @@ static int find_lcs(xdfenv_t *env,
 	int ret = -1;
 	struct histindex index;
 
-	histindex_init(&index, env, line1, count1);
+	histindex_init(&index, line1, count1);
 
-	if (scanA(&index, line1, count1))
+	if (scanA(&index, env, line1, count1))
 		goto cleanup;
 
 	index.count = MAX_CHAIN_LENGTH + 1;
 
 	for (b_ptr = line2; b_ptr <= LINE_END(2); )
-		b_ptr = try_lcs(&index, lcs, b_ptr, line1, count1, line2, count2);
+		b_ptr = try_lcs(&index, env, lcs, b_ptr, line1, count1, line2, count2);
 
 	if (index.has_common && MAX_CHAIN_LENGTH < index.count)
 		ret = 1;
