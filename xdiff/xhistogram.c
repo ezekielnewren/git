@@ -49,7 +49,7 @@
 #define ONE_INDEXED 1
 
 struct record {
-	size_t ptr, cnt;
+	size_t ptr, count;
 	struct record *next;
 };
 
@@ -63,7 +63,7 @@ struct histindex {
 	struct IVec_usize next_ptr;
 	size_t table_bits;
 	size_t ptr_shift;
-	size_t cnt;
+	size_t count;
 	bool has_common;
 
 	xdfenv_t *env;
@@ -80,7 +80,7 @@ struct region {
 	(index->next_ptr.ptr[(line_number) - index->ptr_shift])
 
 #define CNT(index, ptr) \
-	((LINE_MAP(index, ptr))->cnt)
+	((LINE_MAP(index, ptr))->count)
 
 #define MPH(env, s, l) \
 	(env->xdf##s.minimal_perfect_hash.ptr[l - ONE_INDEXED])
@@ -112,7 +112,7 @@ static int scanA(struct histindex *index, size_t line1, size_t count1)
 				 */
 				NEXT_PTR(index, ptr) = rec->ptr;
 				rec->ptr = ptr;
-				rec->cnt += 1;
+				rec->count += 1;
 				LINE_MAP(index, ptr) = rec;
 				goto continue_scan;
 			}
@@ -132,7 +132,7 @@ static int scanA(struct histindex *index, size_t line1, size_t count1)
 			ivec_reserve_exact(&index->record_storage, index->env->mph_size);
 		rec = &index->record_storage.ptr[index->record_storage.length++];
 		rec->ptr = ptr;
-		rec->cnt = 1;
+		rec->count = 1;
 		rec->next = *rec_chain;
 		*rec_chain = rec;
 		LINE_MAP(index, ptr) = rec;
@@ -153,7 +153,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
 	bool should_break;
 
 	for (; rec; rec = rec->next) {
-		if (rec->cnt > index->cnt) {
+		if (rec->count > index->count) {
 			if (!index->has_common)
 				index->has_common = CMP(index, 1, rec->ptr, 2, b_ptr);
 			continue;
@@ -170,7 +170,7 @@ static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
 			bs = b_ptr;
 			ae = as;
 			be = bs;
-			rc = rec->cnt;
+			rc = rec->count;
 
 			while (line1 < as && line2 < bs
 				&& CMP(index, 1, as - 1, 2, bs - 1)) {
@@ -189,12 +189,12 @@ static int try_lcs(struct histindex *index, struct region *lcs, size_t b_ptr,
 
 			if (b_next <= be)
 				b_next = be + 1;
-			if (lcs->end1 - lcs->begin1 < ae - as || rc < index->cnt) {
+			if (lcs->end1 - lcs->begin1 < ae - as || rc < index->count) {
 				lcs->begin1 = as;
 				lcs->begin2 = bs;
 				lcs->end1 = ae;
 				lcs->end2 = be;
-				index->cnt = rc;
+				index->count = rc;
 			}
 
 			if (np == 0)
@@ -259,12 +259,12 @@ static int find_lcs(xdfenv_t *env,
 	if (scanA(&index, line1, count1))
 		goto cleanup;
 
-	index.cnt = MAX_CHAIN_LENGTH + 1;
+	index.count = MAX_CHAIN_LENGTH + 1;
 
 	for (b_ptr = line2; b_ptr <= LINE_END(2); )
 		b_ptr = try_lcs(&index, lcs, b_ptr, line1, count1, line2, count2);
 
-	if (index.has_common && MAX_CHAIN_LENGTH < index.cnt)
+	if (index.has_common && MAX_CHAIN_LENGTH < index.count)
 		ret = 1;
 	else
 		ret = 0;
