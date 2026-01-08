@@ -83,7 +83,7 @@ struct region {
 #define TABLE_HASH(side, line, mask) \
 	(MPH(side, line)&mask)
 
-static int scanA(struct histindex *index, xdfenv_t *xe,
+static int scanA(struct histindex *index,
 	struct IVec_usize *mph1,
 	size_t line1, size_t count1
 ) {
@@ -122,8 +122,6 @@ static int scanA(struct histindex *index, xdfenv_t *xe,
 		 * This is the first time we have ever seen this particular
 		 * element in the sequence. Construct a new chain for it.
 		 */
-		if (index->record_storage.capacity == 0)
-			ivec_reserve_exact(&index->record_storage, xe->mph_size);
 		rec = &index->record_storage.ptr[index->record_storage.length++];
 		rec->ptr = ptr;
 		rec->count = 1;
@@ -219,7 +217,7 @@ static inline void free_index(struct histindex *index)
 	ivec_free(&index->next_ptr);
 }
 
-static int histindex_init(struct histindex *index, size_t line1, size_t count1)
+static int histindex_init(struct histindex *index, size_t line1, size_t count1, size_t mph_size)
 {
 	memset(index, 0, sizeof(struct histindex));
 	IVEC_INIT(index->record);
@@ -235,6 +233,8 @@ static int histindex_init(struct histindex *index, size_t line1, size_t count1)
 
 	index->ptr_shift = line1;
 
+	ivec_reserve_exact(&index->record_storage, mph_size);
+
 	return 0;
 }
 
@@ -246,9 +246,9 @@ static int find_lcs(xdfenv_t *env, struct region *lcs,
 	int ret = -1;
 	struct histindex index;
 
-	histindex_init(&index, line1, count1);
+	histindex_init(&index, line1, count1, env->mph_size);
 
-	if (scanA(&index, env, mph1, line1, count1))
+	if (scanA(&index, mph1, line1, count1))
 		goto cleanup;
 
 	index.count = MAX_CHAIN_LENGTH + 1;
