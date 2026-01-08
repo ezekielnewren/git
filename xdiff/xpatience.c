@@ -350,7 +350,7 @@ static int patience_diff(xpparam_t const *xpp, xdfenv_t *env,
 		result = walk_common_sequence(&map, first, mph1, mph2,
 			line1, count1, line2, count2);
 	else
-		result = xdl_fall_back_diff(env, xpp->flags,
+		result = xdl_fall_back_diff(env, xpp->flags, mph1, mph2,
 			line1, count1, line2, count2);
  out:
 	xdl_free(map.entries);

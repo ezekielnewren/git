@@ -47,6 +47,7 @@ int xdl_num_out(char *out, long val);
 int xdl_emit_hunk_hdr(long s1, long c1, long s2, long c2,
 		      const char *func, long funclen, xdemitcb_t *ecb);
 int xdl_fall_back_diff(xdfenv_t *diff_env, uint64_t flags,
+		       struct IVec_usize *mph1, struct IVec_usize *mph2,
 		       size_t line1, size_t count1, size_t line2, size_t count2);
 
 #endif /* #if !defined(XUTILS_H) */

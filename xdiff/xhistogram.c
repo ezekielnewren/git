@@ -294,7 +294,7 @@ redo:
 	if (lcs_found < 0)
 		goto out;
 	else if (lcs_found)
-		result = xdl_fall_back_diff(env, flags, line1, count1, line2, count2);
+		result = xdl_fall_back_diff(env, flags, mph1, mph2, line1, count1, line2, count2);
 	else {
 		if (lcs.begin1 == 0 && lcs.begin2 == 0) {
 			while (count1--)
