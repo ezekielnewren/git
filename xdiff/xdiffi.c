@@ -1020,13 +1020,14 @@ static int group_slide_up(struct IVec_usize *mph, struct IVec_bool *changed, str
  * This also helps in finding joinable change groups and reducing the diff
  * size.
  */
-int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
+int xdl_change_compact(xdfile_t *xdf, struct IVec_bool *changed_lhs,
+		       struct IVec_bool *changed_rhs, uint64_t flags) {
 	struct xdlgroup g, go;
 	long earliest_end, end_matching_other;
 	long groupsize;
 
-	group_init(&xdf->changed, &g);
-	group_init(&xdfo->changed, &go);
+	group_init(changed_lhs, &g);
+	group_init(changed_rhs, &go);
 
 	while (1) {
 		/*
@@ -1052,8 +1053,8 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			end_matching_other = -1;
 
 			/* Shift the group backward as much as possible: */
-			while (!group_slide_up(&xdf->minimal_perfect_hash, &xdf->changed, &g))
-				if (group_previous(&xdfo->changed, &go))
+			while (!group_slide_up(&xdf->minimal_perfect_hash, changed_lhs, &g))
+				if (group_previous(changed_rhs, &go))
 					BUG("group sync broken sliding up");
 
 			/*
@@ -1067,9 +1068,9 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 			/* Now shift the group forward as far as possible: */
 			while (1) {
-				if (group_slide_down(&xdf->minimal_perfect_hash, &xdf->changed, &g))
+				if (group_slide_down(&xdf->minimal_perfect_hash, changed_lhs, &g))
 					break;
-				if (group_next(&xdfo->changed, &go))
+				if (group_next(changed_rhs, &go))
 					BUG("group sync broken sliding down");
 
 				if (go.end > go.start)
@@ -1094,9 +1095,9 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			 * other file that it can align with.
 			 */
 			while (go.end == go.start) {
-				if (group_slide_up(&xdf->minimal_perfect_hash, &xdf->changed, &g))
+				if (group_slide_up(&xdf->minimal_perfect_hash, changed_lhs, &g))
 					BUG("match disappeared");
-				if (group_previous(&xdfo->changed, &go))
+				if (group_previous(changed_rhs, &go))
 					BUG("group sync broken sliding to match");
 			}
 		} else if (flags & XDF_INDENT_HEURISTIC) {
@@ -1137,22 +1138,22 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			}
 
 			while (g.end > best_shift) {
-				if (group_slide_up(&xdf->minimal_perfect_hash, &xdf->changed, &g))
+				if (group_slide_up(&xdf->minimal_perfect_hash, changed_lhs, &g))
 					BUG("best shift unreached");
-				if (group_previous(&xdfo->changed, &go))
+				if (group_previous(changed_rhs, &go))
 					BUG("group sync broken sliding to blank line");
 			}
 		}
 
 	next:
 		/* Move past the just-processed group: */
-		if (group_next(&xdf->changed, &g))
+		if (group_next(changed_lhs, &g))
 			break;
-		if (group_next(&xdfo->changed, &go))
+		if (group_next(changed_rhs, &go))
 			BUG("group sync broken moving to next group");
 	}
 
-	if (!group_next(&xdfo->changed, &go))
+	if (!group_next(changed_rhs, &go))
 		BUG("group sync broken at end of file");
 
 	return 0;
@@ -1281,8 +1282,8 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 
 		return -1;
 	}
-	if (xdl_change_compact(&xe.xdf1, &xe.xdf2, xpp->flags) < 0 ||
-	    xdl_change_compact(&xe.xdf2, &xe.xdf1, xpp->flags) < 0 ||
+	if (xdl_change_compact(&xe.xdf1, &xe.xdf1.changed, &xe.xdf2.changed, xpp->flags) < 0 ||
+	    xdl_change_compact(&xe.xdf2, &xe.xdf2.changed, &xe.xdf1.changed, xpp->flags) < 0 ||
 	    xdl_build_script(&xe.xdf1.changed, &xe.xdf2.changed, &xscr) < 0) {
 
 		xdl_free_env(&xe);

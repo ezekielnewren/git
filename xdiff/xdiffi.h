@@ -46,7 +46,8 @@ int xdl_recs_cmp(struct IVec_usize *mph1, long off1, long lim1, struct IVec_usiz
 int xdl_do_classic_diff(xdfenv_t *xe, struct IVec_usize *mph1, struct IVec_usize *mph2, uint64_t flags);
 int xdl_do_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 		xdfenv_t *xe);
-int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags);
+int xdl_change_compact(xdfile_t *xdf, struct IVec_bool *changed_lhs,
+		       struct IVec_bool *changed_rhs, uint64_t flags);
 int xdl_build_script(struct IVec_bool *changed1, struct IVec_bool *changed2, xdchange_t **xscr);
 void xdl_free_script(xdchange_t *xscr);
 int xdl_emit_diff(xdfenv_t *xe, xdchange_t *xscr, xdemitcb_t *ecb,
