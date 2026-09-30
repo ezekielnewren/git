@@ -172,4 +172,35 @@ static inline void put_be64(void *ptr, uint64_t value)
 	p[7] = (value >>  0) & 0xff;
 }
 
+static inline uint32_t get_le32(const void *ptr)
+{
+	const unsigned char *p = ptr;
+	return	(uint32_t)p[0] <<  0 |
+		(uint32_t)p[1] <<  8 |
+		(uint32_t)p[2] << 16 |
+		(uint32_t)p[3] << 24;
+}
+
+static inline void put_le32(void *ptr, uint32_t value)
+{
+	unsigned char *p = ptr;
+	p[0] = (value >>  0) & 0xff;
+	p[1] = (value >>  8) & 0xff;
+	p[2] = (value >> 16) & 0xff;
+	p[3] = (value >> 24) & 0xff;
+}
+
+static inline void put_le64(void *ptr, uint64_t value)
+{
+	unsigned char *p = ptr;
+	p[0] = (value >>  0) & 0xff;
+	p[1] = (value >>  8) & 0xff;
+	p[2] = (value >> 16) & 0xff;
+	p[3] = (value >> 24) & 0xff;
+	p[4] = (value >> 32) & 0xff;
+	p[5] = (value >> 40) & 0xff;
+	p[6] = (value >> 48) & 0xff;
+	p[7] = (value >> 56) & 0xff;
+}
+
 #endif /* COMPAT_BSWAP_H */
