@@ -1587,6 +1587,7 @@ https_backend = get_option('https_backend')
 sha1_backend = get_option('sha1_backend')
 sha1_unsafe_backend = get_option('sha1_unsafe_backend')
 sha256_backend = get_option('sha256_backend')
+md5_backend = get_option('md5_backend')
 
 security_framework = dependency('Security', required: 'CommonCrypto' in [https_backend, sha1_backend, sha1_unsafe_backend])
 core_foundation_framework = dependency('CoreFoundation', required: security_framework.found())
@@ -1683,6 +1684,9 @@ elif sha256_backend == 'block'
 else
   error('Unhandled SHA256 backend ' + sha256_backend)
 endif
+
+libgit_c_args += '-DMD5_BLK'
+libgit_sources += 'md5/block/md5.c'
 
 # Backends are ordered to reflect our preference for more secure and faster
 # ones over the ones that are less so.
@@ -2386,6 +2390,7 @@ summary({
   'sha1': sha1_backend,
   'sha1_unsafe': sha1_unsafe_backend,
   'sha256': sha256_backend,
+  'md5': md5_backend,
   'zlib': zlib_backend,
 }, section: 'Backends')
 

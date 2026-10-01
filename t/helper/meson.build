@@ -32,6 +32,7 @@ test_tool_sources = [
   'test-json-writer.c',
   'test-lazy-init-name-hash.c',
   'test-match-trees.c',
+  'test-md5.c',
   'test-mergesort.c',
   'test-mktemp.c',
   'test-name-hash.c',

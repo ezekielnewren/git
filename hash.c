@@ -42,6 +42,24 @@ static const struct object_id null_oid_sha256 = {
 	.hash = {0},
 	.algo = GIT_HASH_SHA256,
 };
+static const struct object_id empty_tree_oid_md5 = {
+	.hash = {
+		0xfe, 0x20, 0x56, 0x59, 0xa1, 0x2b, 0x97, 0x65, 0x5d, 0x0a,
+		0x89, 0x87, 0x50, 0xce, 0xaf, 0x96
+	},
+	.algo = GIT_HASH_MD5,
+};
+static const struct object_id empty_blob_oid_md5 = {
+	.hash = {
+		0x80, 0xff, 0xc6, 0xeb, 0x72, 0x86, 0xb1, 0x5a, 0xfc, 0x63,
+		0xf9, 0xb8, 0x61, 0x79, 0xcc, 0xb1
+	},
+	.algo = GIT_HASH_MD5,
+};
+static const struct object_id null_oid_md5 = {
+	.hash = {0},
+	.algo = GIT_HASH_MD5,
+};
 
 static void git_hash_sha1_init(struct git_hash_ctx *ctx)
 {
@@ -150,6 +168,46 @@ static void git_hash_sha256_discard(struct git_hash_ctx *ctx)
 	git_SHA256_Discard(&ctx->state.sha256);
 }
 
+
+static void git_hash_md5_init(struct git_hash_ctx *ctx)
+{
+	ctx->algop = unsafe_hash_algo(&hash_algos[GIT_HASH_MD5]);
+	git_MD5_Init(&ctx->state.md5);
+}
+
+static void git_hash_md5_clone(struct git_hash_ctx *dst, const struct git_hash_ctx *src)
+{
+	dst->algop = src->algop;
+	git_MD5_Clone(&dst->state.md5, &src->state.md5);
+}
+
+static void git_hash_md5_update(struct git_hash_ctx *ctx, const void *data, size_t len)
+{
+	git_MD5_Update(&ctx->state.md5, data, len);
+}
+
+static void git_hash_md5_final(unsigned char *hash, struct git_hash_ctx *ctx)
+{
+	git_MD5_Final(hash, &ctx->state.md5);
+}
+
+static void git_hash_md5_final_oid(struct object_id *oid, struct git_hash_ctx *ctx)
+{
+	git_MD5_Final(oid->hash, &ctx->state.md5);
+	/*
+	 * This currently does nothing, so the compiler should optimize it out,
+	 * but keep it in case we extend the hash size again.
+	 */
+	memset(oid->hash + GIT_MD5_RAWSZ, 0, GIT_MAX_RAWSZ - GIT_MD5_RAWSZ);
+	oid->algo = GIT_HASH_MD5;
+}
+
+static void git_hash_md5_discard(struct git_hash_ctx *ctx)
+{
+	git_MD5_Discard(&ctx->state.md5);
+}
+
+
 static void git_hash_unknown_init(struct git_hash_ctx *ctx UNUSED)
 {
 	BUG("trying to init unknown hash");
@@ -251,6 +309,22 @@ const struct git_hash_algo hash_algos[GIT_HASH_NALGOS] = {
 		.empty_tree = &empty_tree_oid_sha256,
 		.empty_blob = &empty_blob_oid_sha256,
 		.null_oid = &null_oid_sha256,
+	},
+	{
+		.name = "md5",
+		.format_id = GIT_MD5_FORMAT_ID,
+		.rawsz = GIT_MD5_RAWSZ,
+		.hexsz = GIT_MD5_HEXSZ,
+		.blksz = GIT_MD5_BLKSZ,
+		.init_fn = git_hash_md5_init,
+		.clone_fn = git_hash_md5_clone,
+		.update_fn = git_hash_md5_update,
+		.final_fn = git_hash_md5_final,
+		.final_oid_fn = git_hash_md5_final_oid,
+		.discard_fn = git_hash_md5_discard,
+		.empty_tree = &empty_tree_oid_md5,
+		.empty_blob = &empty_blob_oid_md5,
+		.null_oid = &null_oid_md5,
 	}
 };
 

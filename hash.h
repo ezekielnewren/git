@@ -72,6 +72,9 @@
 #include "sha256/block/sha256.h"
 #endif
 
+#define MD5_BACKEND "MD5_BLK"
+#include "md5/block/md5.h"
+
 #ifndef platform_SHA_CTX
 /*
  * platform's underlying implementation of SHA-1; could be OpenSSL,
@@ -142,6 +145,17 @@
 #define git_SHA1_Update		git_SHA1_Update_Chunked
 #endif
 
+#define git_MD5_CTX		platform_MD5_CTX
+#define git_MD5_Init		platform_MD5_Init
+#define git_MD5_Update		platform_MD5_Update
+#define git_MD5_Final		platform_MD5_Final
+
+#ifdef platform_MD5_Clone
+#define git_MD5_Clone	platform_MD5_Clone
+#define git_MD5_Discard	platform_MD5_Discard
+#endif
+
+
 #ifndef SHA1_NEEDS_CLONE_HELPER
 static inline void git_SHA1_Clone(git_SHA_CTX *dst, const git_SHA_CTX *src)
 {
@@ -175,6 +189,17 @@ static inline void git_SHA256_Discard(git_SHA256_CTX *ctx UNUSED)
 }
 #endif
 
+#ifndef MD5_NEEDS_CLONE_HELPER
+static inline void git_MD5_Clone(git_MD5_CTX *dst, const git_MD5_CTX *src)
+{
+	memcpy(dst, src, sizeof(*dst));
+}
+static inline void git_MD5_Discard(git_MD5_CTX *ctx UNUSED)
+{
+	/* noop */
+}
+#endif
+
 /*
  * Note that these constants are suitable for indexing the hash_algos array and
  * comparing against each other, but are otherwise arbitrary, so they should not
@@ -189,8 +214,9 @@ static inline void git_SHA256_Discard(git_SHA256_CTX *ctx UNUSED)
 #define GIT_HASH_SHA1 1
 /* SHA-256  */
 #define GIT_HASH_SHA256 2
+#define GIT_HASH_MD5 3
 /* Number of algorithms supported (including unknown). */
-#define GIT_HASH_NALGOS (GIT_HASH_SHA256 + 1)
+#define GIT_HASH_NALGOS (GIT_HASH_MD5 + 1)
 
 /* Default hash algorithm if unspecified. */
 #ifdef WITH_BREAKING_CHANGES
@@ -219,6 +245,16 @@ static inline void git_SHA256_Discard(git_SHA256_CTX *ctx UNUSED)
 #define GIT_SHA256_HEXSZ (2 * GIT_SHA256_RAWSZ)
 /* The block size of SHA-256. */
 #define GIT_SHA256_BLKSZ 64
+
+
+/* "md5 ", big-endian */
+#define GIT_MD5_FORMAT_ID 0x6d643520
+
+/* The length in bytes and in hex digits of an object name (MD5 value). */
+#define GIT_MD5_RAWSZ 16
+#define GIT_MD5_HEXSZ (2 * GIT_MD5_RAWSZ)
+/* The block size of MD5. */
+#define GIT_MD5_BLKSZ 64
 
 /* The length in byte and in hex digits of the largest possible hash value. */
 #define GIT_MAX_RAWSZ GIT_SHA256_RAWSZ
@@ -280,6 +316,7 @@ struct git_hash_ctx {
 		git_SHA_CTX sha1;
 		git_SHA_CTX_unsafe sha1_unsafe;
 		git_SHA256_CTX sha256;
+		git_MD5_CTX md5;
 	} state;
 	bool active;
 };

@@ -51,7 +51,7 @@ foreach header : headers_to_check
 endforeach
 
 coccinelle_includes = []
-foreach path : ['compat', 'ewah', 'refs', 'sha256', 'trace2', 'win32', 'xdiff']
+foreach path : ['compat', 'ewah', 'md5', 'refs', 'sha256', 'trace2', 'win32', 'xdiff']
   coccinelle_includes += ['-I', meson.project_source_root() / path]
 endforeach
 
